@@ -1,4 +1,4 @@
-! $Id: code_timer_module.F90 8106 2016-05-17 23:29:01Z raut@uwm.edu $
+! $Id$
 module code_timer_module
 
 ! Description:

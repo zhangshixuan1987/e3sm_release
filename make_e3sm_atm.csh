@@ -13,7 +13,7 @@ set run_model     = 1   # 0 = No, >0 = Yes
 # here: 
 #    https://kaizhangpnl.github.io/start.html#quick-start-guide
 ####################################################################
-setenv CCSMTAG CLUBB_SILHS_L72_debug_wlin_script_settings_14mo
+setenv CCSMTAG CLUBB_SILHS
 setenv CCSMROOT $PWD
 
 ####################################################################
@@ -149,56 +149,6 @@ cd $CASEROOT
 ./xmlchange  -file env_run.xml  -id  REST_N          -val '14'
 ./xmlchange  -file env_run.xml  -id  REST_OPTION     -val 'nmonths'
 ./xmlchange  -file env_run.xml  -id  DOUT_S          -val 'FALSE'
-
-#cat <<EOF >! user_nl_cam
-#&camexp
-#!!inithist = 'DAILY'
-#nhtfrq  = 0,-3 !!,-3
-#mfilt   = 1,1   !!,1
-#fincl2  = 'PS',
-#          'U',
-#          'V',
-#          'T',
-#          'Q',
-#          'QFLX',
-#          'PRECC',
-#          'PRECL',
-#          'PRECSC',
-#          'PRECSL',
-#          'LHFLX',
-#          'SHFLX',
-#          'FLNT',
-#          'FSNT',
-#          'FLNS',
-#          'FSNS',
-#          'SST',
-#          'TS',
-#avgflag_pertape(2) = 'A'
-#state_debug_checks=.true.
-#use_gw_convect = .false.
-#use_gw_front   = .false.
-#ice_supersat = .true.
-#macrop_scheme = 'CLUBB_SGS'
-#eddy_scheme = 'CLUBB_SGS'
-#shallow_scheme = 'CLUBB_SGS'
-#deep_scheme = 'off'
-#subcol_scheme = 'SILHS'
-#use_subcol_microp = .true.
-#microp_uniform = .true.
-#clubb_do_adv = .false.
-#clubb_expldiff = .false.
-#clubb_rainevap_turb = .false.
-#clubb_cloudtop_cooling = .false.
-#subcol_SILHS_weight = .true.
-#subcol_SILHS_numsubcol = 8
-#subcol_SILHS_corr_file_name = 'arm_97'
-#subcol_silhs_q_to_micro = .true. ! if .false. gridbox means are used instead of sample points
-#subcol_silhs_n_to_micro = .true. ! if .false. gridbox means are used instead of sample points
-#subcol_silhs_use_clear_col = .false.
-#subcol_SILHS_constrainmn = .false.
-#subcol_silhs_ncnp2_on_ncnm2 = 0.05,
-#/
-#EOF
 
 # A list of CLUBB variables
 #clubb_vars_zt_list="'thlm', 'thvm', 'rtm', 'rcm', 'rvm', 'um', 'vm', 'um_ref','vm_ref','ug', 'vg', 'cloud_frac', 'cloud_cover', 'rcm_in_layer', 'rcm_in_cloud', 'p_in_Pa', 'exner', 'rho_ds_zt', 'thv_ds_zt', 'Lscale', 'Lscale_pert_1', 'Lscale_pert_2', 'T_in_K', 'rel_humidity', 'wp3', 'wpthlp2', 'wp2thlp', 'wprtp2', 'wp2rtp', 'Lscale_up', 'Lscale_down', 'tau_zt', 'Kh_zt', 'wp2thvp', 'wp2rcp', 'wprtpthlp', 'sigma_sqd_w_zt', 'rho', 'radht', 'radht_LW', 'radht_SW', 'Ncm', 'Nc_in_cloud', 'Nc_activated', 'snowslope', 'sed_rcm', 'rsat', 'rsati', 'diam', 'mass_ice_cryst', 'rcm_icedfs', 'u_T_cm', 'rtm_bt', 'rtm_ma', 'rtm_ta', 'rtm_mfl', 'rtm_tacl', 'rtm_cl', 'rtm_forcing', 'rtm_sdmp','rtm_mc', 'rtm_pd', 'rvm_mc', 'rcm_mc', 'rcm_sd_mg_morr', 'thlm_bt', 'thlm_ma', 'thlm_ta', 'thlm_mfl', 'thlm_tacl', 'thlm_cl', 'thlm_forcing', 'thlm_sdmp','thlm_mc', 'thlm_old', 'thlm_without_ta', 'thlm_mfl_min', 'thlm_mfl_max', 'thlm_enter_mfl', 'thlm_exit_mfl', 'rtm_old', 'rtm_without_ta', 'rtm_mfl_min', 'rtm_mfl_max', 'rtm_enter_mfl', 'rtm_exit_mfl', 'um_bt', 'um_ma', 'um_gf', 'um_cf', 'um_ta', 'um_f', 'um_sdmp', 'um_ndg', 'vm_bt', 'vm_ma', 'vm_gf', 'vm_cf', 'vm_ta', 'vm_f', 'vm_sdmp', 'vm_ndg', 'wp3_bt', 'wp3_ma', 'wp3_ta', 'wp3_tp', 'wp3_ac', 'wp3_bp1', 'wp3_bp2', 'wp3_pr1', 'wp3_pr2', 'wp3_dp1', 'wp3_cl', 'mixt_frac', 'w_1', 'w_2', 'varnce_w_1', 'varnce_w_2', 'thl_1', 'thl_2', 'varnce_thl_1', 'varnce_thl_2', 'rt_1', 'rt_2', 'varnce_rt_1', 'varnce_rt_2', 'rc_1', 'rc_2', 'rsatl_1', 'rsatl_2', 'cloud_frac_1', 'cloud_frac_2', 'a3_coef_zt', 'wp3_on_wp2_zt', 'chi_1', 'chi_2', 'stdev_chi_1', 'stdev_chi_2', 'stdev_eta_1', 'stdev_eta_2', 'covar_chi_eta_1', 'covar_chi_eta_2', 'corr_chi_eta_1', 'corr_chi_eta_2', 'rrtthl', 'crt_1', 'crt_2', 'cthl_1', 'cthl_2', 'precip_frac', 'precip_frac_1', 'precip_frac_2', 'Ncnm', 'wp2_zt', 'thlp2_zt', 'wpthlp_zt', 'wprtp_zt', 'rtp2_zt', 'rtpthlp_zt', 'up2_zt', 'vp2_zt', 'upwp_zt', 'vpwp_zt', 'C11_Skw_fnc'"

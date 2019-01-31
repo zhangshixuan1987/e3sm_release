@@ -2742,34 +2742,64 @@ Whether to use a clear-air only column to ensure consistant subcolumn cloud frac
 Prescribed in-cloud ratio [N_cn'^2] / [N_cn]^2 [no units]
 </entry>
 
-<entry id="hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip" type="real" category="conv"
+<entry id="hmp2_ip_on_hmm2_ip_slope%rr" type="real" category="conv"
        group="subcol_silhs_nl" valid_values="" >
-Prescribed in-cloud ratio [r_r'^2] / [r_r]^2   [no units]
+Slope for prescribed in-cloud ratio [r_r'^2] / [r_r]^2   [no units]
 </entry>
 
-<entry id="hmp2_ip_on_hmm2_ip_ratios%nrp2_ip_on_nrm2_ip" type="real" category="conv"
+<entry id="hmp2_ip_on_hmm2_ip_slope%Nr" type="real" category="conv"
        group="subcol_silhs_nl" valid_values="" >
-Prescribed in-cloud ratio [N_r'^2] / [N_r]^2   [no units]
+Slope for prescribed in-cloud ratio [N_r'^2] / [N_r]^2   [no units]
 </entry>
 
-<entry id="hmp2_ip_on_hmm2_ip_ratios%rsp2_ip_on_rsm2_ip" type="real" category="conv"
+<entry id="hmp2_ip_on_hmm2_ip_slope%rs" type="real" category="conv"
        group="subcol_silhs_nl" valid_values="" >
-Prescribed in-cloud ratio [r_s'^2] / [r_s]^2   [no units]
+Slope for prescribed in-cloud ratio [r_s'^2] / [r_s]^2   [no units]
 </entry>
 
-<entry id="hmp2_ip_on_hmm2_ip_ratios%nsp2_ip_on_nsm2_ip" type="real" category="conv"
+<entry id="hmp2_ip_on_hmm2_ip_slope%Ns" type="real" category="conv"
        group="subcol_silhs_nl" valid_values="" >
-Prescribed in-cloud ratio [N_s'^2] / [N_s]^2   [no units]
+Slope for prescribed in-cloud ratio [N_s'^2] / [N_s]^2   [no units]
 </entry>
 
-<entry id="hmp2_ip_on_hmm2_ip_ratios%rip2_ip_on_rim2_ip" type="real" category="conv"
+<entry id="hmp2_ip_on_hmm2_ip_slope%ri" type="real" category="conv"
        group="subcol_silhs_nl" valid_values="" >
-       Prescribed in-cloud ratio [r_i'^2] / [r_i]^2   [no units]
+Slope for prescribed in-cloud ratio [r_i'^2] / [r_i]^2   [no units]
 </entry>
 
-<entry id="hmp2_ip_on_hmm2_ip_ratios%nip2_ip_on_nim2_ip" type="real" category="conv"
+<entry id="hmp2_ip_on_hmm2_ip_slope%Ni" type="real" category="conv"
        group="subcol_silhs_nl" valid_values="" >
-Prescribed in-cloud ratio [N_i'^2] / [N_i]^2   [no units]
+Slope for prescribed in-cloud ratio [N_i'^2] / [N_i]^2   [no units]
+</entry>
+
+<entry id="hmp2_ip_on_hmm2_ip_intrcpt%rr" type="real" category="conv"
+       group="subcol_silhs_nl" valid_values="" >
+Intercept for prescribed in-cloud ratio [r_r'^2] / [r_r]^2   [no units]
+</entry>
+
+<entry id="hmp2_ip_on_hmm2_ip_intrcpt%Nr" type="real" category="conv"
+       group="subcol_silhs_nl" valid_values="" >
+Intercept for prescribed in-cloud ratio [N_r'^2] / [N_r]^2   [no units]
+</entry>
+
+<entry id="hmp2_ip_on_hmm2_ip_intrcpt%rs" type="real" category="conv"
+       group="subcol_silhs_nl" valid_values="" >
+Intercept for prescribed in-cloud ratio [r_s'^2] / [r_s]^2   [no units]
+</entry>
+
+<entry id="hmp2_ip_on_hmm2_ip_intrcpt%Ns" type="real" category="conv"
+       group="subcol_silhs_nl" valid_values="" >
+Intercept for prescribed in-cloud ratio [N_s'^2] / [N_s]^2   [no units]
+</entry>
+
+<entry id="hmp2_ip_on_hmm2_ip_intrcpt%ri" type="real" category="conv"
+       group="subcol_silhs_nl" valid_values="" >
+Intercept for prescribed in-cloud ratio [r_i'^2] / [r_i]^2   [no units]
+</entry>
+
+<entry id="hmp2_ip_on_hmm2_ip_intrcpt%Ni" type="real" category="conv"
+       group="subcol_silhs_nl" valid_values="" >
+Intercept for prescribed in-cloud ratio [N_i'^2] / [N_i]^2   [no units]
 </entry>
 
 <entry id="subcol_silhs_c6rt" type="real" category="conv"

@@ -266,11 +266,11 @@ contains
 
                                          l_diagnose_correlations, &
                                          l_calc_w_corr, l_use_cloud_cover, &
-                                         l_fix_chi_eta_correlations, l_const_Nc_in_cloud, &
+                                         l_fix_w_chi_eta_correlations, l_const_Nc_in_cloud, &
 
                                          pdf_dim, &
                                          setup_corr_varnce_array_api, &
-                                         setup_pdf_indices_api, &
+                                         init_pdf_hydromet_arrays_api, &
 
                                          hydromet_list, hydromet_tol, &
                                          hmp2_ip_on_hmm2_ip, &
@@ -295,6 +295,10 @@ contains
             below_file_ext  = "_corr_array_below.in"
       character(len=256) :: corr_file_path_cloud, corr_file_path_below
 
+      real(r8), parameter :: &
+        host_dx = 100000._r8, &           ! Host model deltax [m]
+        host_dy = 100000._r8              ! Host model deltay [m]
+
       ! Set CLUBB's debug level
       ! This is called in module clubb_intr; no need to do it here.
 !      call set_clubb_debug_level_api( 0 )
@@ -303,7 +307,7 @@ contains
       ! CLUBB-SILHS Parameters (global module variables)
       !-------------------------------
 
-      l_fix_chi_eta_correlations = .true.
+      l_fix_w_chi_eta_correlations = .true.
       l_lh_importance_sampling = .true.
       l_diagnose_correlations = .false.
       l_calc_w_corr = .false.
@@ -359,78 +363,6 @@ contains
 
       hydromet_dim = 6
 
- 
-      allocate( hydromet_list(hydromet_dim) )
-      allocate( hydromet_tol(hydromet_dim) )
-      allocate( l_mix_rat_hm(hydromet_dim) )
-      allocate( l_frozen_hm(hydromet_dim) )
-      allocate( hmp2_ip_on_hmm2_ip(hydromet_dim) )
-
-      if ( iirr > 0 ) then
-         ! The microphysics scheme predicts rain water mixing ratio, rr.
-         hydromet_list(iirr) = "rrm"
-         l_mix_rat_hm(iirr)  = .true.
-         l_frozen_hm(iirr)   = .false.
-         hydromet_tol(iirr)  = rr_tol
-         hmp2_ip_on_hmm2_ip(iirr) = hmp2_ip_on_hmm2_ip_intrcpt%rr
-      endif
-      if ( iiri > 0 ) then
-         ! The microphysics scheme predicts ice mixing ratio, ri.
-         hydromet_list(iiri) = "rim"
-         l_mix_rat_hm(iiri)  = .true.
-         l_frozen_hm(iiri)   = .true.
-         hydromet_tol(iiri)  = ri_tol
-         hmp2_ip_on_hmm2_ip(iiri) = hmp2_ip_on_hmm2_ip_intrcpt%ri
-      endif
-      if ( iirs > 0 ) then
-         ! The microphysics scheme predicts snow mixing ratio, rs.
-         hydromet_list(iirs) = "rsm"
-         l_mix_rat_hm(iirs)  = .true.
-         l_frozen_hm(iirs)   = .true.
-         hydromet_tol(iirs)  = rs_tol
-         hmp2_ip_on_hmm2_ip(iirs) = hmp2_ip_on_hmm2_ip_intrcpt%rs
-      endif
-      if ( iirg > 0 ) then
-         ! The microphysics scheme predicts graupel mixing ratio, rg.
-         hydromet_list(iirg) = "rgm"
-         l_mix_rat_hm(iirg)  = .true.
-         l_frozen_hm(iirg)   = .true.
-         hydromet_tol(iirg)  = rg_tol
-         hmp2_ip_on_hmm2_ip(iirg) = hmp2_ip_on_hmm2_ip_intrcpt%rg
-      endif
-      if ( iiNr > 0 ) then
-         ! The microphysics scheme predicts rain drop concentration, Nr.
-         hydromet_list(iiNr) = "Nrm"
-         l_frozen_hm(iiNr)   = .false.
-         l_mix_rat_hm(iiNr)  = .false.
-         hydromet_tol(iiNr)  = Nr_tol
-         hmp2_ip_on_hmm2_ip(iiNr) = hmp2_ip_on_hmm2_ip_intrcpt%Nr
-      endif
-      if ( iiNi > 0 ) then
-         ! The microphysics scheme predicts ice concentration, Ni.
-         hydromet_list(iiNi) = "Nim"
-         l_mix_rat_hm(iiNi)  = .false.
-         l_frozen_hm(iiNi)   = .true.
-         hydromet_tol(iiNi)  = Ni_tol
-         hmp2_ip_on_hmm2_ip(iiNi) = hmp2_ip_on_hmm2_ip_intrcpt%Ni
-      endif
-      if ( iiNs > 0 ) then
-         ! The microphysics scheme predicts snowflake concentration, Ns.
-         hydromet_list(iiNs) = "Nsm"
-         l_mix_rat_hm(iiNs)  = .false.
-         l_frozen_hm(iiNs)   = .true.
-         hydromet_tol(iiNs)  = Ns_tol
-         hmp2_ip_on_hmm2_ip(iiNs) = hmp2_ip_on_hmm2_ip_intrcpt%Ns
-      endif
-      if ( iiNg > 0 ) then
-         ! The microphysics scheme predicts graupel concentration, Ng.
-         hydromet_list(iiNg) = "Ngm"
-         l_mix_rat_hm(iiNg)  = .false.
-         l_frozen_hm(iiNg)   = .true.
-         hydromet_tol(iiNg)  = Ng_tol
-         hmp2_ip_on_hmm2_ip(iiNg) = hmp2_ip_on_hmm2_ip_intrcpt%Ng
-      endif
-
       Ncnp2_on_Ncnm2 = subcol_SILHS_ncnp2_on_ncnm2
 
       !-------------------------------
@@ -441,9 +373,11 @@ contains
 
       iunit = getunit()
 
-
-      call setup_pdf_indices_api( hydromet_dim, iirr, iiNr, iiri, &
-                              iiNi, iirs, iiNs, iirg, iiNg )
+      call init_pdf_hydromet_arrays_api( host_dx, host_dy, hydromet_dim, & ! In
+                                         iirr, iiri, iirs, iirg,         & ! In
+                                         iiNr, iiNi, iiNs, iiNg,         & ! In
+                                         hmp2_ip_on_hmm2_ip_slope,       & ! In
+                                         hmp2_ip_on_hmm2_ip_intrcpt      ) ! In
       call setup_corr_varnce_array_api( corr_file_path_cloud, corr_file_path_below, &
                                     iunit )
       call freeunit(iunit) 
@@ -1499,7 +1433,10 @@ contains
 
      use physics_buffer,          only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
      use subcol_utils,            only: subcol_unpack, subcol_get_nsubcol, subcol_get_weight
-     use clubb_api_module,        only: T_in_K2thlm_api
+     use clubb_api_module,        only: T_in_K2thlm_api, &
+                                        pdf_parameter, &
+                                        unpack_pdf_params_api, &
+                                        num_pdf_params
      use silhs_api_module,        only: lh_microphys_var_covar_driver_api
 
      implicit none
@@ -1537,9 +1474,15 @@ contains
      ! Inputs to lh_microphys_var_covar_driver
      real(r8), dimension(pcols,pverp,psubcols) :: rt_all_clubb, thl_all_clubb, w_all_clubb, &
                                                   qctend_clubb, qvtend_clubb, thltend_clubb
+
+      type(pdf_parameter), dimension(pverp) :: pdf_params     ! PDF parameters
+      real(r8), dimension(pverp, num_pdf_params) :: pdf_params_packed
+
      ! Outputs from lh_microphys_var_covar_driver
      real(r8), dimension(:,:), pointer :: rtp2_mc_zt, thlp2_mc_zt, wprtp_mc_zt, &
                                           wpthlp_mc_zt, rtpthlp_mc_zt
+
+     real(r8), pointer, dimension(:,:,:) :: pdf_params_ptr  ! Packed PDF_Params
 
      ! pbuf indices
      integer :: &
@@ -1572,6 +1515,9 @@ contains
      call pbuf_get_field(pbuf, wprtp_mc_zt_idx, wprtp_mc_zt)
      call pbuf_get_field(pbuf, wpthlp_mc_zt_idx, wpthlp_mc_zt)
      call pbuf_get_field(pbuf, rtpthlp_mc_zt_idx, rtpthlp_mc_zt)
+
+     ! Obtain pbuf fields for input
+     call pbuf_get_field(pbuf, pdf_params_idx, pdf_params_ptr)
 
      ! Unpack needed tendencies from subcolumn ptends
      call subcol_unpack(lchnk, ptend_sc%s(:,:), stend, fillvalue)
@@ -1645,13 +1591,17 @@ contains
      ! Call lh_microphys_var_covar_driver for each column
      do igrdcol=1, ngrdcol
        ns = nsubcol(igrdcol)
+       call unpack_pdf_params_api(pdf_params_ptr(igrdcol,:,:), pverp, pdf_params)
        ! Make the call!!!!!
        call lh_microphys_var_covar_driver_api &
-            ( pverp, ns, ztodt, weights(igrdcol,1:ns), &
-              rt_all_clubb(igrdcol,:,1:ns), thl_all_clubb(igrdcol,:,1:ns), w_all_clubb(igrdcol,:,1:ns), &
-              qctend_clubb(igrdcol,:,1:ns), qvtend_clubb(igrdcol,:,1:ns), thltend_clubb(igrdcol,:,1:ns), &
-              rtp2_mc_zt(igrdcol,:), thlp2_mc_zt(igrdcol,:), wprtp_mc_zt(igrdcol,:), &
-              wpthlp_mc_zt(igrdcol,:), rtpthlp_mc_zt(igrdcol,:) )
+            ( pverp, ns, ztodt, weights(igrdcol,1:ns), & ! In
+              pdf_params, rt_all_clubb(igrdcol,:,1:ns), & ! In
+              thl_all_clubb(igrdcol,:,1:ns), w_all_clubb(igrdcol,:,1:ns), & ! In
+              qctend_clubb(igrdcol,:,1:ns), qvtend_clubb(igrdcol,:,1:ns), & ! In
+              thltend_clubb(igrdcol,:,1:ns), & ! In
+              rtp2_mc_zt(igrdcol,:), thlp2_mc_zt(igrdcol,:), & ! Out
+              wprtp_mc_zt(igrdcol,:), wpthlp_mc_zt(igrdcol,:), & ! Out
+              rtpthlp_mc_zt(igrdcol,:) ) ! Out
      end do ! igrdcol=1, ngrdcol
 
      return

@@ -113,9 +113,10 @@ module clubb_intr
 
 !  Constant parameters
   logical, parameter, private :: &
-    l_uv_nudge       = .false.,       &  ! Use u/v nudging (not used)
-    l_implemented    = .true.,        &  ! Implemented in a host model (always true)
-    l_host_applies_sfc_fluxes = .false.  ! Whether the host model applies the surface fluxes
+    l_uv_nudge       = .false.,          & ! Use u/v nudging (not used)
+    l_implemented    = .true.,           & ! Implemented in a host model (always true)
+    l_host_applies_sfc_fluxes = .false., & ! Whether the host model applies the surface fluxes
+    l_input_fields   = .false.             ! Uses input fields (always false)
     
   logical            :: do_tms
   logical            :: lq(pcnst)
@@ -151,6 +152,10 @@ module clubb_intr
     rtm_idx, &          ! mean total water mixing ratio
     um_idx, &           ! mean of east-west wind
     vm_idx, &           ! mean of north-south wind
+    wpthvp_idx, &       ! < w'th_v' >
+    wp2thvp_idx, &      ! < w'^2 th_v' >
+    rtpthvp_idx, &      ! < r_t'th_v' >
+    thlpthvp_idx, &     ! < th_l'th_v' >
     cld_idx, &          ! Cloud fraction
     concld_idx, &       ! Convective cloud fraction
     ast_idx, &          ! Stratiform cloud fraction
@@ -177,8 +182,10 @@ module clubb_intr
     radf_idx, &         !
     ice_supersat_idx, & ! ice cloud fraction for SILHS
     num_subcols_idx, &  ! number of subcolumns or samples for SILHS
-    pdf_params_idx, &   ! pdf parameters for SILHS
-    rcm_idx, &          ! Cloud water mixing ratio for SILHS
+    pdf_params_idx, &   ! PDF parameters
+    pdf_params_zm_idx, & ! PDF parameters on momentum levels
+    rcm_idx, &          ! Cloud water mixing ratio
+    cloud_frac_idx, &   ! Cloud fraction
     ztodt_idx           ! physics timestep for SILHS
 
   ! Indices for microphysical covariance tendencies
@@ -312,11 +319,18 @@ module clubb_intr
     call pbuf_add_field('UM',         'global', dtype_r8, (/pcols,pverp,dyn_time_lvls/), um_idx)
     call pbuf_add_field('VM',         'global', dtype_r8, (/pcols,pverp,dyn_time_lvls/), vm_idx)
 
-    call pbuf_add_field('ISS_FRAC',   'global', dtype_r8, (/pcols,pverp/), ice_supersat_idx)
-    call pbuf_add_field('PDF_PARAMS', 'global', dtype_r8, (/pcols,pverp,num_pdf_params/), pdf_params_idx)
-    call pbuf_add_field('RCM',        'global', dtype_r8, (/pcols,pverp/), rcm_idx)
-    call pbuf_add_field('ZTODT',      'global', dtype_r8, (/pcols/),       ztodt_idx)
-    call pbuf_add_field('num_subcols','global', dtype_r8, (/pcols/),       num_subcols_idx)
+    call pbuf_add_field('WPTHVP',     'global', dtype_r8, (/pcols,pverp/), wpthvp_idx)
+    call pbuf_add_field('WP2THVP',    'global', dtype_r8, (/pcols,pverp/), wp2thvp_idx)
+    call pbuf_add_field('RTPTHVP',    'global', dtype_r8, (/pcols,pverp/), rtpthvp_idx)
+    call pbuf_add_field('THLPTHVP',   'global', dtype_r8, (/pcols,pverp/), thlpthvp_idx)
+
+    call pbuf_add_field('ISS_FRAC',      'global', dtype_r8, (/pcols,pverp/), ice_supersat_idx)
+    call pbuf_add_field('PDF_PARAMS',    'global', dtype_r8, (/pcols,pverp,num_pdf_params/), pdf_params_idx)
+    call pbuf_add_field('PDF_PARAMS_ZM', 'global', dtype_r8, (/pcols,pverp,num_pdf_params/), pdf_params_zm_idx)
+    call pbuf_add_field('RCM',           'global', dtype_r8, (/pcols,pverp/), rcm_idx)
+    call pbuf_add_field('CLOUD_FRAC',    'global', dtype_r8, (/pcols,pverp/), cloud_frac_idx)
+    call pbuf_add_field('ZTODT',         'global', dtype_r8, (/pcols/),       ztodt_idx)
+    call pbuf_add_field('num_subcols',   'global', dtype_r8, (/pcols/),       num_subcols_idx)
 
     ! For SILHS microphysical covariance contributions
     call pbuf_add_field('rtp2_mc_zt', 'global', dtype_r8, (/pcols,pverp/), rtp2_mc_zt_idx)
@@ -572,7 +586,7 @@ end subroutine clubb_init_cnst
                                 imult_coef, ic_K10, l_stability_correct_tau_zm, &
                                 iC8, iC11, iC11b, iC4, iC14, iup2_vp2_factor, &
                                 l_use_C7_Richardson, l_use_C11_Richardson, l_brunt_vaisala_freq_moist, &
-                                l_use_thvm_in_bv_freq, l_rcm_supersat_adj
+                                l_use_thvm_in_bv_freq, l_rcm_supersat_adj, l_do_expldiff_rtm_thlm
 
     use units,                     only: getunit, freeunit
     use error_messages,            only: handle_errmsg
@@ -611,7 +625,7 @@ end subroutine clubb_init_cnst
 
     character(len=128) :: errstring             ! error status for CLUBB init
 
-    integer :: err_code, iunit                  ! Code for when CLUBB fails
+    integer :: err_code, iunit
     integer :: i, j, k, l                       ! Indices
     integer :: read_status                      ! Length of a string
     integer :: ntop_eddy                        ! Top    interface level to which eddy vertical diffusion is applied ( = 1 )
@@ -634,6 +648,7 @@ end subroutine clubb_init_cnst
 
 
     !----- Begin Code -----
+    l_do_expldiff_rtm_thlm = do_expldiff
 
     ! ----------------------------------------------------------------- !
     ! Determine how many constituents CLUBB will transport.  Note that  
@@ -820,6 +835,7 @@ end subroutine clubb_init_cnst
            sclr_tol, edsclr_dim, clubb_params, &                      ! In
            l_host_applies_sfc_fluxes, &                               ! In
            l_uv_nudge, saturation_equation,  &                        ! In
+           l_input_fields, &                                          ! In
            l_implemented, grid_type, zi_g(2), zi_g(1), zi_g(pverp), & ! In
            zi_g(1:pverp), zt_g(1:pverp), zi_g(1), &                   ! In
            err_code )
@@ -1107,6 +1123,7 @@ end subroutine clubb_init_cnst
                                         l_stats, stats_tsamp, stats_tout, stats_zt, &
                                         stats_sfc, stats_zm, stats_rad_zt, stats_rad_zm, l_output_rad_files, &
                                         pdf_parameter, num_pdf_params, &  ! Type, dimension
+                                        unpack_pdf_params_api, & ! convert array to type
                                         pack_pdf_params_api, & ! convert type to 2d real array
                                         stats_begin_timestep_api, &
                                         hydromet_dim, calculate_thlp2_rad_api, mu, update_xp2_mc_api, &
@@ -1161,7 +1178,7 @@ end subroutine clubb_init_cnst
    integer :: ixcldice, ixcldliq, ixnumliq, ixnumice, ixq
    integer :: itim_old
    integer :: ncol, lchnk                       ! # of columns, and chunk identifier
-   integer :: err_code                          ! Diagnostic, for if some calculation goes amiss.
+   integer :: err_code
    integer :: begin_height, end_height
    integer :: icnt, clubbtop
    
@@ -1185,6 +1202,10 @@ end subroutine clubb_init_cnst
    real(r8) :: rtpthlp_in(pverp)                ! covariance of thetal and qt                  [kg/kg K]
    real(r8) :: rtp2_in(pverp)                   ! total water variance                         [kg^2/k^2]
    real(r8) :: thlp2_in(pverp)                  ! thetal variance                              [K^2]
+   real(r8) :: wpthvp_inout(pverp)              ! < w'th_v' > (momentum levels)                [m/s K]
+   real(r8) :: wp2thvp_inout(pverp)             ! < w'^2 th_v' > (thermodynamic levels)        [m^2/s^2 K]
+   real(r8) :: rtpthvp_inout(pverp)             ! < r_t'th_v' > (momentum levels)              [kg/kg K]
+   real(r8) :: thlpthvp_inout(pverp)            ! < th_l'th_v' > (momentum levels)             [K^2]
    real(r8) :: up2_in(pverp)                    ! meridional wind variance                     [m^2/s^2]
    real(r8) :: vp2_in(pverp)                    ! zonal wind variance                          [m^2/s^2]
    real(r8) :: upwp_in(pverp)                   ! meridional wind flux                         [m^2/s^2]
@@ -1201,10 +1222,10 @@ end subroutine clubb_init_cnst
    real(r8) :: wprtp_mc_out(pverp)
    real(r8) :: wpthlp_mc_out(pverp)
    real(r8) :: rtpthlp_mc_out(pverp)
-   real(r8) :: rcm_out(pverp)                   ! CLUBB output of liquid water mixing ratio     [kg/kg]
+   real(r8) :: rcm_inout(pverp)                 ! CLUBB output of liquid water mixing ratio     [kg/kg]
    real(r8) :: rcm_out_zm(pverp)
    real(r8) :: wprcp_out(pverp)                 ! CLUBB output of flux of liquid water          [kg/kg m/s]
-   real(r8) :: cloud_frac_out(pverp)            ! CLUBB output of cloud fraction                [fraction]
+   real(r8) :: cloud_frac_inout(pverp)          ! CLUBB output of cloud fraction                [fraction]
    real(r8) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
    real(r8) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
    real(r8) :: thlprcp_out(pverp)
@@ -1254,6 +1275,7 @@ end subroutine clubb_init_cnst
    real(r8) :: sclrp2(pverp,sclr_dim)           ! sclr'^2 (momentum levels)                     [{units vary}^2]
    real(r8) :: sclrprtp(pverp,sclr_dim)         ! sclr'rt' (momentum levels)                    [{units vary} (kg/kg)]
    real(r8) :: sclrpthlp(pverp,sclr_dim)        ! sclr'thlp' (momentum levels)                  [{units vary} (K)]
+   real(r8) :: sclrpthvp_inout(pverp,sclr_dim)  ! sclr'thvp' (momentum levels)                  [{units vary} (K)]
    real(r8) :: hydromet(pverp,hydromet_dim)
    real(r8) :: wphydrometp(pverp,hydromet_dim)
    real(r8) :: wp2hmp(pverp,hydromet_dim)
@@ -1302,11 +1324,11 @@ end subroutine clubb_init_cnst
    real(r8) :: rho(pcols,pverp)                 ! Midpoint density in CAM                       [kg/m^3]
    real(r8) :: thv(pcols,pver)                  ! virtual potential temperature                 [K]
    real(r8) :: edsclr_out(pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB          [units vary]
-   real(r8) :: cloud_frac(pcols,pverp)          ! CLUBB cloud fraction                          [fraction]
+   !real(r8) :: cloud_frac(pcols,pverp)          ! CLUBB cloud fraction                          [fraction]
    real(r8) :: rcm_in_layer(pcols,pverp)        ! CLUBB in-cloud liquid water mixing ratio      [kg/kg]
    real(r8) :: cloud_cover(pcols,pverp)         ! CLUBB in-cloud cloud fraction                 [fraction]
    real(r8) :: wprcp(pcols,pverp)               ! CLUBB liquid water flux                       [m/s kg/kg]
-   real(r8) :: wpthvp(pcols,pverp)              ! CLUBB buoyancy flux                           [W/m^2]
+   real(r8) :: wpthvp_diag(pcols,pverp)         ! CLUBB buoyancy flux                           [W/m^2]
    real(r8) :: rvm(pcols,pverp)
 
    real(r8) :: pdfp_rtp2(pcols, pverp)          ! Calculated R-tot variance from pdf_params     [kg^2/kg^2]
@@ -1365,7 +1387,9 @@ end subroutine clubb_init_cnst
    real(r8), dimension(nparams)          :: clubb_params                ! These adjustable CLUBB parameters (C1, C2 ...)
    real(r8), dimension(sclr_dim)         :: sclr_tol                    ! Tolerance on passive scalar       [units vary]
    type(pdf_parameter), dimension(pverp) :: pdf_params                  ! PDF parameters                    [units vary]
-   real(r8), dimension(pverp,num_pdf_params) :: pdf_params_packed   ! Packed for storage in pbuf
+   type(pdf_parameter), dimension(pverp) :: pdf_params_zm               ! PDF parameters on momentum levels [units vary]
+   real(r8), dimension(pverp,num_pdf_params) :: pdf_params_packed       ! Packed for storage in pbuf
+   real(r8), dimension(pverp,num_pdf_params) :: pdf_params_zm_packed    ! Packed for storage in pbuf
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
    integer :: stats_nsamp, stats_nout                               ! Stats sampling and output intervals for CLUBB [timestep]
 
@@ -1389,7 +1413,12 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: vpwp     ! north-south momentum flux                    [m^2/s^2]
    real(r8), pointer, dimension(:,:) :: thlm     ! mean temperature                             [K]
    real(r8), pointer, dimension(:,:) :: rtm      ! mean moisture mixing ratio                   [kg/kg]
+   real(r8), pointer, dimension(:,:) :: wpthvp   ! < w'th_v' > (momentum levels)                [m/s K]
+   real(r8), pointer, dimension(:,:) :: wp2thvp  ! < w'^2 th_v' > (thermodynamic levels)        [m^2/s^2 K]
+   real(r8), pointer, dimension(:,:) :: rtpthvp  ! < r_t'th_v' > (momentum levels)              [kg/kg K]
+   real(r8), pointer, dimension(:,:) :: thlpthvp ! < th_l'th_v' > (momentum levels)             [K^2]
    real(r8), pointer, dimension(:,:) :: rcm      ! CLUBB cloud water mixing ratio               [kg/kg]
+   real(r8), pointer, dimension(:,:) :: cloud_frac ! CLUBB cloud fraction                       [-]
    real(r8), pointer, dimension(:)   :: ztodtptr ! timestep to send to SILHS
    real(r8), pointer, dimension(:,:) :: um       ! mean east-west wind                          [m/s]
    real(r8), pointer, dimension(:,:) :: vm       ! mean north-south wind                        [m/s]
@@ -1412,7 +1441,8 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: accre_enhan ! accretion enhancement factor              [-]
    real(r8), pointer, dimension(:,:) :: naai
    real(r8), pointer, dimension(:,:) :: cmeliq 
-   real(r8), pointer, dimension(:,:,:) :: pdf_params_ptr ! putting the params in the pbuf         [variable]
+   real(r8), pointer, dimension(:,:,:) :: pdf_params_ptr    ! putting the params in the pbuf          [variable]
+   real(r8), pointer, dimension(:,:,:) :: pdf_params_zm_ptr ! putting the params (zm) in the pbuf     [variable]
    real(r8), pointer, dimension(:,:) :: cmfmc_sh ! Shallow convective mass flux--m subc (pcols,pverp) [kg/m2/s/]
 
 
@@ -1523,6 +1553,11 @@ end subroutine clubb_init_cnst
    call pbuf_get_field(pbuf, um_idx,      um,      start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
    call pbuf_get_field(pbuf, vm_idx,      vm,      start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
    
+   call pbuf_get_field(pbuf, wpthvp_idx,   wpthvp)
+   call pbuf_get_field(pbuf, wp2thvp_idx,  wp2thvp)
+   call pbuf_get_field(pbuf, rtpthvp_idx,  rtpthvp)
+   call pbuf_get_field(pbuf, thlpthvp_idx, thlpthvp)
+
    call pbuf_get_field(pbuf, tke_idx,     tke)
    call pbuf_get_field(pbuf, qrl_idx,     qrl)
    call pbuf_get_field(pbuf, radf_idx,    radf_clubb)
@@ -1541,7 +1576,9 @@ end subroutine clubb_init_cnst
 
    call pbuf_get_field(pbuf, ice_supersat_idx, ice_supersat_frac)
    call pbuf_get_field(pbuf, pdf_params_idx,  pdf_params_ptr)
+   call pbuf_get_field(pbuf, pdf_params_zm_idx,  pdf_params_zm_ptr)
    call pbuf_get_field(pbuf, rcm_idx,     rcm)
+   call pbuf_get_field(pbuf, cloud_frac_idx, cloud_frac)
    call pbuf_get_field(pbuf, ztodt_idx,   ztodtptr)
 
    call pbuf_get_field(pbuf, relvar_idx,  relvar)
@@ -2077,6 +2114,13 @@ end subroutine clubb_init_cnst
          wprtp_in(k)   = wprtp(i,pverp-k+1)
          wpthlp_in(k)  = wpthlp(i,pverp-k+1)
          rtpthlp_in(k) = rtpthlp(i,pverp-k+1)
+
+         wpthvp_inout(k)     = wpthvp(i,pverp-k+1)
+         wp2thvp_inout(k)    = wp2thvp(i,pverp-k+1)
+         rtpthvp_inout(k)    = rtpthvp(i,pverp-k+1)
+         thlpthvp_inout(k)   = thlpthvp(i,pverp-k+1)
+         rcm_inout(k)        = rcm(i,pverp-k+1)
+         cloud_frac_inout(k) = cloud_frac(i,pverp-k+1)
  
          ! thlp3 and rtp3 are used in CLUBB only if l_use_3D_closure is
          ! set to true in CLUBB's model_flags.F90. This flag and thlp3 and rtp3 are
@@ -2090,9 +2134,7 @@ end subroutine clubb_init_cnst
          endif
 
          !  Initialize these to prevent crashing behavior
-         rcm_out(k)          = 0._r8
          wprcp_out(k)        = 0._r8
-         cloud_frac_out(k)   = 0._r8
          rcm_in_layer_out(k) = 0._r8
          cloud_cover_out(k)  = 0._r8
          edsclr_in(k,:)      = 0._r8
@@ -2101,22 +2143,29 @@ end subroutine clubb_init_cnst
          khzt_out(k)         = 0._r8
 
          !  higher order scalar stuff, put to zero
-         sclrm(k,:)          = 0._r8
-         wpsclrp(k,:)        = 0._r8
-         sclrp2(k,:)         = 0._r8
-         sclrprtp(k,:)       = 0._r8
-         sclrpthlp(k,:)      = 0._r8
-         wpsclrp_sfc(:)      = 0._r8
-         hydromet(k,:)       = 0._r8
-         wphydrometp(k,:)    = 0._r8
-         wp2hmp(k,:)         = 0._r8
-         rtphmp_zt(k,:)      = 0._r8
-         thlphmp_zt(k,:)     = 0._r8
+         sclrm(k,:)           = 0._r8
+         wpsclrp(k,:)         = 0._r8
+         sclrp2(k,:)          = 0._r8
+         sclrprtp(k,:)        = 0._r8
+         sclrpthlp(k,:)       = 0._r8
+         sclrpthvp_inout(k,:) = 0._r8
+         wpsclrp_sfc(:)       = 0._r8
+         hydromet(k,:)        = 0._r8
+         wphydrometp(k,:)     = 0._r8
+         wp2hmp(k,:)          = 0._r8
+         rtphmp_zt(k,:)       = 0._r8
+         thlphmp_zt(k,:)      = 0._r8
  
       enddo
      
       pre_in(1) = pre_in(2)
      
+      ! Unpack up pdf_params from the pbuf
+      pdf_params_packed(:,:) = pdf_params_ptr(i,:,:)
+      pdf_params_zm_packed(:,:) = pdf_params_zm_ptr(i,:,:)
+      call unpack_pdf_params_api(pdf_params_packed, pverp, pdf_params)
+      call unpack_pdf_params_api(pdf_params_zm_packed, pverp, pdf_params_zm)
+ 
       if (clubb_do_adv) then
         if ((macmic_it .eq. 1).and.(.not.clubb_interp_advtend)) then
           wp2_in=zt2zm_api(wp2_in)    
@@ -2248,35 +2297,40 @@ end subroutine clubb_init_cnst
          !  Advance CLUBB CORE one timestep in the future
          call t_startf('advance_clubb_core')
          call advance_clubb_core_api &
-            ( l_implemented, dtime, fcor, sfc_elevation, hydromet_dim, &
-            thlm_forcing, rtm_forcing, um_forcing, vm_forcing, &
-            sclrm_forcing, edsclrm_forcing, wprtp_forcing, &  
-            wpthlp_forcing, rtp2_forcing, thlp2_forcing, &
-            rtpthlp_forcing, wm_zm, wm_zt, &      
-            wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, &
-            wpsclrp_sfc, wpedsclrp_sfc, &       
-            p_in_Pa, rho_zm, rho_in, exner, &
-            rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
-            invrs_rho_ds_zt, thv_ds_zm, thv_ds_zt, hydromet, &
-            rfrzm, radf, wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, &
-            host_dx, host_dy, &
-            um_in, vm_in, upwp_in, &
-            vpwp_in, up2_in, vp2_in, &
-            thlm_in, rtm_in, wprtp_in, wpthlp_in, &
-            wp2_in, wp3_in, rtp2_in, rtp3_dummy_in, &
-            thlp2_in, thlp3_dummy_in, rtpthlp_in, &
-            sclrm, sclrp2, sclrprtp, sclrpthlp, &        
-            wpsclrp, edsclr_in, err_code, &
-            rcm_out, wprcp_out, cloud_frac_out, ice_supersat_frac_out, &
-            rcm_in_layer_out, cloud_cover_out, &
-            khzm_out, khzt_out, qclvar_out, thlprcp_out, &
-            pdf_params)
+            ( l_implemented, dtime, fcor, sfc_elevation, hydromet_dim, & ! In
+              thlm_forcing, rtm_forcing, um_forcing, vm_forcing, & ! In
+              sclrm_forcing, edsclrm_forcing, wprtp_forcing, &  ! In
+              wpthlp_forcing, rtp2_forcing, thlp2_forcing, & ! In
+              rtpthlp_forcing, wm_zm, wm_zt, & ! In
+              wpthlp_sfc, wprtp_sfc, upwp_sfc, vpwp_sfc, & ! In
+              wpsclrp_sfc, wpedsclrp_sfc, & ! In
+              p_in_Pa, rho_zm, rho_in, exner, & ! In
+              rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, & ! In
+              invrs_rho_ds_zt, thv_ds_zm, thv_ds_zt, hydromet, & ! In
+              rfrzm, radf, & ! In
+              wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, & ! In
+              host_dx, host_dy, & ! In
+              um_in, vm_in, upwp_in, vpwp_in, up2_in, vp2_in, & ! Inout
+              thlm_in, rtm_in, wprtp_in, wpthlp_in, & ! Inout
+              wp2_in, wp3_in, rtp2_in, rtp3_dummy_in, & ! Inout
+              thlp2_in, thlp3_dummy_in, rtpthlp_in, & ! Inout
+              sclrm, & ! Inout
+              sclrp2, sclrprtp, sclrpthlp, & ! Inout
+              wpsclrp, edsclr_in, err_code, & ! Inout
+              rcm_inout, cloud_frac_inout, & ! Inout
+              wpthvp_inout, wp2thvp_inout, rtpthvp_inout, thlpthvp_inout, & ! Inout
+              sclrpthvp_inout, & ! Inout
+              pdf_params, pdf_params_zm, & ! Inout
+              khzm_out, khzt_out, & ! Out
+              qclvar_out, thlprcp_out, & ! Out
+              wprcp_out, ice_supersat_frac_out, & ! Out
+              rcm_in_layer_out, cloud_cover_out ) ! Out
          call t_stopf('advance_clubb_core')
 
          if (do_rainturb) then
-            rvm_in = rtm_in - rcm_out 
-            call update_xp2_mc_api(pverp, dtime, cloud_frac_out, &
-            rcm_out, rvm_in, thlm_in, wm_zt, exner, pre_in, pdf_params, &
+            rvm_in = rtm_in - rcm_inout 
+            call update_xp2_mc_api(pverp, dtime, cloud_frac_inout, &
+            rcm_inout, rvm_in, thlm_in, wm_zt, exner, pre_in, pdf_params, &
             rtp2_mc_out, thlp2_mc_out, &
             wprtp_mc_out, wpthlp_mc_out, &
             rtpthlp_mc_out)
@@ -2299,7 +2353,7 @@ end subroutine clubb_init_cnst
 
          if (do_cldcool) then
          
-            rcm_out_zm = zt2zm_api(rcm_out)
+            rcm_out_zm = zt2zm_api(rcm_inout)
             qrl_zm = zt2zm_api(qrl_clubb)
             thlp2_rad_out(:) = 0._r8
             call calculate_thlp2_rad_api(pverp, rcm_out_zm, thlprcp_out, qrl_zm, thlp2_rad_out)
@@ -2353,7 +2407,9 @@ end subroutine clubb_init_cnst
 
       ! Pack up pdf_params and store it in the pbuf
       call pack_pdf_params_api(pdf_params, pverp, pdf_params_packed)
+      call pack_pdf_params_api(pdf_params_zm, pverp, pdf_params_zm_packed)
       pdf_params_ptr(i,:,:) = pdf_params_packed(:,:)
+      pdf_params_zm_ptr(i,:,:) = pdf_params_zm_packed(:,:)
  
       !  Arrays need to be "flipped" to CAM grid 
       do k=1,pverp
@@ -2373,9 +2429,13 @@ end subroutine clubb_init_cnst
           rtp2(i,k)         = rtp2_in(pverp-k+1)
           thlp2(i,k)        = thlp2_in(pverp-k+1)
           rtpthlp(i,k)      = rtpthlp_in(pverp-k+1)
-          rcm(i,k)          = rcm_out(pverp-k+1)
+          wpthvp(i,k)       = wpthvp_inout(pverp-k+1)
+          wp2thvp(i,k)      = wp2thvp_inout(pverp-k+1)
+          rtpthvp(i,k)      = rtpthvp_inout(pverp-k+1)
+          thlpthvp(i,k)     = thlpthvp_inout(pverp-k+1)
+          rcm(i,k)          = rcm_inout(pverp-k+1)
           wprcp(i,k)        = wprcp_out(pverp-k+1)
-          cloud_frac(i,k)   = min(cloud_frac_out(pverp-k+1),1._r8)
+          cloud_frac(i,k)   = min(cloud_frac_inout(pverp-k+1),1._r8)
           rcm_in_layer(i,k) = rcm_in_layer_out(pverp-k+1)
           cloud_cover(i,k)  = min(cloud_cover_out(pverp-k+1),1._r8)
           zt_out(i,k)       = zt_g(pverp-k+1)
@@ -2731,13 +2791,13 @@ end subroutine clubb_init_cnst
    rho(:ncol,pverp)  = state1%ps(:ncol)/(rair*state1%t(:ncol,pver))
 
    eps = rair/rh2o
-   wpthvp(:,:) = 0.0_r8
+   wpthvp_diag(:,:) = 0.0_r8
    do k=1,pver
       do i=1,ncol
          !  buoyancy flux
-         wpthvp(i,k) = (wpthlp(i,k)-(apply_const*wpthlp_const))+((1._r8-eps)/eps)*theta0* &
-                       (wprtp(i,k)-(apply_const*wprtp_const))+((latvap/cpair)* &
-                       state1%exner(i,k)-(1._r8/eps)*theta0)*wprcp(i,k)
+         wpthvp_diag(i,k) = (wpthlp(i,k)-(apply_const*wpthlp_const))+((1._r8-eps)/eps)*theta0* &
+                            (wprtp(i,k)-(apply_const*wprtp_const))+((latvap/cpair)* &
+                            state1%exner(i,k)-(1._r8/eps)*theta0)*wprcp(i,k)
 
          !  total water mixing ratio
          qt_output(i,k) = state1%q(i,k,ixq)+state1%q(i,k,ixcldliq)+state1%q(i,k,ixcldice)
@@ -2940,7 +3000,7 @@ end subroutine clubb_init_cnst
    call outfld( 'CLOUDFRAC_CLUBB',  alst,                    pcols, lchnk )
    call outfld( 'RCMINLAYER_CLUBB', rcm_in_layer*1000._r8,   pcols, lchnk )
    call outfld( 'CLOUDCOVER_CLUBB', cloud_frac,              pcols, lchnk )
-   call outfld( 'WPTHVP_CLUBB',     wpthvp*cpair,            pcols, lchnk )
+   call outfld( 'WPTHVP_CLUBB',     wpthvp_diag*cpair,       pcols, lchnk )
    call outfld( 'ZT_CLUBB',         1._r8*zt_out,            pcols, lchnk )
    call outfld( 'ZM_CLUBB',         1._r8*zi_out,            pcols, lchnk )
    call outfld( 'UM_CLUBB',         um,                      pcols, lchnk )

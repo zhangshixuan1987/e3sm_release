@@ -249,9 +249,9 @@ contains
       use units,                   only: getunit, freeunit 
 #ifdef CLUBB_SGS
 #ifdef SILHS
-      use clubb_api_module,        only: iirrm, iiNrm, iirsm, iirim, &
-                                         iirgm, iiNsm, &
-                                         iiNim, iiNgm, &
+      use clubb_api_module,        only: iirr, iiNr, iirs, iiri, &
+                                         iirg, iiNs, &
+                                         iiNi, iiNg, &
                                          l_mix_rat_hm, l_frozen_hm, &
 
                                          hydromet_dim, &
@@ -265,7 +265,7 @@ contains
                                          l_calc_w_corr, l_use_cloud_cover, &
                                          l_fix_chi_eta_correlations, l_const_Nc_in_cloud, &
 
-                                         d_variables, &
+                                         pdf_dim, &
                                          setup_corr_varnce_array_api, &
                                          setup_pdf_indices_api, &
 
@@ -344,15 +344,15 @@ contains
       !        Steve wants to set up a microphysics query so I can ask the microphysics
       !        scheme which hydrometeors to use. For the future.
       !-------------------------------
-      iirrm = 1
-      iirsm = 3
-      iirim  = 5
-      iirgm = -1
+      iirr = 1
+      iirs = 3
+      iiri  = 5
+      iirg = -1
 
-      iiNrm    = 2
-      iiNsm = 4
-      iiNim    = 6
-      iiNgm = -1
+      iiNr    = 2
+      iiNs = 4
+      iiNi    = 6
+      iiNg = -1
 
       hydromet_dim = 6
 
@@ -363,69 +363,69 @@ contains
       allocate( l_frozen_hm(hydromet_dim) )
       allocate( hmp2_ip_on_hmm2_ip(hydromet_dim) )
 
-      if ( iirrm > 0 ) then
+      if ( iirr > 0 ) then
          ! The microphysics scheme predicts rain water mixing ratio, rr.
-         hydromet_list(iirrm) = "rrm"
-         l_mix_rat_hm(iirrm)  = .true.
-         l_frozen_hm(iirrm)   = .false.
-         hydromet_tol(iirrm)  = rr_tol
-         hmp2_ip_on_hmm2_ip(iirrm) = hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip 
+         hydromet_list(iirr) = "rrm"
+         l_mix_rat_hm(iirr)  = .true.
+         l_frozen_hm(iirr)   = .false.
+         hydromet_tol(iirr)  = rr_tol
+         hmp2_ip_on_hmm2_ip(iirr) = hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip 
       endif
-      if ( iirim > 0 ) then
+      if ( iiri > 0 ) then
          ! The microphysics scheme predicts ice mixing ratio, ri.
-         hydromet_list(iirim) = "rim"
-         l_mix_rat_hm(iirim)  = .true.
-         l_frozen_hm(iirim)   = .true.
-         hydromet_tol(iirim)  = ri_tol
-         hmp2_ip_on_hmm2_ip(iirim) = hmp2_ip_on_hmm2_ip_ratios%rip2_ip_on_rim2_ip
+         hydromet_list(iiri) = "rim"
+         l_mix_rat_hm(iiri)  = .true.
+         l_frozen_hm(iiri)   = .true.
+         hydromet_tol(iiri)  = ri_tol
+         hmp2_ip_on_hmm2_ip(iiri) = hmp2_ip_on_hmm2_ip_ratios%rip2_ip_on_rim2_ip
       endif
-      if ( iirsm > 0 ) then
+      if ( iirs > 0 ) then
          ! The microphysics scheme predicts snow mixing ratio, rs.
-         hydromet_list(iirsm) = "rsm"
-         l_mix_rat_hm(iirsm)  = .true.
-         l_frozen_hm(iirsm)   = .true.
-         hydromet_tol(iirsm)  = rs_tol
-         hmp2_ip_on_hmm2_ip(iirsm) = hmp2_ip_on_hmm2_ip_ratios%rsp2_ip_on_rsm2_ip
+         hydromet_list(iirs) = "rsm"
+         l_mix_rat_hm(iirs)  = .true.
+         l_frozen_hm(iirs)   = .true.
+         hydromet_tol(iirs)  = rs_tol
+         hmp2_ip_on_hmm2_ip(iirs) = hmp2_ip_on_hmm2_ip_ratios%rsp2_ip_on_rsm2_ip
       endif
-      if ( iirgm > 0 ) then
+      if ( iirg > 0 ) then
          ! The microphysics scheme predicts graupel mixing ratio, rg.
-         hydromet_list(iirgm) = "rgm"
-         l_mix_rat_hm(iirgm)  = .true.
-         l_frozen_hm(iirgm)   = .true.
-         hydromet_tol(iirgm)  = rg_tol
-         hmp2_ip_on_hmm2_ip(iirgm) = hmp2_ip_on_hmm2_ip_ratios%rgp2_ip_on_rgm2_ip 
+         hydromet_list(iirg) = "rgm"
+         l_mix_rat_hm(iirg)  = .true.
+         l_frozen_hm(iirg)   = .true.
+         hydromet_tol(iirg)  = rg_tol
+         hmp2_ip_on_hmm2_ip(iirg) = hmp2_ip_on_hmm2_ip_ratios%rgp2_ip_on_rgm2_ip 
       endif
-      if ( iiNrm > 0 ) then
+      if ( iiNr > 0 ) then
          ! The microphysics scheme predicts rain drop concentration, Nr.
-         hydromet_list(iiNrm) = "Nrm"
-         l_frozen_hm(iiNrm)   = .false.
-         l_mix_rat_hm(iiNrm)  = .false.
-         hydromet_tol(iiNrm)  = Nr_tol
-         hmp2_ip_on_hmm2_ip(iiNrm) = hmp2_ip_on_hmm2_ip_ratios%Nrp2_ip_on_Nrm2_ip
+         hydromet_list(iiNr) = "Nrm"
+         l_frozen_hm(iiNr)   = .false.
+         l_mix_rat_hm(iiNr)  = .false.
+         hydromet_tol(iiNr)  = Nr_tol
+         hmp2_ip_on_hmm2_ip(iiNr) = hmp2_ip_on_hmm2_ip_ratios%Nrp2_ip_on_Nrm2_ip
       endif
-      if ( iiNim > 0 ) then
+      if ( iiNi > 0 ) then
          ! The microphysics scheme predicts ice concentration, Ni.
-         hydromet_list(iiNim) = "Nim"
-         l_mix_rat_hm(iiNim)  = .false.
-         l_frozen_hm(iiNim)   = .true.
-         hydromet_tol(iiNim)  = Ni_tol
-         hmp2_ip_on_hmm2_ip(iiNim) = hmp2_ip_on_hmm2_ip_ratios%Nip2_ip_on_Nim2_ip
+         hydromet_list(iiNi) = "Nim"
+         l_mix_rat_hm(iiNi)  = .false.
+         l_frozen_hm(iiNi)   = .true.
+         hydromet_tol(iiNi)  = Ni_tol
+         hmp2_ip_on_hmm2_ip(iiNi) = hmp2_ip_on_hmm2_ip_ratios%Nip2_ip_on_Nim2_ip
       endif
-      if ( iiNsm > 0 ) then
+      if ( iiNs > 0 ) then
          ! The microphysics scheme predicts snowflake concentration, Ns.
-         hydromet_list(iiNsm) = "Nsm"
-         l_mix_rat_hm(iiNsm)  = .false.
-         l_frozen_hm(iiNsm)   = .true.
-         hydromet_tol(iiNsm)  = Ns_tol
-         hmp2_ip_on_hmm2_ip(iiNsm) = hmp2_ip_on_hmm2_ip_ratios%Nsp2_ip_on_Nsm2_ip
+         hydromet_list(iiNs) = "Nsm"
+         l_mix_rat_hm(iiNs)  = .false.
+         l_frozen_hm(iiNs)   = .true.
+         hydromet_tol(iiNs)  = Ns_tol
+         hmp2_ip_on_hmm2_ip(iiNs) = hmp2_ip_on_hmm2_ip_ratios%Nsp2_ip_on_Nsm2_ip
       endif
-      if ( iiNgm > 0 ) then
+      if ( iiNg > 0 ) then
          ! The microphysics scheme predicts graupel concentration, Ng.
-         hydromet_list(iiNgm) = "Ngm"
-         l_mix_rat_hm(iiNgm)  = .false.
-         l_frozen_hm(iiNgm)   = .true.
-         hydromet_tol(iiNgm)  = Ng_tol
-         hmp2_ip_on_hmm2_ip(iiNgm) = hmp2_ip_on_hmm2_ip_ratios%Ngp2_ip_on_Ngm2_ip
+         hydromet_list(iiNg) = "Ngm"
+         l_mix_rat_hm(iiNg)  = .false.
+         l_frozen_hm(iiNg)   = .true.
+         hydromet_tol(iiNg)  = Ng_tol
+         hmp2_ip_on_hmm2_ip(iiNg) = hmp2_ip_on_hmm2_ip_ratios%Ngp2_ip_on_Ngm2_ip
       endif
 
       Ncnp2_on_Ncnm2 = subcol_SILHS_ncnp2_on_ncnm2
@@ -439,8 +439,8 @@ contains
       iunit = getunit()
 
 
-      call setup_pdf_indices_api( hydromet_dim, iirrm, iiNrm, iirim, &
-                              iiNim, iirsm, iiNsm, iirgm, iiNgm )
+      call setup_pdf_indices_api( hydromet_dim, iirr, iiNr, iiri, &
+                              iiNi, iirs, iiNs, iirg, iiNg )
       call setup_corr_varnce_array_api( corr_file_path_cloud, corr_file_path_below, &
                                     iunit )
       call freeunit(iunit) 
@@ -542,7 +542,7 @@ contains
    subroutine subcol_gen_SILHS(state, tend, state_sc, tend_sc, pbuf)
       !-------------------------------
       ! This is where the subcolumns are created, and the call to
-      !      lh_subcolumn_generator_mod_api
+      !      generate_silhs_sample_api
       !    goes out. Variables needed to make this call are pulled from the 
       !    pbuf, from module data, and calculated based on the CAM state.
       !-------------------------------
@@ -573,15 +573,15 @@ contains
 
                                          zm2zt_api, setup_grid_heights_api, &
 
-                                         iirrm, iiNrm, iirsm, iirim, &
-                                         iirgm, iiNsm, &
-                                         iiNim, iiNgm, &
+                                         iirr, iiNr, iirs, iiri, &
+                                         iirg, iiNs, &
+                                         iiNi, iiNg, &
 
                                          core_rknd, &
 
                                          w_tol_sqd, zero_threshold, cloud_frac_min, & ! rc_tol, &
 
-                                         d_variables, &
+                                         pdf_dim, &
                                          corr_array_n_cloud, &
                                          corr_array_n_below, &
                                          iiPDF_chi, iiPDF_rr, &
@@ -589,7 +589,7 @@ contains
                                          iiPDF_ri, iiPDF_Ni, &
                                          iiPDF_Ncn, iiPDF_rs, iiPDF_Ns
    
-      use silhs_api_module, only :       lh_subcolumn_generator_api, & ! Ncn_to_Nc, &
+      use silhs_api_module, only :       generate_silhs_sample_api, & ! Ncn_to_Nc, &
                                          lh_clipped_variables_type, &
                                          clip_transform_silhs_output_api, &
                                          est_kessler_microphys_api
@@ -646,7 +646,7 @@ contains
 
 
       !----------------
-      ! Input to lh_subcolumn_generator
+      ! Input to generate_silhs_sample
       !----------------
       integer :: iter                            ! CLUBB iteration 
       integer :: num_subcols                     ! Number of subcolumns
@@ -661,12 +661,15 @@ contains
       real(r8), dimension(pverp) :: rcm_in       ! Cld water mixing ratio on CLUBB levs
       real(r8), dimension(pverp,hydromet_dim) :: hydromet  ! Hydrometeor spcies
       real(r8), dimension(pverp)              :: Ncm ! Mean cloud droplet concentration, <N_c>
+
+      logical, parameter :: &
+        l_calc_weights_all_levs_itime = .false.
       
 
       !---------------
-      !Output from lh_subcolumn_generator
+      !Output from generate_silhs_sample
       !--------------
-      real(r8), allocatable, dimension(:,:,:) :: X_nl_all_levs ! Sample transformed to normal-lognormal
+      real(r8), allocatable, dimension(:,:,:) :: X_nl_all_levs_raw ! Sample transformed to normal-lognormal
       real(r8), allocatable, dimension(:) :: LH_sample_point_weights ! Subcolumn weights
       integer, allocatable, dimension(:,:) :: X_mixt_comp_all_levs ! Which Mixture Component
 
@@ -686,6 +689,8 @@ contains
       !----------------
       type(lh_clipped_variables_type), dimension(:,:), allocatable :: &
         lh_clipped_vars
+
+      real(r8), allocatable, dimension(:,:,:) :: X_nl_all_levs ! Sample (clipped) transformed to normal-lognormal
 
       logical, parameter :: &
         l_use_Ncn_to_Nc = .true.  ! Whether to call Ncn_to_Nc (.true.) or not (.false.);
@@ -879,42 +884,42 @@ contains
 
          ! Set up hydromet array, flipped from CAM vert grid to CLUBB
          do k=1,pver  
-            if ( iirrm > 0 ) then
+            if ( iirr > 0 ) then
               ! If ixrain and family are greater than zero, then MG2 is
               ! being used, and rain and snow are part of state. Otherwise,
               ! diagnostic rain and snow from MG1 are used in hydromet.
               if (ixrain > 0) then
-                hydromet(k+1,iirrm) = state%q(i,pver-k+1,ixrain)
+                hydromet(k+1,iirr) = state%q(i,pver-k+1,ixrain)
               else
-                hydromet(k+1,iirrm) = qrain(i,pver-k+1)
+                hydromet(k+1,iirr) = qrain(i,pver-k+1)
               end if
             endif
-            if ( iiNrm > 0 ) then
+            if ( iiNr > 0 ) then
               if (ixnumrain > 0) then
-                hydromet(k+1,iiNrm) = state%q(i,pver-k+1,ixnumrain)
+                hydromet(k+1,iiNr) = state%q(i,pver-k+1,ixnumrain)
               else
-                hydromet(k+1,iiNrm) = nrain(i,pver-k+1)
+                hydromet(k+1,iiNr) = nrain(i,pver-k+1)
               end if
             endif
-            if ( iirsm > 0 ) then
+            if ( iirs > 0 ) then
               if (ixsnow > 0) then
-                hydromet(k+1,iirsm) = state%q(i,pver-k+1,ixsnow)
+                hydromet(k+1,iirs) = state%q(i,pver-k+1,ixsnow)
               else
-                hydromet(k+1,iirsm) = qsnow(i,pver-k+1)
+                hydromet(k+1,iirs) = qsnow(i,pver-k+1)
               end if
             endif
-            if ( iiNsm > 0 ) then
+            if ( iiNs > 0 ) then
               if (ixnumsnow > 0) then
-                hydromet(k+1,iiNsm) = state%q(i,pver-k+1,ixnumsnow)
+                hydromet(k+1,iiNs) = state%q(i,pver-k+1,ixnumsnow)
               else
-                hydromet(k+1,iiNsm) = nsnow(i,pver-k+1)
+                hydromet(k+1,iiNs) = nsnow(i,pver-k+1)
               end if
             endif
-            if ( iirim > 0 ) then
-               hydromet(k+1,iirim) = state%q(i,pver-k+1,ixcldice)
+            if ( iiri > 0 ) then
+               hydromet(k+1,iiri) = state%q(i,pver-k+1,ixcldice)
             endif
-            if ( iiNim > 0 ) then
-               hydromet(k+1,iiNim) = state%q(i,pver-k+1,ixnumice)
+            if ( iiNi > 0 ) then
+               hydromet(k+1,iiNi) = state%q(i,pver-k+1,ixnumice)
             endif
      
             Ncm(k+1)            = state%q(i,pver-k+1,ixnumliq)
@@ -932,18 +937,19 @@ contains
          enddo
 
          ! Allocate arrays for setup_pdf_params
-         allocate( corr_array_1(d_variables, d_variables, pverp) )
-         allocate( corr_array_2(d_variables, d_variables, pverp) )
-         allocate( mu_x_1(d_variables, pverp) )
-         allocate( mu_x_2(d_variables, pverp) )
-         allocate( sigma_x_1(d_variables, pverp) )
-         allocate( sigma_x_2(d_variables, pverp) )
-         allocate( corr_cholesky_mtx_1(d_variables, d_variables, pverp) )
-         allocate( corr_cholesky_mtx_2(d_variables, d_variables, pverp) )
+         allocate( corr_array_1(pdf_dim, pdf_dim, pverp) )
+         allocate( corr_array_2(pdf_dim, pdf_dim, pverp) )
+         allocate( mu_x_1(pdf_dim, pverp) )
+         allocate( mu_x_2(pdf_dim, pverp) )
+         allocate( sigma_x_1(pdf_dim, pverp) )
+         allocate( sigma_x_2(pdf_dim, pverp) )
+         allocate( corr_cholesky_mtx_1(pdf_dim, pdf_dim, pverp) )
+         allocate( corr_cholesky_mtx_2(pdf_dim, pdf_dim, pverp) )
          ! Allocate arrays for SILHS output
          allocate( LH_sample_point_weights(num_subcols) )
          allocate( X_mixt_comp_all_levs(pverp,num_subcols) )
-         allocate( X_nl_all_levs(pverp,num_subcols,d_variables) )
+         allocate( X_nl_all_levs_raw(pverp,num_subcols,pdf_dim) )
+         allocate( X_nl_all_levs(pverp,num_subcols,pdf_dim) )
          allocate( lh_clipped_vars(pverp,num_subcols) )
          ! Allocate arrays for output to either history files or for updating state_sc
          allocate( rc_all_points(pverp, num_subcols) )
@@ -980,7 +986,7 @@ contains
          wp2_zt  = max( zm2zt_api( wp2_flip ), w_tol_sqd)
          
          ! make the call
-         call setup_pdf_parameters_api(pverp, d_variables, ztodt, &    ! In
+         call setup_pdf_parameters_api(pverp, pdf_dim, ztodt, &    ! In
                                    Nc_in_cloud, rcm_in, cld_frac_in, &            ! In
                                    ice_supersat_frac_in, hydromet, wphydrometp, & ! In
                                    corr_array_n_cloud, corr_array_n_below, &          ! In
@@ -993,24 +999,28 @@ contains
                                    hydromet_pdf_params )                          ! Out
 
          ! Let's generate some subcolumns!!!!!
-         call lh_subcolumn_generator_api &
-              (iter, d_variables, num_subcols, sequence_length, & ! In
-              pverp, pdf_params, delta_zm, rcm_in, Lscale, &      ! In
-              rho_ds_zt, mu_x_1, mu_x_2, sigma_x_1, sigma_x_2, &  ! In 
-              corr_cholesky_mtx_1, corr_cholesky_mtx_2, &         ! In
-              hydromet_pdf_params, &                              ! In
-              X_nl_all_levs, X_mixt_comp_all_levs, &              ! Out
-              LH_sample_point_weights)                            ! Out
+         call generate_silhs_sample_api &
+              ( iter, pdf_dim, num_subcols, sequence_length, pverp, & ! In
+                l_calc_weights_all_levs_itime, &                      ! In
+                pdf_params, delta_zm, rcm_in, Lscale, &               ! In
+                rho_ds_zt, mu_x_1, mu_x_2, sigma_x_1, sigma_x_2, &    ! In 
+                corr_cholesky_mtx_1, corr_cholesky_mtx_2, &           ! In
+                hydromet_pdf_params, &                                ! In
+                X_nl_all_levs_raw, X_mixt_comp_all_levs, &            ! Out
+                LH_sample_point_weights )                             ! Out
 
          ! Extract clipped variables from subcolumns
-         call clip_transform_silhs_output_api( pverp, num_subcols, d_variables, &     ! In
-                                               X_mixt_comp_all_levs, X_nl_all_levs, & ! In
-                                               pdf_params, l_use_Ncn_to_Nc, &         ! In
-                                               lh_clipped_vars )                      ! Out
+         call clip_transform_silhs_output_api( pverp, num_subcols, &          ! In
+                                               pdf_dim, hydromet_dim,  &      ! In
+                                               X_mixt_comp_all_levs, &        ! In
+                                               X_nl_all_levs_raw, &           ! In
+                                               pdf_params, l_use_Ncn_to_Nc, & ! In
+                                               lh_clipped_vars, &             ! out
+                                               X_nl_all_levs )                ! Out
 
          ! Test subcolumns by comparing to an estimate of kessler autoconversion
          call est_kessler_microphys_api &
-              (pverp, num_subcols, d_variables, X_nl_all_levs, pdf_params, &
+              (pverp, num_subcols, pdf_dim, X_nl_all_levs, pdf_params, &
               rcm_in, cld_frac_in, X_mixt_comp_all_levs, LH_sample_point_weights, &
               lh_AKm, AKm, AKstd, AKstd_cld, AKm_rcm, AKm_rcc, LH_rcm_avg)
 
@@ -1260,11 +1270,14 @@ contains
 
      
          ! Deallocate the dynamic arrays used
-         deallocate( LH_sample_point_weights, X_mixt_comp_all_levs, X_nl_all_levs, &
-                     lh_clipped_vars, corr_array_1, corr_array_2, mu_x_1, mu_x_2, &
-                     sigma_x_1, sigma_x_2, corr_cholesky_mtx_1, corr_cholesky_mtx_2 )
+         deallocate( LH_sample_point_weights, X_mixt_comp_all_levs, &
+                     X_nl_all_levs_raw, X_nl_all_levs, lh_clipped_vars, &
+                     corr_array_1, corr_array_2, mu_x_1, mu_x_2, &
+                     sigma_x_1, sigma_x_2, corr_cholesky_mtx_1, &
+                     corr_cholesky_mtx_2 )
          ! deallocate( RVM_LH_out ) 
-         deallocate( rc_all_points, rain_all_pts, nrain_all_pts, snow_all_pts, nsnow_all_pts, ice_all_pts, &
+         deallocate( rc_all_points, rain_all_pts, nrain_all_pts, &
+                     snow_all_pts, nsnow_all_pts, ice_all_pts, &
                      nice_all_pts, nclw_all_pts, w_all_points )
       enddo ! ngrdcol
 

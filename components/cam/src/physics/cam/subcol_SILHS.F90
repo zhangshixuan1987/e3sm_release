@@ -17,7 +17,8 @@ module subcol_SILHS
    use cam_history,      only: addfld, add_default, outfld, horiz_only
 #ifdef CLUBB_SGS
 #ifdef SILHS
-   use clubb_api_module, only: hmp2_ip_on_hmm2_ip_ratios_type
+   use clubb_api_module, only: hmp2_ip_on_hmm2_ip_slope_type
+   use clubb_api_module, only: hmp2_ip_on_hmm2_ip_intrcpt_type
 #endif
 #endif
    use physconst,     only: cpair, gravit, latvap, latice, rair
@@ -77,7 +78,8 @@ module subcol_SILHS
    real(r8) :: ztodt  ! model timestep
 #ifdef CLUBB_SGS
 #ifdef SILHS
-   type(hmp2_ip_on_hmm2_ip_ratios_type) :: hmp2_ip_on_hmm2_ip_ratios
+   type(hmp2_ip_on_hmm2_ip_slope_type) :: hmp2_ip_on_hmm2_ip_slope
+   type(hmp2_ip_on_hmm2_ip_intrcpt_type) :: hmp2_ip_on_hmm2_ip_intrcpt
 #endif
 #endif
 
@@ -131,7 +133,8 @@ contains
                                  subcol_SILHS_q_to_micro, &
                                  subcol_SILHS_n_to_micro, &
                                  subcol_SILHS_ncnp2_on_ncnm2, &
-                                 hmp2_ip_on_hmm2_ip_ratios, &
+                                 hmp2_ip_on_hmm2_ip_slope, &
+                                 hmp2_ip_on_hmm2_ip_intrcpt, &
                                  subcol_SILHS_meanice, &
                                  subcol_SILHS_use_clear_col, &
                                  subcol_SILHS_constrainmn
@@ -150,17 +153,17 @@ contains
       subcol_SILHS_destroy_massless_droplets = .true.  ! TODO: put this in namelist
 
       ! Eric Raut changed a default.
-      ! hmp2_ip_on_hmm2_ip_ratios%Nip2_ip_on_Nim2_ip = 0.5_core_rknd
-      ! initialize the namelist varriables in hmp2_ip_on_hmm2_ip_ratios
+      ! hmp2_ip_on_hmm2_ip_intrcpt%Ni = 0.5_core_rknd
+      ! initialize the namelist variables in hmp2_ip_on_hmm2_ip_intrcpt
       ! If not specified via namelist, all set to be equal to rrp2_ip_on_rrm2_ip
       ! after processing the namelist file.
 
-      hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip = 1.0_core_rknd
-      hmp2_ip_on_hmm2_ip_ratios%Nrp2_ip_on_Nrm2_ip = init_value
-      hmp2_ip_on_hmm2_ip_ratios%rsp2_ip_on_rsm2_ip = init_value
-      hmp2_ip_on_hmm2_ip_ratios%Nsp2_ip_on_Nsm2_ip = init_value
-      hmp2_ip_on_hmm2_ip_ratios%rip2_ip_on_rim2_ip = init_value
-      hmp2_ip_on_hmm2_ip_ratios%Nip2_ip_on_Nim2_ip = init_value
+      hmp2_ip_on_hmm2_ip_intrcpt%rr = 1.0_core_rknd
+      hmp2_ip_on_hmm2_ip_intrcpt%Nr = init_value
+      hmp2_ip_on_hmm2_ip_intrcpt%rs = init_value
+      hmp2_ip_on_hmm2_ip_intrcpt%Ns = init_value
+      hmp2_ip_on_hmm2_ip_intrcpt%ri = init_value
+      hmp2_ip_on_hmm2_ip_intrcpt%Ni = init_value
 
       if (masterproc) then
          unitn = getunit()
@@ -174,25 +177,25 @@ contains
          end if
          close(unitn)
          call freeunit(unitn)
-         if (hmp2_ip_on_hmm2_ip_ratios%Nrp2_ip_on_Nrm2_ip == init_value) &
-             hmp2_ip_on_hmm2_ip_ratios%Nrp2_ip_on_Nrm2_ip =  &
-             hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip
+         if (hmp2_ip_on_hmm2_ip_intrcpt%Nr == init_value) &
+             hmp2_ip_on_hmm2_ip_intrcpt%Nr =  &
+             hmp2_ip_on_hmm2_ip_intrcpt%rr
 
-         if (hmp2_ip_on_hmm2_ip_ratios%rsp2_ip_on_rsm2_ip == init_value) &
-             hmp2_ip_on_hmm2_ip_ratios%rsp2_ip_on_rsm2_ip = &
-             hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip
+         if (hmp2_ip_on_hmm2_ip_intrcpt%rs == init_value) &
+             hmp2_ip_on_hmm2_ip_intrcpt%rs = &
+             hmp2_ip_on_hmm2_ip_intrcpt%rr
 
-         if (hmp2_ip_on_hmm2_ip_ratios%Nsp2_ip_on_Nsm2_ip == init_value) &
-             hmp2_ip_on_hmm2_ip_ratios%Nsp2_ip_on_Nsm2_ip = &
-             hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip
+         if (hmp2_ip_on_hmm2_ip_intrcpt%Ns == init_value) &
+             hmp2_ip_on_hmm2_ip_intrcpt%Ns = &
+             hmp2_ip_on_hmm2_ip_intrcpt%rr
 
-         if (hmp2_ip_on_hmm2_ip_ratios%rip2_ip_on_rim2_ip == init_value) &
-             hmp2_ip_on_hmm2_ip_ratios%rip2_ip_on_rim2_ip = &
-             hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip
+         if (hmp2_ip_on_hmm2_ip_intrcpt%ri == init_value) &
+             hmp2_ip_on_hmm2_ip_intrcpt%ri = &
+             hmp2_ip_on_hmm2_ip_intrcpt%rr
 
-         if (hmp2_ip_on_hmm2_ip_ratios%Nip2_ip_on_Nim2_ip == init_value) &
-             hmp2_ip_on_hmm2_ip_ratios%Nip2_ip_on_Nim2_ip = &
-             hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip
+         if (hmp2_ip_on_hmm2_ip_intrcpt%Ni == init_value) &
+             hmp2_ip_on_hmm2_ip_intrcpt%Ni = &
+             hmp2_ip_on_hmm2_ip_intrcpt%rr
 
       end if
 
@@ -212,12 +215,12 @@ contains
       call mpi_bcast(subcol_SILHS_var_covar_src,1,mpi_logical,masterprocid, mpicom, ierr)
       call mpi_bcast(subcol_SILHS_destroy_massless_droplets, 1, mpi_logical, masterprocid, mpicom, ierr)
       call mpi_bcast(subcol_SILHS_ncnp2_on_ncnm2, 1, mpir8, masterprocid, mpicom, ierr)
-      call mpi_bcast(hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip, 1, mpir8, masterprocid, mpicom, ierr)
-      call mpi_bcast(hmp2_ip_on_hmm2_ip_ratios%nrp2_ip_on_nrm2_ip, 1, mpir8, masterprocid, mpicom, ierr)
-      call mpi_bcast(hmp2_ip_on_hmm2_ip_ratios%rip2_ip_on_rim2_ip, 1, mpir8, masterprocid, mpicom, ierr)
-      call mpi_bcast(hmp2_ip_on_hmm2_ip_ratios%nip2_ip_on_nim2_ip, 1, mpir8, masterprocid, mpicom, ierr)
-      call mpi_bcast(hmp2_ip_on_hmm2_ip_ratios%rsp2_ip_on_rsm2_ip, 1, mpir8, masterprocid, mpicom, ierr)
-      call mpi_bcast(hmp2_ip_on_hmm2_ip_ratios%nsp2_ip_on_nsm2_ip, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_intrcpt%rr, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_intrcpt%Nr, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_intrcpt%ri, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_intrcpt%Ni, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_intrcpt%rs, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_intrcpt%Ns, 1, mpir8, masterprocid, mpicom, ierr)
 !      call mpi_bcast(subcol_SILHS_c6rt, 1, mpir8, masterprocid, mpicom, ierr)
 !      call mpi_bcast(subcol_SILHS_c7, 1, mpir8, masterprocid, mpicom, ierr)
 !      call mpi_bcast(subcol_SILHS_c8, 1, mpir8, masterprocid, mpicom, ierr)
@@ -369,7 +372,7 @@ contains
          l_mix_rat_hm(iirr)  = .true.
          l_frozen_hm(iirr)   = .false.
          hydromet_tol(iirr)  = rr_tol
-         hmp2_ip_on_hmm2_ip(iirr) = hmp2_ip_on_hmm2_ip_ratios%rrp2_ip_on_rrm2_ip 
+         hmp2_ip_on_hmm2_ip(iirr) = hmp2_ip_on_hmm2_ip_intrcpt%rr
       endif
       if ( iiri > 0 ) then
          ! The microphysics scheme predicts ice mixing ratio, ri.
@@ -377,7 +380,7 @@ contains
          l_mix_rat_hm(iiri)  = .true.
          l_frozen_hm(iiri)   = .true.
          hydromet_tol(iiri)  = ri_tol
-         hmp2_ip_on_hmm2_ip(iiri) = hmp2_ip_on_hmm2_ip_ratios%rip2_ip_on_rim2_ip
+         hmp2_ip_on_hmm2_ip(iiri) = hmp2_ip_on_hmm2_ip_intrcpt%ri
       endif
       if ( iirs > 0 ) then
          ! The microphysics scheme predicts snow mixing ratio, rs.
@@ -385,7 +388,7 @@ contains
          l_mix_rat_hm(iirs)  = .true.
          l_frozen_hm(iirs)   = .true.
          hydromet_tol(iirs)  = rs_tol
-         hmp2_ip_on_hmm2_ip(iirs) = hmp2_ip_on_hmm2_ip_ratios%rsp2_ip_on_rsm2_ip
+         hmp2_ip_on_hmm2_ip(iirs) = hmp2_ip_on_hmm2_ip_intrcpt%rs
       endif
       if ( iirg > 0 ) then
          ! The microphysics scheme predicts graupel mixing ratio, rg.
@@ -393,7 +396,7 @@ contains
          l_mix_rat_hm(iirg)  = .true.
          l_frozen_hm(iirg)   = .true.
          hydromet_tol(iirg)  = rg_tol
-         hmp2_ip_on_hmm2_ip(iirg) = hmp2_ip_on_hmm2_ip_ratios%rgp2_ip_on_rgm2_ip 
+         hmp2_ip_on_hmm2_ip(iirg) = hmp2_ip_on_hmm2_ip_intrcpt%rg
       endif
       if ( iiNr > 0 ) then
          ! The microphysics scheme predicts rain drop concentration, Nr.
@@ -401,7 +404,7 @@ contains
          l_frozen_hm(iiNr)   = .false.
          l_mix_rat_hm(iiNr)  = .false.
          hydromet_tol(iiNr)  = Nr_tol
-         hmp2_ip_on_hmm2_ip(iiNr) = hmp2_ip_on_hmm2_ip_ratios%Nrp2_ip_on_Nrm2_ip
+         hmp2_ip_on_hmm2_ip(iiNr) = hmp2_ip_on_hmm2_ip_intrcpt%Nr
       endif
       if ( iiNi > 0 ) then
          ! The microphysics scheme predicts ice concentration, Ni.
@@ -409,7 +412,7 @@ contains
          l_mix_rat_hm(iiNi)  = .false.
          l_frozen_hm(iiNi)   = .true.
          hydromet_tol(iiNi)  = Ni_tol
-         hmp2_ip_on_hmm2_ip(iiNi) = hmp2_ip_on_hmm2_ip_ratios%Nip2_ip_on_Nim2_ip
+         hmp2_ip_on_hmm2_ip(iiNi) = hmp2_ip_on_hmm2_ip_intrcpt%Ni
       endif
       if ( iiNs > 0 ) then
          ! The microphysics scheme predicts snowflake concentration, Ns.
@@ -417,7 +420,7 @@ contains
          l_mix_rat_hm(iiNs)  = .false.
          l_frozen_hm(iiNs)   = .true.
          hydromet_tol(iiNs)  = Ns_tol
-         hmp2_ip_on_hmm2_ip(iiNs) = hmp2_ip_on_hmm2_ip_ratios%Nsp2_ip_on_Nsm2_ip
+         hmp2_ip_on_hmm2_ip(iiNs) = hmp2_ip_on_hmm2_ip_intrcpt%Ns
       endif
       if ( iiNg > 0 ) then
          ! The microphysics scheme predicts graupel concentration, Ng.
@@ -425,7 +428,7 @@ contains
          l_mix_rat_hm(iiNg)  = .false.
          l_frozen_hm(iiNg)   = .true.
          hydromet_tol(iiNg)  = Ng_tol
-         hmp2_ip_on_hmm2_ip(iiNg) = hmp2_ip_on_hmm2_ip_ratios%Ngp2_ip_on_Ngm2_ip
+         hmp2_ip_on_hmm2_ip(iiNg) = hmp2_ip_on_hmm2_ip_intrcpt%Ng
       endif
 
       Ncnp2_on_Ncnm2 = subcol_SILHS_ncnp2_on_ncnm2

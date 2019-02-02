@@ -570,12 +570,12 @@ contains
       real(r8), dimension(pverp) :: wp2_flip     ! CLUBB vert vel var flipped from pbuf
       type(hydromet_pdf_parameter), dimension(pverp) :: &
                                     hydromet_pdf_params  ! Hydrometeor PDF parameters
-      real(r8), dimension(:,:,:), allocatable :: &       ! Correlation matrix for pdf components
+      real(r8), dimension(pdf_dim, pdf_dim, pverp) :: &  ! Correlation matrix for pdf components
                                     corr_array_1, corr_array_2 
-      real(r8), dimension(:,:), allocatable :: &
+      real(r8), dimension(pdf_dim, pverp) :: &
                                     mu_x_1, mu_x_2, &    ! Mean array for PDF components
                                     sigma_x_1, sigma_x_2 ! Std dev arr for PDF components
-      real(r8), dimension(:,:,:), allocatable :: &       ! Transposed corr cholesky mtx
+      real(r8), dimension(pdf_dim, pdf_dim, pverp) :: &  ! Transposed corr cholesky mtx
                                     corr_cholesky_mtx_1, corr_cholesky_mtx_2
       real(r8), dimension(pverp) :: Nc_in_cloud
       real(r8), dimension(pverp) :: ice_supersat_frac_in
@@ -606,28 +606,28 @@ contains
       !---------------
       !Output from generate_silhs_sample
       !--------------
-      real(r8), allocatable, dimension(:,:,:) :: X_nl_all_levs_raw ! Sample transformed to normal-lognormal
-      real(r8), allocatable, dimension(:) :: LH_sample_point_weights ! Subcolumn weights
-      integer, allocatable, dimension(:,:) :: X_mixt_comp_all_levs ! Which Mixture Component
+      real(r8), dimension(pverp,subcol_SILHS_numsubcol,pdf_dim) :: X_nl_all_levs_raw ! Sample transformed to normal-lognormal
+      real(r8), dimension(subcol_SILHS_numsubcol) :: LH_sample_point_weights ! Subcolumn weights
+      integer, dimension(pverp,subcol_SILHS_numsubcol) :: X_mixt_comp_all_levs ! Which Mixture Component
 
-      real(r8), allocatable, dimension(:,:) :: rc_all_points ! Calculate RCM from LH output
-      real(r8), allocatable, dimension(:,:) :: rain_all_pts  ! Calculate Rain from LH output
-      real(r8), allocatable, dimension(:,:) :: nrain_all_pts ! Calculate Rain Conc from LH
-      real(r8), allocatable, dimension(:,:) :: snow_all_pts  ! Calculate Snow from LH output
-      real(r8), allocatable, dimension(:,:) :: nsnow_all_pts ! Calculate Snow Conc from LH
-      real(r8), allocatable, dimension(:,:) :: w_all_points  ! Calculate W from LH output
-      ! real(r8), allocatable, dimension(:,:) :: RVM_LH_out    ! Vapor mixing ratio sent away
-      real(r8), allocatable, dimension(:,:) :: ice_all_pts   ! Calculate Cld Ice from LH output
-      real(r8), allocatable, dimension(:,:) :: nice_all_pts  ! Calculate Num cld ice from LH
-      real(r8), allocatable, dimension(:,:) :: nclw_all_pts  ! Calculate Num cld wat from LH
+      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: rc_all_points ! Calculate RCM from LH output
+      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: rain_all_pts  ! Calculate Rain from LH output
+      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: nrain_all_pts ! Calculate Rain Conc from LH
+      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: snow_all_pts  ! Calculate Snow from LH output
+      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: nsnow_all_pts ! Calculate Snow Conc from LH
+      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: w_all_points  ! Calculate W from LH output
+      ! real(r8), dimension(subcol_SILHS_numsubcol, pverp) :: RVM_LH_out    ! Vapor mixing ratio sent away
+      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: ice_all_pts   ! Calculate Cld Ice from LH output
+      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: nice_all_pts  ! Calculate Num cld ice from LH
+      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: nclw_all_pts  ! Calculate Num cld wat from LH
 
       !----------------
       ! Output from clip_transform_silhs_output_api
       !----------------
-      type(lh_clipped_variables_type), dimension(:,:), allocatable :: &
+      type(lh_clipped_variables_type), dimension(pverp,subcol_SILHS_numsubcol) :: &
         lh_clipped_vars
 
-      real(r8), allocatable, dimension(:,:,:) :: X_nl_all_levs ! Sample (clipped) transformed to normal-lognormal
+      real(r8), dimension(pverp,subcol_SILHS_numsubcol,pdf_dim) :: X_nl_all_levs ! Sample (clipped) transformed to normal-lognormal
 
       logical, parameter :: &
         l_use_Ncn_to_Nc = .true.  ! Whether to call Ncn_to_Nc (.true.) or not (.false.);
@@ -873,33 +873,6 @@ contains
             hydromet(1,k) = hydromet(2,k)                  
          enddo
 
-         ! Allocate arrays for setup_pdf_params
-         allocate( corr_array_1(pdf_dim, pdf_dim, pverp) )
-         allocate( corr_array_2(pdf_dim, pdf_dim, pverp) )
-         allocate( mu_x_1(pdf_dim, pverp) )
-         allocate( mu_x_2(pdf_dim, pverp) )
-         allocate( sigma_x_1(pdf_dim, pverp) )
-         allocate( sigma_x_2(pdf_dim, pverp) )
-         allocate( corr_cholesky_mtx_1(pdf_dim, pdf_dim, pverp) )
-         allocate( corr_cholesky_mtx_2(pdf_dim, pdf_dim, pverp) )
-         ! Allocate arrays for SILHS output
-         allocate( LH_sample_point_weights(num_subcols) )
-         allocate( X_mixt_comp_all_levs(pverp,num_subcols) )
-         allocate( X_nl_all_levs_raw(pverp,num_subcols,pdf_dim) )
-         allocate( X_nl_all_levs(pverp,num_subcols,pdf_dim) )
-         allocate( lh_clipped_vars(pverp,num_subcols) )
-         ! Allocate arrays for output to either history files or for updating state_sc
-         allocate( rc_all_points(pverp, num_subcols) )
-         allocate( rain_all_pts(pverp, num_subcols) )
-         allocate( nrain_all_pts(pverp, num_subcols) )
-         allocate( snow_all_pts(pverp, num_subcols) )
-         allocate( nsnow_all_pts(pverp, num_subcols) )
-         allocate( w_all_points(pverp, num_subcols) )
-         ! allocate( RVM_LH_out(num_subcols, pverp) )  ! This one used only to update state
-         allocate( ice_all_pts(pverp, num_subcols) )
-         allocate( nice_all_pts(pverp, num_subcols) )
-         allocate( nclw_all_pts(pverp, num_subcols) )
-         
          ! Convert from CAM vertical grid to CLUBB
          do k=1,pverp 
             rcm_in(k)  = rcm(i,pverp-k+1)
@@ -1205,17 +1178,6 @@ contains
          ! Only use weights if namelist variable turned on
          if (subcol_SILHS_weight) call subcol_set_weight(state_sc%lchnk, weights)
 
-     
-         ! Deallocate the dynamic arrays used
-         deallocate( LH_sample_point_weights, X_mixt_comp_all_levs, &
-                     X_nl_all_levs_raw, X_nl_all_levs, lh_clipped_vars, &
-                     corr_array_1, corr_array_2, mu_x_1, mu_x_2, &
-                     sigma_x_1, sigma_x_2, corr_cholesky_mtx_1, &
-                     corr_cholesky_mtx_2 )
-         ! deallocate( RVM_LH_out ) 
-         deallocate( rc_all_points, rain_all_pts, nrain_all_pts, &
-                     snow_all_pts, nsnow_all_pts, ice_all_pts, &
-                     nice_all_pts, nclw_all_pts, w_all_points )
       enddo ! ngrdcol
 
       call outfld( 'SILHS_THLM_SCOL', THL_LH_out, pcols*psubcols, lchnk )

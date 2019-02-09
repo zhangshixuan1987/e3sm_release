@@ -17,8 +17,9 @@ module subcol_SILHS
    use cam_history,      only: addfld, add_default, outfld, horiz_only
 #ifdef CLUBB_SGS
 #ifdef SILHS
-   use clubb_api_module, only: hmp2_ip_on_hmm2_ip_slope_type
-   use clubb_api_module, only: hmp2_ip_on_hmm2_ip_intrcpt_type
+   use clubb_api_module, only: &
+        hmp2_ip_on_hmm2_ip_slope_type, &
+        hmp2_ip_on_hmm2_ip_intrcpt_type
 #endif
 #endif
    use physconst,     only: cpair, gravit, latvap, latice, rair
@@ -78,8 +79,8 @@ module subcol_SILHS
    real(r8) :: ztodt  ! model timestep
 #ifdef CLUBB_SGS
 #ifdef SILHS
-   type(hmp2_ip_on_hmm2_ip_slope_type) :: hmp2_ip_on_hmm2_ip_slope
-   type(hmp2_ip_on_hmm2_ip_intrcpt_type) :: hmp2_ip_on_hmm2_ip_intrcpt
+    type(hmp2_ip_on_hmm2_ip_slope_type) :: hmp2_ip_on_hmm2_ip_slope    
+    type(hmp2_ip_on_hmm2_ip_intrcpt_type) :: hmp2_ip_on_hmm2_ip_intrcpt
 #endif
 #endif
 
@@ -142,28 +143,14 @@ contains
 !                                 subcol_SILHS_c8, subcol_SILHS_c11, subcol_SILHS_c11b, &
 !                                 subcol_SILHS_gamma_coef, subcol_SILHS_mult_coef, subcol_SILHS_mu
 
-      real( kind = core_rknd ), parameter :: &
-      init_value = -999._core_rknd ! Initial value for the parameters, used to detect missing values
-
-
       !-----------------------------------------------------------------------------
       ! Set defaults
-
       subcol_SILHS_var_covar_src = .true.  ! TODO: put this in namelist
       subcol_SILHS_destroy_massless_droplets = .true.  ! TODO: put this in namelist
 
       ! Eric Raut changed a default.
-      ! hmp2_ip_on_hmm2_ip_intrcpt%Ni = 0.5_core_rknd
-      ! initialize the namelist variables in hmp2_ip_on_hmm2_ip_intrcpt
-      ! If not specified via namelist, all set to be equal to rrp2_ip_on_rrm2_ip
-      ! after processing the namelist file.
-
-      hmp2_ip_on_hmm2_ip_intrcpt%rr = 1.0_core_rknd
-      hmp2_ip_on_hmm2_ip_intrcpt%Nr = init_value
-      hmp2_ip_on_hmm2_ip_intrcpt%rs = init_value
-      hmp2_ip_on_hmm2_ip_intrcpt%Ns = init_value
-      hmp2_ip_on_hmm2_ip_intrcpt%ri = init_value
-      hmp2_ip_on_hmm2_ip_intrcpt%Ni = init_value
+      hmp2_ip_on_hmm2_ip_slope%Ni = 0.0_core_rknd
+      hmp2_ip_on_hmm2_ip_intrcpt%Ni = 0.5_core_rknd
 
       if (masterproc) then
          unitn = getunit()
@@ -177,26 +164,6 @@ contains
          end if
          close(unitn)
          call freeunit(unitn)
-         if (hmp2_ip_on_hmm2_ip_intrcpt%Nr == init_value) &
-             hmp2_ip_on_hmm2_ip_intrcpt%Nr =  &
-             hmp2_ip_on_hmm2_ip_intrcpt%rr
-
-         if (hmp2_ip_on_hmm2_ip_intrcpt%rs == init_value) &
-             hmp2_ip_on_hmm2_ip_intrcpt%rs = &
-             hmp2_ip_on_hmm2_ip_intrcpt%rr
-
-         if (hmp2_ip_on_hmm2_ip_intrcpt%Ns == init_value) &
-             hmp2_ip_on_hmm2_ip_intrcpt%Ns = &
-             hmp2_ip_on_hmm2_ip_intrcpt%rr
-
-         if (hmp2_ip_on_hmm2_ip_intrcpt%ri == init_value) &
-             hmp2_ip_on_hmm2_ip_intrcpt%ri = &
-             hmp2_ip_on_hmm2_ip_intrcpt%rr
-
-         if (hmp2_ip_on_hmm2_ip_intrcpt%Ni == init_value) &
-             hmp2_ip_on_hmm2_ip_intrcpt%Ni = &
-             hmp2_ip_on_hmm2_ip_intrcpt%rr
-
       end if
 
 #ifdef SPMD
@@ -215,6 +182,12 @@ contains
       call mpi_bcast(subcol_SILHS_var_covar_src,1,mpi_logical,masterprocid, mpicom, ierr)
       call mpi_bcast(subcol_SILHS_destroy_massless_droplets, 1, mpi_logical, masterprocid, mpicom, ierr)
       call mpi_bcast(subcol_SILHS_ncnp2_on_ncnm2, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_slope%rr, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_slope%Nr, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_slope%ri, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_slope%Ni, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_slope%rs, 1, mpir8, masterprocid, mpicom, ierr)
+      call mpi_bcast(hmp2_ip_on_hmm2_ip_slope%Ns, 1, mpir8, masterprocid, mpicom, ierr)
       call mpi_bcast(hmp2_ip_on_hmm2_ip_intrcpt%rr, 1, mpir8, masterprocid, mpicom, ierr)
       call mpi_bcast(hmp2_ip_on_hmm2_ip_intrcpt%Nr, 1, mpir8, masterprocid, mpicom, ierr)
       call mpi_bcast(hmp2_ip_on_hmm2_ip_intrcpt%ri, 1, mpir8, masterprocid, mpicom, ierr)
@@ -252,30 +225,15 @@ contains
       use units,                   only: getunit, freeunit 
 #ifdef CLUBB_SGS
 #ifdef SILHS
-      use clubb_api_module,        only: iirr, iiNr, iirs, iiri, &
-                                         iirg, iiNs, &
-                                         iiNi, iiNg, &
-                                         l_mix_rat_hm, l_frozen_hm, &
-
-                                         hydromet_dim, &
-
+      use clubb_api_module,        only: core_rknd, &
                                          l_prescribed_avg_deltaz, &
-
-                                         rr_tol, ri_tol, rs_tol, rg_tol, &
-                                         Nr_tol, Ni_tol, Ns_tol, Ng_tol, Nc_tol, &
-
                                          l_diagnose_correlations, &
                                          l_calc_w_corr, l_use_cloud_cover, &
                                          l_fix_w_chi_eta_correlations, l_const_Nc_in_cloud, &
-
                                          pdf_dim, &
                                          setup_corr_varnce_array_api, &
                                          init_pdf_hydromet_arrays_api, &
-
-                                         hydromet_list, hydromet_tol, &
-                                         hmp2_ip_on_hmm2_ip, &
                                          Ncnp2_on_Ncnm2, &
-
                                          set_clubb_debug_level_api
 
     use silhs_api_module, only :         l_lh_importance_sampling
@@ -295,9 +253,18 @@ contains
             below_file_ext  = "_corr_array_below.in"
       character(len=256) :: corr_file_path_cloud, corr_file_path_below
 
-      real(r8), parameter :: &
-        host_dx = 100000._r8, &           ! Host model deltax [m]
-        host_dy = 100000._r8              ! Host model deltay [m]
+      ! To set up CLUBB hydromet indices
+      integer :: &
+          hydromet_dim, & ! Number of enabled hydrometeors
+          iirr,         & ! Hydrometeor array index for rain water mixing ratio, rr
+          iirs,         & ! Hydrometeor array index for snow mixing ratio, rs
+          iiri,         & ! Hydrometeor array index for ice mixing ratio, ri
+          iirg,         & ! Hydrometeor array index for graupel mixing ratio, rg
+          iiNr,         & ! Hydrometeor array index for rain drop concentration, Nr
+          iiNs,         & ! Hydrometeor array index for snow concentration, Ns
+          iiNi,         & ! Hydrometeor array index for ice concentration, Ni
+          iiNg            ! Hydrometeor array index for graupel concentration, Ng
+
 
       ! Set CLUBB's debug level
       ! This is called in module clubb_intr; no need to do it here.
@@ -363,6 +330,15 @@ contains
 
       hydromet_dim = 6
 
+ 
+      ! Set up pdf indices, hydromet indicies, hydromet arrays, and hydromet variance ratios
+      call init_pdf_hydromet_arrays_api( 1.0_core_rknd, 1.0_core_rknd,  & ! intent(in)
+                                         hydromet_dim,                  & ! intent(in)
+                                         iirr, iiri, iirs, iirg,        & ! intent(in)
+                                         iiNr, iiNi, iiNs, iiNg,        & ! intent(in)
+                                         hmp2_ip_on_hmm2_ip_slope,      & ! optional(in)
+                                         hmp2_ip_on_hmm2_ip_intrcpt )     ! optional(in)
+
       Ncnp2_on_Ncnm2 = subcol_SILHS_ncnp2_on_ncnm2
 
       !-------------------------------
@@ -373,11 +349,7 @@ contains
 
       iunit = getunit()
 
-      call init_pdf_hydromet_arrays_api( host_dx, host_dy, hydromet_dim, & ! In
-                                         iirr, iiri, iirs, iirg,         & ! In
-                                         iiNr, iiNi, iiNs, iiNg,         & ! In
-                                         hmp2_ip_on_hmm2_ip_slope,       & ! In
-                                         hmp2_ip_on_hmm2_ip_intrcpt      ) ! In
+
       call setup_corr_varnce_array_api( corr_file_path_cloud, corr_file_path_below, &
                                     iunit )
       call freeunit(iunit) 
@@ -448,7 +420,7 @@ contains
                   'Calculated cloud fraction from subcolumn liq or ice') 
 
      call addfld('SILHS_CLUBB_PRECIP_FRAC', (/ 'lev' /), 'A', 'frac', &
-                  'Precipitation fraction from CLUBB (setup_pdf_params)')
+                  'Precipitation fraction from CLUBB (set_up_pdf_params_incl_hydromet)')
      call addfld('SILHS_CLUBB_ICE_SS_FRAC', (/ 'lev' /), 'A', 'frac', &
                   'Ice supersaturation fraction from CLUBB')
 
@@ -479,7 +451,7 @@ contains
    subroutine subcol_gen_SILHS(state, tend, state_sc, tend_sc, pbuf)
       !-------------------------------
       ! This is where the subcolumns are created, and the call to
-      !      generate_silhs_sample_api
+      !      generate_silhs_sample_mod_api
       !    goes out. Variables needed to make this call are pulled from the 
       !    pbuf, from module data, and calculated based on the CAM state.
       !-------------------------------
@@ -564,18 +536,18 @@ contains
       real(r8) :: scale = 1.0_r8
 
       !----------------
-      ! Required for setup_pdf_params
+      ! Required for set_up_pdf_params_incl_hydromet
       !----------------
       real(r8), dimension(pverp) :: cld_frac_in  ! Cloud fraction
       real(r8), dimension(pverp) :: wp2_flip     ! CLUBB vert vel var flipped from pbuf
       type(hydromet_pdf_parameter), dimension(pverp) :: &
                                     hydromet_pdf_params  ! Hydrometeor PDF parameters
-      real(r8), dimension(pdf_dim, pdf_dim, pverp) :: &  ! Correlation matrix for pdf components
+      real(r8), dimension(:,:,:), allocatable :: &       ! Correlation matrix for pdf components
                                     corr_array_1, corr_array_2 
-      real(r8), dimension(pdf_dim, pverp) :: &
+      real(r8), dimension(:,:), allocatable :: &
                                     mu_x_1, mu_x_2, &    ! Mean array for PDF components
                                     sigma_x_1, sigma_x_2 ! Std dev arr for PDF components
-      real(r8), dimension(pdf_dim, pdf_dim, pverp) :: &  ! Transposed corr cholesky mtx
+      real(r8), dimension(:,:,:), allocatable :: &       ! Transposed corr cholesky mtx
                                     corr_cholesky_mtx_1, corr_cholesky_mtx_2
       real(r8), dimension(pverp) :: Nc_in_cloud
       real(r8), dimension(pverp) :: ice_supersat_frac_in
@@ -598,36 +570,38 @@ contains
       real(r8), dimension(pverp) :: rcm_in       ! Cld water mixing ratio on CLUBB levs
       real(r8), dimension(pverp,hydromet_dim) :: hydromet  ! Hydrometeor spcies
       real(r8), dimension(pverp)              :: Ncm ! Mean cloud droplet concentration, <N_c>
-
-      logical, parameter :: &
-        l_calc_weights_all_levs_itime = .false.
+      logical, parameter :: &  
+         l_calc_weights_all_levs = .false. ! .false. if all time steps use the same
+                                          !   weights at all vertical grid levels 
+      logical :: & 
+        l_calc_weights_all_levs_itime, & ! .true. if we calculate sample weights separately at all 
+                                         !    grid levels at the current time step   
+        l_rad_itime                      ! .true. if we calculate radiation at the current time step  
       
-
       !---------------
       !Output from generate_silhs_sample
       !--------------
-      real(r8), dimension(pverp,subcol_SILHS_numsubcol,pdf_dim) :: X_nl_all_levs_raw ! Sample transformed to normal-lognormal
-      real(r8), dimension(subcol_SILHS_numsubcol) :: LH_sample_point_weights ! Subcolumn weights
-      integer, dimension(pverp,subcol_SILHS_numsubcol) :: X_mixt_comp_all_levs ! Which Mixture Component
+      real(r8), allocatable, dimension(:,:,:) :: X_nl_all_levs ! Sample transformed to normal-lognormal
+      real(r8), allocatable, dimension(:,:,:) :: X_nl_all_levs_raw ! Raw (unclipped) SILHS samples
+      real(r8), allocatable, dimension(:,:)   :: lh_sample_point_weights ! Subcolumn weights
+      integer,  allocatable, dimension(:,:)    :: X_mixt_comp_all_levs ! Which Mixture Component
 
-      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: rc_all_points ! Calculate RCM from LH output
-      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: rain_all_pts  ! Calculate Rain from LH output
-      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: nrain_all_pts ! Calculate Rain Conc from LH
-      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: snow_all_pts  ! Calculate Snow from LH output
-      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: nsnow_all_pts ! Calculate Snow Conc from LH
-      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: w_all_points  ! Calculate W from LH output
-      ! real(r8), dimension(subcol_SILHS_numsubcol, pverp) :: RVM_LH_out    ! Vapor mixing ratio sent away
-      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: ice_all_pts   ! Calculate Cld Ice from LH output
-      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: nice_all_pts  ! Calculate Num cld ice from LH
-      real(r8), dimension(pverp, subcol_SILHS_numsubcol) :: nclw_all_pts  ! Calculate Num cld wat from LH
+      real(r8), allocatable, dimension(:,:) :: rc_all_points ! Calculate RCM from LH output
+      real(r8), allocatable, dimension(:,:) :: rain_all_pts  ! Calculate Rain from LH output
+      real(r8), allocatable, dimension(:,:) :: nrain_all_pts ! Calculate Rain Conc from LH
+      real(r8), allocatable, dimension(:,:) :: snow_all_pts  ! Calculate Snow from LH output
+      real(r8), allocatable, dimension(:,:) :: nsnow_all_pts ! Calculate Snow Conc from LH
+      real(r8), allocatable, dimension(:,:) :: w_all_points  ! Calculate W from LH output
+      ! real(r8), allocatable, dimension(:,:) :: RVM_lh_out    ! Vapor mixing ratio sent away
+      real(r8), allocatable, dimension(:,:) :: ice_all_pts   ! Calculate Cld Ice from LH output
+      real(r8), allocatable, dimension(:,:) :: nice_all_pts  ! Calculate Num cld ice from LH
+      real(r8), allocatable, dimension(:,:) :: nclw_all_pts  ! Calculate Num cld wat from LH
 
       !----------------
       ! Output from clip_transform_silhs_output_api
       !----------------
-      type(lh_clipped_variables_type), dimension(pverp,subcol_SILHS_numsubcol) :: &
+      type(lh_clipped_variables_type), dimension(:,:), allocatable :: &
         lh_clipped_vars
-
-      real(r8), dimension(pverp,subcol_SILHS_numsubcol,pdf_dim) :: X_nl_all_levs ! Sample (clipped) transformed to normal-lognormal
 
       logical, parameter :: &
         l_use_Ncn_to_Nc = .true.  ! Whether to call Ncn_to_Nc (.true.) or not (.false.);
@@ -639,19 +613,25 @@ contains
       !----------------
       ! Output to history
       !----------------
-      real(r8), dimension(pcols*psubcols, pverp) :: RT_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: THL_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: OMEGA_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: WM_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: RVM_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: RCM_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: NCLW_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: ICE_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: NICE_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: RAIN_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: NRAIN_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: SNOW_LH_out
-      real(r8), dimension(pcols*psubcols, pverp) :: NSNOW_LH_out
+      ! V. Larson note: These variables are on the zt (full) levels: why do they
+      ! have dimension pverp?  The pverp level corresponds to the CLUBB
+      ! below-ground level.
+      ! The variables in this paragraph are oriented like CAM variables (k=1 is
+      ! the model top).
+      ! They are flipped versions of CLUBB variables, for the entire chunk.
+      real(r8), dimension(pcols*psubcols, pverp) :: RT_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: THL_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: OMEGA_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: WM_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: RVM_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: RCM_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: NCLW_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: ICE_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: NICE_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: RAIN_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: NRAIN_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: SNOW_lh_out
+      real(r8), dimension(pcols*psubcols, pverp) :: NSNOW_lh_out
 
       real(r8), dimension(state_sc%psetcols) :: weights ! Subcol weights
 
@@ -678,7 +658,7 @@ contains
       real(r8), dimension(pverp) :: AKstd_cld  ! Exact w/in cloud stdev of gba Kessler
       real(r8), dimension(pverp) :: AKm_rcm    ! Exact local gba Kessler auto based on rcm
       real(r8), dimension(pverp) :: AKm_rcc    ! Exact local gba Kessler based on w/in cloud rc
-      real(r8), dimension(pverp) :: LH_rcm_avg ! LH estimate of grid box avg liquid water
+      real(r8), dimension(pverp) :: lh_rcm_avg ! LH estimate of grid box avg liquid water
       real(r8), dimension(pcols,pverp) :: lh_AKm_out, AKm_out
 
       !----------------
@@ -772,6 +752,8 @@ contains
       do i=1,ngrdcol
       
          ! JHDBG: Big suspicion about that code
+         ! V. Larson: I don't know what happens to arrays allocated with size
+         ! num_subcols if num_subcols varies with the grid column.
          num_subcols = numsubcol_arr(i)
          stncol = 0         ! Each grid column needs to know how many subcolumns have gone by
          do k=1,i-1
@@ -873,6 +855,33 @@ contains
             hydromet(1,k) = hydromet(2,k)                  
          enddo
 
+         ! Allocate arrays for set_up_pdf_params_incl_hydromet
+         allocate( corr_array_1(pdf_dim, pdf_dim, pverp) )
+         allocate( corr_array_2(pdf_dim, pdf_dim, pverp) )
+         allocate( mu_x_1(pdf_dim, pverp) )
+         allocate( mu_x_2(pdf_dim, pverp) )
+         allocate( sigma_x_1(pdf_dim, pverp) )
+         allocate( sigma_x_2(pdf_dim, pverp) )
+         allocate( corr_cholesky_mtx_1(pdf_dim, pdf_dim, pverp) )
+         allocate( corr_cholesky_mtx_2(pdf_dim, pdf_dim, pverp) )
+         ! Allocate arrays for SILHS output
+         allocate( lh_sample_point_weights(pverp,num_subcols) )
+         allocate( X_mixt_comp_all_levs(pverp,num_subcols) )
+         allocate( X_nl_all_levs(pverp,num_subcols,pdf_dim) )
+         allocate( X_nl_all_levs_raw(pverp,num_subcols,pdf_dim) )
+         allocate( lh_clipped_vars(pverp,num_subcols) )
+         ! Allocate arrays for output to either history files or for updating state_sc
+         allocate( rc_all_points(pverp, num_subcols) )
+         allocate( rain_all_pts(pverp, num_subcols) )
+         allocate( nrain_all_pts(pverp, num_subcols) )
+         allocate( snow_all_pts(pverp, num_subcols) )
+         allocate( nsnow_all_pts(pverp, num_subcols) )
+         allocate( w_all_points(pverp, num_subcols) )
+         ! allocate( RVM_lh_out(num_subcols, pverp) )  ! This one used only to update state
+         allocate( ice_all_pts(pverp, num_subcols) )
+         allocate( nice_all_pts(pverp, num_subcols) )
+         allocate( nclw_all_pts(pverp, num_subcols) )
+         
          ! Convert from CAM vertical grid to CLUBB
          do k=1,pverp 
             rcm_in(k)  = rcm(i,pverp-k+1)
@@ -908,46 +917,76 @@ contains
                                    corr_cholesky_mtx_1, corr_cholesky_mtx_2, &    ! Out
                                    hydromet_pdf_params )                          ! Out
 
+         ! Calculate radiation only once in a while
+         ! l_rad_itime = (mod( itime, floor(dt_rad/dt_main) ) == 0 .or. itime == 1)  
+
+         ! Calculate sample weights separately at all grid levels when
+         ! radiation is not called  
+         ! l_calc_weights_all_levs_itime = l_calc_weights_all_levs .and. .not.
+         ! l_rad_itime  
+         l_calc_weights_all_levs_itime = .false. ! subcol_utils cannot compute weighted avgs
+                                                 !   when the weights vary with height.   
+                                                 !   Don't set to true until this is fixed!!
+
          ! Let's generate some subcolumns!!!!!
          call generate_silhs_sample_api &
-              ( iter, pdf_dim, num_subcols, sequence_length, pverp, & ! In
-                l_calc_weights_all_levs_itime, &                      ! In
-                pdf_params, delta_zm, rcm_in, Lscale, &               ! In
-                rho_ds_zt, mu_x_1, mu_x_2, sigma_x_1, sigma_x_2, &    ! In 
-                corr_cholesky_mtx_1, corr_cholesky_mtx_2, &           ! In
-                hydromet_pdf_params, &                                ! In
-                X_nl_all_levs_raw, X_mixt_comp_all_levs, &            ! Out
-                LH_sample_point_weights )                             ! Out
+              (iter, pdf_dim, num_subcols, sequence_length, pverp, & ! In
+              l_calc_weights_all_levs_itime, &                       ! In 
+              pdf_params, delta_zm, rcm_in, Lscale, &                ! In
+              rho_ds_zt, mu_x_1, mu_x_2, sigma_x_1, sigma_x_2, &     ! In 
+              corr_cholesky_mtx_1, corr_cholesky_mtx_2, &            ! In
+              hydromet_pdf_params, &                                 ! In
+              X_nl_all_levs_raw, X_mixt_comp_all_levs, &             ! Out
+              lh_sample_point_weights)                               ! Out
 
          ! Extract clipped variables from subcolumns
-         call clip_transform_silhs_output_api( pverp, num_subcols, &          ! In
-                                               pdf_dim, hydromet_dim,  &      ! In
-                                               X_mixt_comp_all_levs, &        ! In
-                                               X_nl_all_levs_raw, &           ! In
+         call clip_transform_silhs_output_api( pverp, num_subcols, &   ! In
+                                               pdf_dim, hydromet_dim, & ! In
+                                               X_mixt_comp_all_levs, & ! In
+                                               X_nl_all_levs_raw, &    ! In
                                                pdf_params, l_use_Ncn_to_Nc, & ! In
-                                               lh_clipped_vars, &             ! out
-                                               X_nl_all_levs )                ! Out
+                                               lh_clipped_vars, & ! Out
+                                               X_nl_all_levs )    ! Out
 
          ! Test subcolumns by comparing to an estimate of kessler autoconversion
          call est_kessler_microphys_api &
               (pverp, num_subcols, pdf_dim, X_nl_all_levs, pdf_params, &
-              rcm_in, cld_frac_in, X_mixt_comp_all_levs, LH_sample_point_weights, &
-              lh_AKm, AKm, AKstd, AKstd_cld, AKm_rcm, AKm_rcc, LH_rcm_avg)
+              rcm_in, cld_frac_in, X_mixt_comp_all_levs, lh_sample_point_weights, &
+              lh_AKm, AKm, AKstd, AKstd_cld, AKm_rcm, AKm_rcc, lh_rcm_avg)
 
          ! Calc column liquid water for output (rcm)
          rc_all_points = lh_clipped_vars(:,:)%rc
-         ! Calc subcolumn precipitating liq water for output (rrm)
-         rain_all_pts = real( X_nl_all_levs(:,:,iiPDF_rr), kind=r8 )
-         ! Calc subcolumn number rain conc for output (nrainm)
-         nrain_all_pts = real( X_nl_all_levs(:,:,iiPDF_Nr), kind=r8 )
-         ! Calc subcolumn precipitating snow      for output (rsm)
-         snow_all_pts = real( X_nl_all_levs(:,:,iiPDF_rs), kind=r8 )
-         ! Calc subcolumn precipitating snow conc for output (Nsm)
-         nsnow_all_pts = real( X_nl_all_levs(:,:,iiPDF_Ns), kind=r8 )
-         ! Calc subcolumn cloud ice mixing ratio
-         ice_all_pts = real( X_nl_all_levs(:,:,iiPDF_ri), kind=r8)
-         ! Calc subcolumn cloud ice number
-         nice_all_pts = real( X_nl_all_levs(:,:,iiPDF_Ni), kind=r8)
+
+         if ( iiPDF_rr > 0 ) then
+             ! Calc subcolumn precipitating liq water for output (rrm)
+             rain_all_pts = real( X_nl_all_levs(:,:,iiPDF_rr), kind=r8 )
+         end if
+
+         if ( iiPDF_Nr > 0 ) then
+             ! Calc subcolumn number rain conc for output (nrainm)
+             nrain_all_pts = real( X_nl_all_levs(:,:,iiPDF_Nr), kind=r8 )
+         end if
+
+         if ( iiPDF_rs > 0 ) then
+             ! Calc subcolumn precipitating snow      for output (rsm)
+             snow_all_pts = real( X_nl_all_levs(:,:,iiPDF_rs), kind=r8 )
+         end if
+
+         if ( iiPDF_Ns > 0 ) then
+             ! Calc subcolumn precipitating snow conc for output (Nsm)
+             nsnow_all_pts = real( X_nl_all_levs(:,:,iiPDF_Ns), kind=r8 )
+         end if
+
+         if ( iiPDF_ri > 0 ) then
+             ! Calc subcolumn cloud ice mixing ratio
+             ice_all_pts = real( X_nl_all_levs(:,:,iiPDF_ri), kind=r8)
+         end if
+
+         if ( iiPDF_Ni > 0 ) then
+             ! Calc subcolumn cloud ice number
+             nice_all_pts = real( X_nl_all_levs(:,:,iiPDF_Ni), kind=r8)
+         end if
+
          ! Calc subcolumn vert velocity for output (wm)
          w_all_points = real( X_nl_all_levs(:,:,iiPDF_w), kind=r8 )
          ! Calc cloud liq water number conc 
@@ -962,7 +1001,7 @@ contains
 
               if((rc_all_points(pverp-k+1,j).gt.qsmall) &
                   .or.(ice_all_pts(pverp-k+1,j).gt.qsmall)) then
-                  eff_cldfrac(i,k) = eff_cldfrac(i,k)+LH_sample_point_weights(j)
+                  eff_cldfrac(i,k) = eff_cldfrac(i,k)+lh_sample_point_weights(pverp-k+1,j)
               endif
            enddo 
 
@@ -977,7 +1016,8 @@ contains
          ! Pack up weights for output
          do j = 1, num_subcols      
                if (subcol_SILHS_weight) then 
-                  weights(stncol+j) = LH_sample_point_weights(j)
+                  weights(stncol+j) = lh_sample_point_weights(2,j) ! Using grid level 2 always won't work 
+                                                                   !   if weights vary with height.
                else
                   weights(stncol+j) = 1._r8
                endif
@@ -987,20 +1027,20 @@ contains
          ! Updating state variables
          do k=1,pverp
             do j=1,num_subcols
-               RT_LH_out(    stncol+j,k ) = lh_clipped_vars(pverp-k+1,j)%rt
-               RCM_LH_out(   stncol+j,k ) = rc_all_points(pverp-k+1,j)
-               NCLW_LH_out(  stncol+j,k ) = nclw_all_pts(pverp-k+1,j)
-               ICE_LH_out(   stncol+j,k) = ice_all_pts(pverp-k+1,j)
-               NICE_LH_out(  stncol+j,k) = nice_all_pts(pverp-k+1,j)
-!               RVM_LH_out(j,k) = RT_LH_out(stncol+j,k)-RCM_LH_out(stncol+j,k)-ICE_LH_out(stncol+j,k)
-               RVM_LH_out(stncol+j,k) = lh_clipped_vars(pverp-k+1,j)%rv
-               THL_LH_out(   stncol+j,k ) = lh_clipped_vars(pverp-k+1,j)%thl
-               RAIN_LH_out(  stncol+j,k ) = rain_all_pts(pverp-k+1,j)
-               NRAIN_LH_out( stncol+j,k ) = nrain_all_pts(pverp-k+1,j)
-               SNOW_LH_out(  stncol+j,k ) = snow_all_pts(pverp-k+1,j)
-               NSNOW_LH_out( stncol+j,k ) = nsnow_all_pts(pverp-k+1,j)
-               WM_LH_out(    stncol+j,k ) = w_all_points(pverp-k+1,j)
-               OMEGA_LH_out( stncol+j,k ) = -1._r8*WM_LH_out(stncol+j,k)*rho_ds_zt(pverp-k+1)*gravit
+               RT_lh_out(    stncol+j,k ) = lh_clipped_vars(pverp-k+1,j)%rt
+               RCM_lh_out(   stncol+j,k ) = rc_all_points(pverp-k+1,j)
+               NCLW_lh_out(  stncol+j,k ) = nclw_all_pts(pverp-k+1,j)
+               ICE_lh_out(   stncol+j,k) = ice_all_pts(pverp-k+1,j)
+               NICE_lh_out(  stncol+j,k) = nice_all_pts(pverp-k+1,j)
+!               RVM_lh_out(j,k) = RT_lh_out(stncol+j,k)-RCM_lh_out(stncol+j,k)-ICE_lh_out(stncol+j,k)
+               RVM_lh_out(stncol+j,k) = lh_clipped_vars(pverp-k+1,j)%rv
+               THL_lh_out(   stncol+j,k ) = lh_clipped_vars(pverp-k+1,j)%thl
+               RAIN_lh_out(  stncol+j,k ) = rain_all_pts(pverp-k+1,j)
+               NRAIN_lh_out( stncol+j,k ) = nrain_all_pts(pverp-k+1,j)
+               SNOW_lh_out(  stncol+j,k ) = snow_all_pts(pverp-k+1,j)
+               NSNOW_lh_out( stncol+j,k ) = nsnow_all_pts(pverp-k+1,j)
+               WM_lh_out(    stncol+j,k ) = w_all_points(pverp-k+1,j)
+               OMEGA_lh_out( stncol+j,k ) = -1._r8*WM_lh_out(stncol+j,k)*rho_ds_zt(pverp-k+1)*gravit
                AKm_out(i,k) = AKm(pverp-k+1)
                lh_AKm_out(i,k) = lh_AKm(pverp-k+1)
             enddo
@@ -1009,74 +1049,74 @@ contains
          ! Constrain the sample distribution of cloud water and ice to the same mean
          ! as the grid to prevent negative condensate errors
          if(subcol_SILHS_constrainmn) then
-            call subcol_constrainmn( num_subcols, ICE_LH_out(stncol+1:stncol+num_subcols,:), &
+            call subcol_constrainmn( num_subcols, ICE_lh_out(stncol+1:stncol+num_subcols,:), &
                                      weights(stncol+1:stncol+num_subcols), &
                                      state%q(i,:,ixcldice), meansc_ice(i,:), stdsc_ice(i,:) )
             if ( ixrain > 0 ) &
-            call subcol_constrainmn( num_subcols, RAIN_LH_out(stncol+1:stncol+num_subcols,:), &
+            call subcol_constrainmn( num_subcols, RAIN_lh_out(stncol+1:stncol+num_subcols,:), &
                                      weights(stncol+1:stncol+num_subcols), &
                                      state%q(i,:,ixrain) )
             if ( ixsnow > 0 ) &
-            call subcol_constrainmn( num_subcols, SNOW_LH_out(stncol+1:stncol+num_subcols,:), &
+            call subcol_constrainmn( num_subcols, SNOW_lh_out(stncol+1:stncol+num_subcols,:), &
                                      weights(stncol+1:stncol+num_subcols), &
                                      state%q(i,:,ixsnow) )
-            call subcol_constrainmn( num_subcols, RCM_LH_out(stncol+1:stncol+num_subcols,:), &
+            call subcol_constrainmn( num_subcols, RCM_lh_out(stncol+1:stncol+num_subcols,:), &
                                      weights(stncol+1:stncol+num_subcols), &
                                      state%q(i,:,ixcldliq), meansc_liq(i,:), stdsc_liq(i,:) )
-            call subcol_constrainmn( num_subcols, RVM_LH_out(stncol+1:stncol+num_subcols,:), &
+            call subcol_constrainmn( num_subcols, RVM_lh_out(stncol+1:stncol+num_subcols,:), &
                                      weights(stncol+1:stncol+num_subcols), &
                                      state%q(i,:,ixq), meansc_vap(i,:), stdsc_vap(i,:) )
-            call subcol_constrainmn( num_subcols, NICE_LH_out(stncol+1:stncol+num_subcols,:), &
+            call subcol_constrainmn( num_subcols, NICE_lh_out(stncol+1:stncol+num_subcols,:), &
                                      weights(stncol+1:stncol+num_subcols), &
                                      state%q(i,:,ixnumice) )
             if ( ixnumrain > 0 ) &
-            call subcol_constrainmn( num_subcols, NRAIN_LH_out(stncol+1:stncol+num_subcols,:), &
+            call subcol_constrainmn( num_subcols, NRAIN_lh_out(stncol+1:stncol+num_subcols,:), &
                                      weights(stncol+1:stncol+num_subcols), &
                                      state%q(i,:,ixnumrain) )
             if ( ixnumsnow > 0 ) &
-            call subcol_constrainmn( num_subcols, NSNOW_LH_out(stncol+1:stncol+num_subcols,:), &
+            call subcol_constrainmn( num_subcols, NSNOW_lh_out(stncol+1:stncol+num_subcols,:), &
                                      weights(stncol+1:stncol+num_subcols), &
                                      state%q(i,:,ixnumsnow) )
-            call subcol_constrainmn( num_subcols, NCLW_LH_out(stncol+1:stncol+num_subcols,:), &
+            call subcol_constrainmn( num_subcols, NCLW_lh_out(stncol+1:stncol+num_subcols,:), &
                                      weights(stncol+1:stncol+num_subcols), &
                                      state%q(i,:,ixnumliq) )
             do k=1,pver
                ! Look for exceptionally large values of condensate
-               if(ANY(ICE_LH_out(stncol+1:stncol+num_subcols,k) .gt. 0.01_r8)) then
+               if(ANY(ICE_lh_out(stncol+1:stncol+num_subcols,k) .gt. 0.01_r8)) then
                   ! Clip the large values
-                  where(ICE_LH_out(stncol+1:stncol+num_subcols,k) .gt. 0.01_r8)
-                     ICE_LH_out(stncol+1:stncol+num_subcols,k) = 0.01_r8
-                     NICE_LH_out(stncol+1:stncol+num_subcols,k) = 1.5e+7_r8
+                  where(ICE_lh_out(stncol+1:stncol+num_subcols,k) .gt. 0.01_r8)
+                     ICE_lh_out(stncol+1:stncol+num_subcols,k) = 0.01_r8
+                     NICE_lh_out(stncol+1:stncol+num_subcols,k) = 1.5e+7_r8
                   end where
                   ! Recalculate the weighted subcolumn mean
-                  tmp_mean = meansc( ICE_LH_out( stncol+1:stncol+num_subcols, k ), & 
+                  tmp_mean = meansc( ICE_lh_out( stncol+1:stncol+num_subcols, k ), & 
                                          weights(stncol+1:stncol+num_subcols), &
                                          real(num_subcols,r8) )
                   ! Calculate the difference between the weighted mean and grid mean
                   diff_mean = state%q(i,k,ixcldice)-tmp_mean
                   ! Add the difference to each subcolumn
-                  ICE_LH_out(stncol+1:stncol+num_subcols,k) = &
-                     ICE_LH_out(stncol+1:stncol+num_subcols,k)+diff_mean
+                  ICE_lh_out(stncol+1:stncol+num_subcols,k) = &
+                     ICE_lh_out(stncol+1:stncol+num_subcols,k)+diff_mean
                   ! Recalculate the weight subcolumn mean for ice num conc
-                  tmp_mean = meansc( NICE_LH_out( stncol+1:stncol+num_subcols, k ), & 
+                  tmp_mean = meansc( NICE_lh_out( stncol+1:stncol+num_subcols, k ), & 
                                          weights(stncol+1:stncol+num_subcols), &
                                          real(num_subcols,r8) )
                   ! Calculate the difference between the weighted mean and grid mean
                   diff_mean = state%q(i,k,ixnumice)-tmp_mean
                   ! Add the difference to each subcolumn
                   if(diff_mean.gt.0.0_r8) then
-                     NICE_LH_out(stncol+1:stncol+num_subcols,k) = &
-                         NICE_LH_out(stncol+1:stncol+num_subcols,k)+diff_mean
+                     NICE_lh_out(stncol+1:stncol+num_subcols,k) = &
+                         NICE_lh_out(stncol+1:stncol+num_subcols,k)+diff_mean
                   else ! just use the grid mean in each subcolumn
-                     NICE_LH_out(stncol+1:stncol+num_subcols,k) = &
+                     NICE_lh_out(stncol+1:stncol+num_subcols,k) = &
                          state%q(i,k,ixnumice)
                   end if
                   ! Test adjusted means for debugging
-                  tmp_mean = meansc( ICE_LH_out( stncol+1:stncol+num_subcols, k ), & 
+                  tmp_mean = meansc( ICE_lh_out( stncol+1:stncol+num_subcols, k ), & 
                                          weights(stncol+1:stncol+num_subcols), &
                                          real(num_subcols,r8) )
                   diff_mean = state%q(i,k,ixcldice)-tmp_mean
-                  tmp_mean = meansc( NICE_LH_out( stncol+1:stncol+num_subcols, k ), & 
+                  tmp_mean = meansc( NICE_lh_out( stncol+1:stncol+num_subcols, k ), & 
                                          weights(stncol+1:stncol+num_subcols), &
                                          real(num_subcols,r8) )
                   diff_mean = state%q(i,k,ixnumice)-tmp_mean
@@ -1088,8 +1128,8 @@ contains
          ! Set state variables
          do j=1,numsubcol_arr(i)
 
-            call Abs_Temp_profile(pver, THL_LH_out(stncol+j,1:pver), &
-                              invs_exner(i,:), RCM_LH_out(stncol+j,1:pver), Temp_prof)
+            call Abs_Temp_profile(pver, THL_lh_out(stncol+j,1:pver), &
+                              invs_exner(i,:), RCM_lh_out(stncol+j,1:pver), Temp_prof)
             state_sc%t(stncol+j,:) = Temp_prof(:)
             call StaticEng_profile(pver, Temp_prof, state%zm(i,:), state%phis(i), &
                                       SE_prof)
@@ -1097,8 +1137,8 @@ contains
 
             ! Vertical Velocity is not part of the energy conservation checks, but
             ! we need to be careful here, because the SILHS output VV is noisy.
-            state_sc%omega(stncol+j,:) = OMEGA_LH_out(stncol+j,1:pver)
-            state_sc%q(stncol+j,:,ixq) = RVM_LH_out(stncol+j,1:pver) 
+            state_sc%omega(stncol+j,:) = OMEGA_lh_out(stncol+j,1:pver)
+            state_sc%q(stncol+j,:,ixq) = RVM_lh_out(stncol+j,1:pver) 
 
             if( rx_Nc ) then
                 stop "rx_Nc not enabled in subcol_gen_SILHS"
@@ -1109,10 +1149,10 @@ contains
 !                      elsewhere
 !                        state_sc%q(stncol+j,:,ixnumliq) = NCLW_ADJ_out(stncol+j,1:pver)
 !                      end where
-!                      NCLW_LH_out(stncol+j,1:pver) = state_sc%q(stncol+j,:,ixnumliq) 
+!                      NCLW_lh_out(stncol+j,1:pver) = state_sc%q(stncol+j,:,ixnumliq) 
 !           else
 !                       state_sc%q(stncol+j,:,ixnumliq) = NCLW_ADJ_out(stncol+j,1:pver)
-!                       NCLW_LH_out(stncol+j,:) = NCLW_ADJ_out(stncol+j,:)
+!                       NCLW_lh_out(stncol+j,:) = NCLW_ADJ_out(stncol+j,:)
             endif
 
 
@@ -1120,16 +1160,16 @@ contains
                 stop "subcol_SILHS_meanice = T not currently available"
                 state_sc%q(stncol+j,:,ixcldice) = state%q(i,:,ixcldice)
                 state_sc%q(stncol+j,:,ixnumice) = state%q(i,:,ixnumice)
-                state_sc%q(stncol+j,:,ixcldliq) = RCM_LH_out(stncol+j,1:pver)
-                state_sc%q(stncol+j,:,ixnumliq) = NCLW_LH_out(stncol+j,1:pver)
+                state_sc%q(stncol+j,:,ixcldliq) = RCM_lh_out(stncol+j,1:pver)
+                state_sc%q(stncol+j,:,ixnumliq) = NCLW_lh_out(stncol+j,1:pver)
             else
                if(subcol_SILHS_q_to_micro) then ! Send SILHS predicted constituents to microp
-                  state_sc%q(stncol+j,:,ixcldliq) = RCM_LH_out(stncol+j,1:pver)
-                  state_sc%q(stncol+j,:,ixcldice) = ICE_LH_out(stncol+j,1:pver)
+                  state_sc%q(stncol+j,:,ixcldliq) = RCM_lh_out(stncol+j,1:pver)
+                  state_sc%q(stncol+j,:,ixcldice) = ICE_lh_out(stncol+j,1:pver)
                   if (ixrain > 0) &
-                    state_sc%q(stncol+j,:,ixrain) = RAIN_LH_out(stncol+j,1:pver)
+                    state_sc%q(stncol+j,:,ixrain) = RAIN_lh_out(stncol+j,1:pver)
                   if (ixsnow > 0) &
-                    state_sc%q(stncol+j,:,ixsnow) = SNOW_LH_out(stncol+j,1:pver)
+                    state_sc%q(stncol+j,:,ixsnow) = SNOW_lh_out(stncol+j,1:pver)
                else            
                   state_sc%q(stncol+j,:,ixcldliq) = state%q(i,:,ixcldliq)
                   state_sc%q(stncol+j,:,ixcldice) = state%q(i,:,ixcldice)
@@ -1139,12 +1179,12 @@ contains
                     state_sc%q(stncol+j,:,ixsnow) = state%q(i,:,ixsnow)
                endif
                if(subcol_SILHS_n_to_micro) then ! Send SILHS predicted number conc to microp
-                  state_sc%q(stncol+j,:,ixnumice) = NICE_LH_out(stncol+j,1:pver)
-                  state_sc%q(stncol+j,:,ixnumliq) = NCLW_LH_out(stncol+j,1:pver)
+                  state_sc%q(stncol+j,:,ixnumice) = NICE_lh_out(stncol+j,1:pver)
+                  state_sc%q(stncol+j,:,ixnumliq) = NCLW_lh_out(stncol+j,1:pver)
                   if (ixnumrain > 0) &
-                    state_sc%q(stncol+j,:,ixnumrain) = NRAIN_LH_out(stncol+j,1:pver)
+                    state_sc%q(stncol+j,:,ixnumrain) = NRAIN_lh_out(stncol+j,1:pver)
                   if (ixnumsnow > 0) &
-                    state_sc%q(stncol+j,:,ixnumsnow) = NSNOW_LH_out(stncol+j,1:pver)
+                    state_sc%q(stncol+j,:,ixnumsnow) = NSNOW_lh_out(stncol+j,1:pver)
                else            
                   state_sc%q(stncol+j,:,ixnumliq) = state%q(i,:,ixnumliq)
                   state_sc%q(stncol+j,:,ixnumice) = state%q(i,:,ixnumice)
@@ -1178,18 +1218,27 @@ contains
          ! Only use weights if namelist variable turned on
          if (subcol_SILHS_weight) call subcol_set_weight(state_sc%lchnk, weights)
 
+     
+         ! Deallocate the dynamic arrays used
+         deallocate( lh_sample_point_weights, X_mixt_comp_all_levs, &
+                     X_nl_all_levs, X_nl_all_levs_raw, lh_clipped_vars, &
+                     corr_array_1, corr_array_2, mu_x_1, mu_x_2, sigma_x_1, &
+                     sigma_x_2, corr_cholesky_mtx_1, corr_cholesky_mtx_2 )
+         ! deallocate( RVM_lh_out ) 
+         deallocate( rc_all_points, rain_all_pts, nrain_all_pts, snow_all_pts, nsnow_all_pts, ice_all_pts, &
+                     nice_all_pts, nclw_all_pts, w_all_points )
       enddo ! ngrdcol
 
-      call outfld( 'SILHS_THLM_SCOL', THL_LH_out, pcols*psubcols, lchnk )
-      call outfld( 'SILHS_RT_SCOL', RT_LH_out, pcols*psubcols, lchnk )
-      call outfld( 'SILHS_OMEGA_SCOL', OMEGA_LH_out, pcols*psubcols, lchnk )
-      call outfld( 'SILHS_WM_SCOL', WM_LH_out, pcols*psubcols, lchnk )
-      call outfld( 'SILHS_RCM_SCOL', RCM_LH_out, pcols*psubcols, lchnk )
-      call outfld( 'SILHS_RICLD_SCOL', ICE_LH_out, pcols*psubcols, lchnk )
-      call outfld( 'SILHS_NICLD_SCOL', NICE_LH_out, pcols*psubcols, lchnk )
-      call outfld( 'SILHS_NCLD_SCOL', NCLW_LH_out, pcols*psubcols, lchnk )
-      call outfld( 'SILHS_RRAIN_SCOL', RAIN_LH_out, pcols*psubcols, lchnk )
-      call outfld( 'SILHS_NRAIN_SCOL', NRAIN_LH_out, pcols*psubcols, lchnk )
+      call outfld( 'SILHS_THLM_SCOL', THL_lh_out, pcols*psubcols, lchnk )
+      call outfld( 'SILHS_RT_SCOL', RT_lh_out, pcols*psubcols, lchnk )
+      call outfld( 'SILHS_OMEGA_SCOL', OMEGA_lh_out, pcols*psubcols, lchnk )
+      call outfld( 'SILHS_WM_SCOL', WM_lh_out, pcols*psubcols, lchnk )
+      call outfld( 'SILHS_RCM_SCOL', RCM_lh_out, pcols*psubcols, lchnk )
+      call outfld( 'SILHS_RICLD_SCOL', ICE_lh_out, pcols*psubcols, lchnk )
+      call outfld( 'SILHS_NICLD_SCOL', NICE_lh_out, pcols*psubcols, lchnk )
+      call outfld( 'SILHS_NCLD_SCOL', NCLW_lh_out, pcols*psubcols, lchnk )
+      call outfld( 'SILHS_RRAIN_SCOL', RAIN_lh_out, pcols*psubcols, lchnk )
+      call outfld( 'SILHS_NRAIN_SCOL', NRAIN_lh_out, pcols*psubcols, lchnk )
       call outfld( 'SILHS_WEIGHT_SCOL', weights, pcols*psubcols, lchnk )
       call outfld( 'NR_IN_LH', nrain, pcols, lchnk )
       call outfld( 'RTM_CLUBB', rtm, pcols, lchnk )
@@ -1241,8 +1290,8 @@ contains
 #ifdef SILHS
    real(r8) function meansc(arr_in, w_in, ns) result(val)
       real(r8), intent(in) :: ns                         ! Length of Array
-      real(r8), dimension(ns), intent(in) :: arr_in      ! Input array
-      real(r8), dimension(ns), intent(in) :: w_in        ! Weights
+      real(r8), dimension(int(ns)), intent(in) :: arr_in      ! Input array
+      real(r8), dimension(int(ns)), intent(in) :: w_in        ! Weights
       real(r8) :: acc  ! accumulator
       integer :: i
       acc = 0
@@ -1255,7 +1304,7 @@ contains
 
    real(r8) function stdsc(arr_in, w_in, mn_in, ns) result(val)
       real(r8), intent(in) :: ns  ! Number of elements (subcolumns)
-      real(r8), dimension(ns), intent(in) :: arr_in, w_in  !Input array and weights
+      real(r8), dimension(int(ns)), intent(in) :: arr_in, w_in  !Input array and weights
       real(r8), intent(in) :: mn_in   ! The mean of arr_in
       real(r8) :: accvar, var
       integer :: i
@@ -1395,10 +1444,7 @@ contains
 
      use physics_buffer,          only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
      use subcol_utils,            only: subcol_unpack, subcol_get_nsubcol, subcol_get_weight
-     use clubb_api_module,        only: T_in_K2thlm_api, &
-                                        pdf_parameter, &
-                                        unpack_pdf_params_api, &
-                                        num_pdf_params
+     use clubb_api_module,        only: T_in_K2thlm_api, pdf_parameter, unpack_pdf_params_api
      use silhs_api_module,        only: lh_microphys_var_covar_driver_api
 
      implicit none
@@ -1428,6 +1474,9 @@ contains
 
      real(r8), dimension(pcols,psubcols,pver)  :: dz_g, pdel_all, rho
      real(r8), dimension(pcols,psubcols,pverp) :: zi_all
+ 
+     real(r8), pointer, dimension(:,:,:) :: pdf_params_ptr  ! Packed PDF_Params
+     type(pdf_parameter), dimension(pverp) :: pdf_params  ! PDF parameters [units vary]
 
      integer :: ixcldliq, ixq
 
@@ -1435,24 +1484,21 @@ contains
 
      ! Inputs to lh_microphys_var_covar_driver
      real(r8), dimension(pcols,pverp,psubcols) :: rt_all_clubb, thl_all_clubb, w_all_clubb, &
-                                                  qctend_clubb, qvtend_clubb, thltend_clubb
-
-      type(pdf_parameter), dimension(pverp) :: pdf_params     ! PDF parameters
-      real(r8), dimension(pverp, num_pdf_params) :: pdf_params_packed
+                                                  qctend_clubb, qvtend_clubb, thltend_clubb, &
+                                                  height_depndt_weights
 
      ! Outputs from lh_microphys_var_covar_driver
      real(r8), dimension(:,:), pointer :: rtp2_mc_zt, thlp2_mc_zt, wprtp_mc_zt, &
                                           wpthlp_mc_zt, rtpthlp_mc_zt
 
-     real(r8), pointer, dimension(:,:,:) :: pdf_params_ptr  ! Packed PDF_Params
-
      ! pbuf indices
      integer :: &
-       rtp2_mc_zt_idx,   &
-       thlp2_mc_zt_idx,  &
-       wprtp_mc_zt_idx,  &
-       wpthlp_mc_zt_idx, &
-       rtpthlp_mc_zt_idx
+       rtp2_mc_zt_idx,    &
+       thlp2_mc_zt_idx,   &
+       wprtp_mc_zt_idx,   &
+       wpthlp_mc_zt_idx,  &
+       rtpthlp_mc_zt_idx, &
+       pdf_params_idx
 
      !----- Begin Code -----
 
@@ -1470,6 +1516,10 @@ contains
      wprtp_mc_zt_idx = pbuf_get_index('wprtp_mc_zt')
      wpthlp_mc_zt_idx = pbuf_get_index('wpthlp_mc_zt')
      rtpthlp_mc_zt_idx = pbuf_get_index('rtpthlp_mc_zt')
+     pdf_params_idx = pbuf_get_index('PDF_PARAMS')
+
+     ! Obtain pbuf fields for computation
+     call pbuf_get_field(pbuf, pdf_params_idx, pdf_params_ptr)
 
      ! Obtain pbuf fields for output
      call pbuf_get_field(pbuf, rtp2_mc_zt_idx, rtp2_mc_zt)
@@ -1477,9 +1527,6 @@ contains
      call pbuf_get_field(pbuf, wprtp_mc_zt_idx, wprtp_mc_zt)
      call pbuf_get_field(pbuf, wpthlp_mc_zt_idx, wpthlp_mc_zt)
      call pbuf_get_field(pbuf, rtpthlp_mc_zt_idx, rtpthlp_mc_zt)
-
-     ! Obtain pbuf fields for input
-     call pbuf_get_field(pbuf, pdf_params_idx, pdf_params_ptr)
 
      ! Unpack needed tendencies from subcolumn ptends
      call subcol_unpack(lchnk, ptend_sc%s(:,:), stend, fillvalue)
@@ -1553,17 +1600,24 @@ contains
      ! Call lh_microphys_var_covar_driver for each column
      do igrdcol=1, ngrdcol
        ns = nsubcol(igrdcol)
+
+       ! Obtein PDF parameters
        call unpack_pdf_params_api(pdf_params_ptr(igrdcol,:,:), pverp, pdf_params)
+
+       ! This code assumes that the weights are height independent.
+       ! It will have to change once the weights vary with altitude!
+       ! I'm not sure whether the grid will need to be flipped.
+       do k=1,pverp
+          height_depndt_weights(igrdcol,k,1:ns) = weights(igrdcol,1:ns)
+       end do
+
        ! Make the call!!!!!
        call lh_microphys_var_covar_driver_api &
-            ( pverp, ns, ztodt, weights(igrdcol,1:ns), & ! In
-              pdf_params, rt_all_clubb(igrdcol,:,1:ns), & ! In
-              thl_all_clubb(igrdcol,:,1:ns), w_all_clubb(igrdcol,:,1:ns), & ! In
-              qctend_clubb(igrdcol,:,1:ns), qvtend_clubb(igrdcol,:,1:ns), & ! In
-              thltend_clubb(igrdcol,:,1:ns), & ! In
-              rtp2_mc_zt(igrdcol,:), thlp2_mc_zt(igrdcol,:), & ! Out
-              wprtp_mc_zt(igrdcol,:), wpthlp_mc_zt(igrdcol,:), & ! Out
-              rtpthlp_mc_zt(igrdcol,:) ) ! Out
+            ( pverp, ns, ztodt, height_depndt_weights(igrdcol,:,1:ns), pdf_params, &
+              rt_all_clubb(igrdcol,:,1:ns), thl_all_clubb(igrdcol,:,1:ns), w_all_clubb(igrdcol,:,1:ns), &
+              qctend_clubb(igrdcol,:,1:ns), qvtend_clubb(igrdcol,:,1:ns), thltend_clubb(igrdcol,:,1:ns), &
+              rtp2_mc_zt(igrdcol,:), thlp2_mc_zt(igrdcol,:), wprtp_mc_zt(igrdcol,:), &
+              wpthlp_mc_zt(igrdcol,:), rtpthlp_mc_zt(igrdcol,:) )
      end do ! igrdcol=1, ngrdcol
 
      return

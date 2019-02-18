@@ -1543,55 +1543,69 @@ contains
      call subcol_unpack(lchnk, state_sc%zi,              zi_all,             fillvalue)
      call subcol_unpack(lchnk, state_sc%pdel,            pdel_all,           fillvalue)
      call subcol_unpack(lchnk, state_sc%pmid,            pmid_all,           fillvalue)
-     rt_all(:,:,1:pver) = rc_all(:,:,1:pver) + rv_all(:,:,1:pver)
-
-     ! Compute dry static density on CLUBB vertical grid
-     do k=1, pver
-       dz_g(:,:,k) = zi_all(:,:,k) - zi_all(:,:,k+1) ! thickness
-       rho(:,:,k) = (1._r8/gravit)*pdel_all(:,:,k)/dz_g(:,:,k)
-     enddo
-     ! Compute w from omega
-     w_all(:,:,1:pver) = -omega_all / ( rho * gravit )
-
-     ! Convert stend and s_all to ttend and t_all
-     !  Note 1: With subcolumns, cpair is truly a constant (I think).
-     !  Note 2: For tendencies, the extra terns zm and phis should
-     !          not be included in the calculation.
-     ttend = stend / cpair
-     do k=1, pver
-       t_all(:,:,k) = (s_all(:,:,k) - gravit*zm_all(:,:,k) - phis_all(:,:)) / cpair
-     end do ! k=1, pver
-
-     ! This formula is taken from earlier in this file.
-     exner(:,:,:) = (pmid_all(:,:,:)/p0_clubb)**(rair/cpair)
-
-     ! Note: all tendencies or all means should be used in the call to
-     !       T_in_K2thlm_api (with the exception of exner)
-     thltend(:,:,1:pver) = T_in_K2thlm_api(ttend(:,:,:), exner(:,:,:), qctend(:,:,1:pver))
-     thl_all(:,:,1:pver) = T_in_K2thlm_api(t_all(:,:,:), exner(:,:,:), rc_all(:,:,1:pver))
-
-     ! Add ghost points
-     rt_all (:,:,pverp)   = rt_all (:,:,pver)
-     thl_all(:,:,pverp)   = thl_all(:,:,pver)
-     w_all  (:,:,pverp)   = w_all  (:,:,pver)
-     qctend (:,:,pverp)   = qctend (:,:,pver)
-     qvtend (:,:,pverp)   = qvtend (:,:,pver)
-     thltend(:,:,pverp)   = thltend(:,:,pver)
 
      ! How many subcolumns in each column?
      call subcol_get_nsubcol(lchnk, nsubcol)
 
-     ! Flip inputs to CLUBB's grid. Note the dimension ordering change.
-     do igrdcol=1, ngrdcol
-       do isubcol=1, nsubcol(igrdcol)
-         rt_all_clubb(igrdcol,:,isubcol) = clubb_flip_grid( rt_all(igrdcol,isubcol,:) )
-         thl_all_clubb(igrdcol,:,isubcol) = clubb_flip_grid( thl_all(igrdcol,isubcol,:) )
-         w_all_clubb(igrdcol,:,isubcol) = clubb_flip_grid( w_all(igrdcol,isubcol,:) )
-         qctend_clubb(igrdcol,:,isubcol) = clubb_flip_grid( qctend(igrdcol,isubcol,:) )
-         qvtend_clubb(igrdcol,:,isubcol) = clubb_flip_grid( qvtend(igrdcol,isubcol,:) )
-         thltend_clubb(igrdcol,:,isubcol) = clubb_flip_grid( thltend(igrdcol,isubcol,:) )
-       end do
-     end do
+     do igrdcol = 1, ngrdcol
+        do isubcol = 1, nsubcol(igrdcol)
+
+           rt_all(igrdcol,isubcol,1:pver) = rc_all(igrdcol,isubcol,1:pver) + rv_all(igrdcol,isubcol,1:pver)
+
+           ! Compute dry static density on CLUBB vertical grid
+           do k = 1, pver
+              dz_g(igrdcol,isubcol,k) = zi_all(igrdcol,isubcol,k) - zi_all(igrdcol,isubcol,k+1) ! thickness
+              rho(igrdcol,isubcol,k) = (1._r8/gravit)*pdel_all(igrdcol,isubcol,k)/dz_g(igrdcol,isubcol,k)
+           enddo
+
+           ! Compute w from omega
+           w_all(igrdcol,isubcol,1:pver) = -omega_all(igrdcol,isubcol,1:pver) &
+                                            / ( rho(igrdcol,isubcol,1:pver) * gravit )
+
+           ! Convert stend and s_all to ttend and t_all
+           !  Note 1: With subcolumns, cpair is truly a constant (I think).
+           !  Note 2: For tendencies, the extra terns zm and phis should
+           !          not be included in the calculation.
+           ttend(igrdcol,isubcol,1:pver) = stend(igrdcol,isubcol,1:pver) / cpair
+
+           do k = 1, pver
+              t_all(igrdcol,isubcol,k) = ( s_all(igrdcol,isubcol,k) &
+                                           - gravit * zm_all(igrdcol,isubcol,k) &
+                                           - phis_all(igrdcol,isubcol) ) / cpair
+           enddo ! k = 1, pver
+
+           ! This formula is taken from earlier in this file.
+           exner(igrdcol,isubcol,1:pver) = ( pmid_all(igrdcol,isubcol,1:pver) / p0_clubb )**(rair/cpair)
+
+           ! Note: all tendencies or all means should be used in the call to
+           !       T_in_K2thlm_api (with the exception of exner)
+           do k = 1, pver
+              thltend(igrdcol,isubcol,k) &
+              = T_in_K2thlm_api( ttend(igrdcol,isubcol,k), exner(igrdcol,isubcol,k), &
+                                 qctend(igrdcol,isubcol,k) )
+              thl_all(igrdcol,isubcol,k) &
+              = T_in_K2thlm_api( t_all(igrdcol,isubcol,k), exner(igrdcol,isubcol,k), &
+                                 rc_all(igrdcol,isubcol,k) )
+           enddo ! k = 1, pver
+
+           ! Add ghost points
+           rt_all (igrdcol,isubcol,pverp) = rt_all (igrdcol,isubcol,pver)
+           thl_all(igrdcol,isubcol,pverp) = thl_all(igrdcol,isubcol,pver)
+           w_all  (igrdcol,isubcol,pverp) = w_all  (igrdcol,isubcol,pver)
+           qctend (igrdcol,isubcol,pverp) = qctend (igrdcol,isubcol,pver)
+           qvtend (igrdcol,isubcol,pverp) = qvtend (igrdcol,isubcol,pver)
+           thltend(igrdcol,isubcol,pverp) = thltend(igrdcol,isubcol,pver)
+
+           ! Flip inputs to CLUBB's grid. Note the dimension ordering change.
+           rt_all_clubb(igrdcol,1:pverp,isubcol) = clubb_flip_grid( rt_all(igrdcol,isubcol,1:pverp) )
+           thl_all_clubb(igrdcol,1:pverp,isubcol) = clubb_flip_grid( thl_all(igrdcol,isubcol,1:pverp) )
+           w_all_clubb(igrdcol,1:pverp,isubcol) = clubb_flip_grid( w_all(igrdcol,isubcol,1:pverp) )
+           qctend_clubb(igrdcol,1:pverp,isubcol) = clubb_flip_grid( qctend(igrdcol,isubcol,1:pverp) )
+           qvtend_clubb(igrdcol,1:pverp,isubcol) = clubb_flip_grid( qvtend(igrdcol,isubcol,1:pverp) )
+           thltend_clubb(igrdcol,1:pverp,isubcol) = clubb_flip_grid( thltend(igrdcol,isubcol,1:pverp) )
+
+        enddo ! isubcol = 1, nsubcol(igrdcol)
+     enddo ! igrdcol = 1, ngrdcol
 
      ! Obtain weights
      call subcol_get_weight(lchnk, weights_packed)
@@ -1613,12 +1627,13 @@ contains
 
        ! Make the call!!!!!
        call lh_microphys_var_covar_driver_api &
-            ( pverp, ns, ztodt, height_depndt_weights(igrdcol,:,1:ns), pdf_params, &
-              rt_all_clubb(igrdcol,:,1:ns), thl_all_clubb(igrdcol,:,1:ns), w_all_clubb(igrdcol,:,1:ns), &
-              qctend_clubb(igrdcol,:,1:ns), qvtend_clubb(igrdcol,:,1:ns), thltend_clubb(igrdcol,:,1:ns), &
-              rtp2_mc_zt(igrdcol,:), thlp2_mc_zt(igrdcol,:), wprtp_mc_zt(igrdcol,:), &
-              wpthlp_mc_zt(igrdcol,:), rtpthlp_mc_zt(igrdcol,:) )
-     end do ! igrdcol=1, ngrdcol
+            ( pverp, ns, ztodt, height_depndt_weights(igrdcol,1:pverp,1:ns), pdf_params, &
+              rt_all_clubb(igrdcol,1:pverp,1:ns), thl_all_clubb(igrdcol,1:pverp,1:ns), &
+              w_all_clubb(igrdcol,1:pverp,1:ns), qctend_clubb(igrdcol,1:pverp,1:ns), &
+              qvtend_clubb(igrdcol,1:pverp,1:ns), thltend_clubb(igrdcol,1:pverp,1:ns), &
+              rtp2_mc_zt(igrdcol,1:pverp), thlp2_mc_zt(igrdcol,1:pverp), wprtp_mc_zt(igrdcol,1:pverp), &
+              wpthlp_mc_zt(igrdcol,1:pverp), rtpthlp_mc_zt(igrdcol,1:pverp) )
+     enddo ! igrdcol = 1, ngrdcol
 
      return
    end subroutine subcol_SILHS_var_covar_driver

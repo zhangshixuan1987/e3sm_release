@@ -1117,6 +1117,9 @@ end subroutine clubb_init_cnst
                                         time_precision, &
                                         advance_clubb_core_api, &
                                         zt2zm_api, zm2zt_api, &
+#ifdef SILHS
+                                        gr, &
+#endif
                                         setup_grid_heights_api, &
                                         em_min, w_tol_sqd, rt_tol, thl_tol, &
                                         l_use_boussinesq, &
@@ -1656,11 +1659,13 @@ end subroutine clubb_init_cnst
      initend(:ncol,:)=0._r8
 
      call t_startf('ice_macro_tend')
-     call ice_macro_tend(naai(:ncol,top_lev:pver),state1%t(:ncol,top_lev:pver), &
+     if ( ( .not. is_first_step() ) .or. micro_do_icesupersat ) then
+       call ice_macro_tend(naai(:ncol,top_lev:pver),state1%t(:ncol,top_lev:pver), &
         state1%pmid(:ncol,top_lev:pver),state1%q(:ncol,top_lev:pver,1),state1%q(:ncol,top_lev:pver,ixcldice),&
         state1%q(:ncol,top_lev:pver,ixnumice),latsub,hdtime,&
         stend(:ncol,top_lev:pver),qvtend(:ncol,top_lev:pver),qitend(:ncol,top_lev:pver),&
         initend(:ncol,top_lev:pver))
+     endif ! ( .not. is_first_step() ) .or. micro_do_icesupersat
      call t_stopf('ice_macro_tend')
 
      ! update local copy of state with the tendencies
@@ -1726,6 +1731,16 @@ end subroutine clubb_init_cnst
    !  host time step divided by CLUBB time step  
    nadv = max(hdtime/dtime,1._r8)
   
+#ifdef SILHS
+   ! The number of vertical grid levels used in CLUBB is pverp, which is originally
+   ! set in the call to setup_clubb_core_api from subroutine clubb_ini_cam.  This is
+   ! stored in CLUBB in the object gr%nz.  This isn't changed in CLUBB.  However, when
+   ! SILHS is used, SILHS only uses pverp - top_lev + 1 vertical grid levels and also
+   ! uses the gr%nz object.  The value of gr%nz needs to be reset for SILHS and set
+   ! again for CLUBB here.
+   gr%nz = pverp
+#endif
+ 
    !  Initialize forcings for transported scalars to zero
    
    sclrm_forcing(:,:)   = 0._r8
@@ -2063,7 +2078,7 @@ end subroutine clubb_init_cnst
      
       !  Read in parameters for CLUBB.  Just read in default values 
       call read_parameters_api( -99, "", clubb_params )
- 
+
       !  Set-up CLUBB core at each CLUBB call because heights can change 
       call setup_grid_heights_api(l_implemented, grid_type, &
         zi_g(2), zi_g(1), zi_g(1:pverp), zt_g(1:pverp) )

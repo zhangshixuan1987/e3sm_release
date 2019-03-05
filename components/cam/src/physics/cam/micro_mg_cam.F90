@@ -2385,6 +2385,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    prec_str = prec_pcw + prec_sed
    snow_str = snow_pcw + snow_sed
 
+   icecldf = 0.0_r8 ! Initialize icecldf to avoid problem when FP trapping is turned on.
+   liqcldf = 0.0_r8 ! Initialize liqcldf to avoid problem when FP trapping is turned on.
    icecldf(:ncol,top_lev:pver) = ast(:ncol,top_lev:pver)
    liqcldf(:ncol,top_lev:pver) = ast(:ncol,top_lev:pver)
 
@@ -2399,6 +2401,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    iclwpst = 0._r8
    icswp = 0._r8
    cldfsnow = 0._r8
+   icimrst = 0.0_r8 ! Initialize icimrst to avoid problem when FP trapping is turned on.
+   icwmrst = 0.0_r8 ! Initialize icwmrst to avoid problem when FP trapping is turned on.
 
    do k = top_lev, pver
       do i = 1, ncol
@@ -2448,6 +2452,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
       ! Cloud fraction for purposes of precipitation is maximum cloud
       ! fraction out of all the layers that the precipitation may be
       ! falling down from.
+      cldmax = 0.0_r8 ! Initialize cldmax to avoid problem when FP trapping is turned on.
       cldmax(:ncol,top_lev:pver) = max(mincld, ast(:ncol,top_lev:pver))
       do k = top_lev+1, pver
          where (state_loc%q(:ncol,k-1,ixrain) >= qsmall .or. &
@@ -2627,6 +2632,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    !
    ! State instead of state_loc to preserve answers for MG1 (and in any
    ! case, it is unlikely to make much difference).
+   rho = 0.0_r8 ! Initialize rho to avoid problem when FP trapping is turned on.
    rho(:ncol,top_lev:) = state%pmid(:ncol,top_lev:) / &
         (rair*state%t(:ncol,top_lev:))
    if (use_subcol_microp) then

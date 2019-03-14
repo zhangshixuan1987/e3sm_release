@@ -584,7 +584,7 @@ end subroutine clubb_init_cnst
                                 em_min, w_tol_sqd, rt_tol, thl_tol, &
                                 iC1, iC1b, iC2rt, iC2thl, iC2rtthl, ic_K_hm, igamma_coef, igamma_coefb, &
                                 imult_coef, ic_K10, l_stability_correct_tau_zm, &
-                                iC8, iC11, iC11b, iC4, iC14, iup2_vp2_factor, &
+                                iC8, iC11, iC11b, iC4, iC14, iup2_vp2_factor, params_list, &
                                 l_use_C7_Richardson, l_use_C11_Richardson, l_brunt_vaisala_freq_moist, &
                                 l_use_thvm_in_bv_freq, l_rcm_supersat_adj, l_do_expldiff_rtm_thlm
 
@@ -840,6 +840,13 @@ end subroutine clubb_init_cnst
            zi_g(1:pverp), zt_g(1:pverp), zi_g(1), &                   ! In
            err_code )
 !$OMP END PARALLEL
+
+    ! Print the list of CLUBB parameters
+    if ( masterproc ) then
+       do j = 1, nparams, 1
+          write(*,*) params_list(j), " = ", clubb_params(j)
+       enddo
+    endif
 
     ! ----------------------------------------------------------------- !
     ! Set-up HB diffusion.  Only initialized to diagnose PBL depth      !

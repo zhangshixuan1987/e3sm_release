@@ -173,8 +173,10 @@ micro_mg_berg_eff_factor = 1.0
 cldfrc2m_rhmini = 0.8
 cldfrc2m_rhmaxi = 1.05
 
-! following parameters overrided by hardwired values in initial implementation. 
-! settings below to make it consistent 
+! Note:  When clubb_C2rt is set in this namelist, the values of C2rt and C2thl
+!        are both set to its value, unless clubb_C2thl is also set in this
+!        namelist.  Likewise, when clubb_C2rt is set in this namelist, C2rtthl
+!        is set to 2 * C2rt unless clubb_C2rtthl is also set in this namelist.
 clubb_C1 = 1.0D0
 clubb_C2rt = 0.2D0
 clubb_C2rtthl = 0.2D0

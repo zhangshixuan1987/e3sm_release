@@ -220,7 +220,11 @@ integer :: &
 ! Pbuf fields needed for subcol_SILHS
 integer :: &
      qrain_idx=-1, qsnow_idx=-1,    &
-     nrain_idx=-1, nsnow_idx=-1
+     nrain_idx=-1, nsnow_idx=-1,    &
+     qcsedten_idx=-1, qrsedten_idx=-1, &
+     qisedten_idx=-1, qssedten_idx=-1, &
+     vtrmc_idx=-1, umr_idx=-1, &
+     vtrmi_idx=-1, ums_idx=-1
 
 integer :: &
    naai_idx = -1,           &
@@ -572,6 +576,15 @@ subroutine micro_mg_cam_register
      call pbuf_add_field('QSNOW',   'global',dtype_r8,(/pcols,pver/), qsnow_idx)
      call pbuf_add_field('NRAIN',   'global',dtype_r8,(/pcols,pver/), nrain_idx)
      call pbuf_add_field('NSNOW',   'global',dtype_r8,(/pcols,pver/), nsnow_idx)
+     ! Fields for subcol_SILHS hole filling
+     call pbuf_add_field('QCSEDTEN', 'global', dtype_r8, (/pcols,pver/), qcsedten_idx)
+     call pbuf_add_field('QRSEDTEN', 'global', dtype_r8, (/pcols,pver/), qrsedten_idx)
+     call pbuf_add_field('QISEDTEN', 'global', dtype_r8, (/pcols,pver/), qisedten_idx)
+     call pbuf_add_field('QSSEDTEN', 'global', dtype_r8, (/pcols,pver/), qssedten_idx)
+     call pbuf_add_field('VTRMC', 'global', dtype_r8, (/pcols,pver/), vtrmc_idx)
+     call pbuf_add_field('UMR', 'global', dtype_r8, (/pcols,pver/), umr_idx)
+     call pbuf_add_field('VTRMI', 'global', dtype_r8, (/pcols,pver/), vtrmi_idx)
+     call pbuf_add_field('UMS', 'global', dtype_r8, (/pcols,pver/), ums_idx)
   end if
    
 
@@ -1029,6 +1042,14 @@ subroutine micro_mg_cam_init(pbuf2d)
    qsnow_idx    = pbuf_get_index('QSNOW', ierr)
    nrain_idx    = pbuf_get_index('NRAIN', ierr)
    nsnow_idx    = pbuf_get_index('NSNOW', ierr)
+   qcsedten_idx = pbuf_get_index('QCSEDTEN', ierr)
+   qrsedten_idx = pbuf_get_index('QRSEDTEN', ierr)
+   qisedten_idx = pbuf_get_index('QISEDTEN', ierr)
+   qssedten_idx = pbuf_get_index('QSSEDTEN', ierr)
+   vtrmc_idx    = pbuf_get_index('VTRMC', ierr)
+   umr_idx      = pbuf_get_index('UMR', ierr)
+   vtrmi_idx    = pbuf_get_index('VTRMI', ierr)
+   ums_idx      = pbuf_get_index('UMS', ierr)
 
   ! fields for heterogeneous freezing
   frzimm_idx = pbuf_get_index('FRZIMM', ierr)
@@ -1059,6 +1080,14 @@ subroutine micro_mg_cam_init(pbuf2d)
       if (qsnow_idx > 0)   call pbuf_set_field(pbuf2d, qsnow_idx, 0._r8)
       if (nrain_idx > 0)   call pbuf_set_field(pbuf2d, nrain_idx, 0._r8)
       if (nsnow_idx > 0)   call pbuf_set_field(pbuf2d, nsnow_idx, 0._r8)
+      if (qcsedten_idx > 0)   call pbuf_set_field(pbuf2d, qcsedten_idx, 0._r8)
+      if (qrsedten_idx > 0)   call pbuf_set_field(pbuf2d, qrsedten_idx, 0._r8)
+      if (qisedten_idx > 0)   call pbuf_set_field(pbuf2d, qisedten_idx, 0._r8)
+      if (qssedten_idx > 0)   call pbuf_set_field(pbuf2d, qssedten_idx, 0._r8)
+      if (vtrmc_idx > 0)      call pbuf_set_field(pbuf2d, vtrmc_idx, 0._r8)
+      if (umr_idx > 0)        call pbuf_set_field(pbuf2d, umr_idx, 0._r8)
+      if (vtrmi_idx > 0)      call pbuf_set_field(pbuf2d, vtrmi_idx, 0._r8)
+      if (ums_idx > 0)        call pbuf_set_field(pbuf2d, ums_idx, 0._r8)
 
       ! If sub-columns turned on, need to set the sub-column fields as well
       if (use_subcol_microp) then
@@ -1521,6 +1550,14 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    real(r8) :: qireso_grid(pcols,pver)
    real(r8) :: prcio_grid(pcols,pver)
    real(r8) :: praio_grid(pcols,pver)
+   real(r8) :: qcsedtenout_grid(pcols,pver)
+   real(r8) :: qrsedtenout_grid(pcols,pver)
+   real(r8) :: qisedtenout_grid(pcols,pver)
+   real(r8) :: qssedtenout_grid(pcols,pver)
+   real(r8) :: vtrmcout_grid(pcols,pver)
+   real(r8) :: umrout_grid(pcols,pver)
+   real(r8) :: vtrmiout_grid(pcols,pver)
+   real(r8) :: umsout_grid(pcols,pver)
 
    real(r8) :: nc_grid(pcols,pver)
    real(r8) :: ni_grid(pcols,pver)
@@ -1565,6 +1602,14 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    real(r8), pointer :: qsout_grid_ptr(:,:)
    real(r8), pointer :: nrout_grid_ptr(:,:)
    real(r8), pointer :: nsout_grid_ptr(:,:)
+   real(r8), pointer :: qcsedtenout_grid_ptr(:,:)
+   real(r8), pointer :: qrsedtenout_grid_ptr(:,:)
+   real(r8), pointer :: qisedtenout_grid_ptr(:,:)
+   real(r8), pointer :: qssedtenout_grid_ptr(:,:)
+   real(r8), pointer :: vtrmcout_grid_ptr(:,:)
+   real(r8), pointer :: umrout_grid_ptr(:,:)
+   real(r8), pointer :: vtrmiout_grid_ptr(:,:)
+   real(r8), pointer :: umsout_grid_ptr(:,:)
 
    integer :: nlev   ! number of levels where cloud physics is done
    integer :: mgncol ! size of mgcols
@@ -1683,6 +1728,18 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    if (qsnow_idx > 0) call pbuf_get_field(pbuf, qsnow_idx, qsout_grid_ptr)
    if (nrain_idx > 0) call pbuf_get_field(pbuf, nrain_idx, nrout_grid_ptr)
    if (nsnow_idx > 0) call pbuf_get_field(pbuf, nsnow_idx, nsout_grid_ptr)
+   if (qcsedten_idx > 0) call pbuf_get_field(pbuf, qcsedten_idx, qcsedtenout_grid_ptr)
+   if (qrsedten_idx > 0 .and. micro_mg_version > 1) &
+      call pbuf_get_field(pbuf, qrsedten_idx, qrsedtenout_grid_ptr)
+   if (qisedten_idx > 0) call pbuf_get_field(pbuf, qisedten_idx, qisedtenout_grid_ptr)
+   if (qssedten_idx > 0 .and. micro_mg_version > 1) &
+      call pbuf_get_field(pbuf, qssedten_idx, qssedtenout_grid_ptr)
+   if (vtrmc_idx > 0) call pbuf_get_field(pbuf, vtrmc_idx, vtrmcout_grid_ptr)
+   if (umr_idx > 0 .and. micro_mg_version > 1) &
+      call pbuf_get_field(pbuf, umr_idx, umrout_grid_ptr)
+   if (vtrmi_idx > 0) call pbuf_get_field(pbuf, vtrmi_idx, vtrmiout_grid_ptr)
+   if (ums_idx > 0 .and. micro_mg_version > 1) &
+      call pbuf_get_field(pbuf, ums_idx, umsout_grid_ptr)
 
    !-----------------------
    ! If subcolumns is turned on, all calculated fields which are on subcolumns
@@ -2517,6 +2574,23 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
       call subcol_field_avg(state_loc%q(:,:,ixnumliq), ngrdcol, lchnk, nc_grid)
       call subcol_field_avg(state_loc%q(:,:,ixnumice), ngrdcol, lchnk, ni_grid)
 
+      call subcol_field_avg(qcsedten,  ngrdcol, lchnk, qcsedtenout_grid)
+      if (micro_mg_version > 1) then
+         call subcol_field_avg(qrsedten,  ngrdcol, lchnk, qrsedtenout_grid)
+      endif
+      call subcol_field_avg(qisedten,  ngrdcol, lchnk, qisedtenout_grid)
+      if (micro_mg_version > 1) then
+         call subcol_field_avg(qssedten,  ngrdcol, lchnk, qssedtenout_grid)
+      endif
+      call subcol_field_avg(vtrmc,     ngrdcol, lchnk, vtrmcout_grid)
+      if (micro_mg_version > 1) then
+         call subcol_field_avg(umr,       ngrdcol, lchnk, umrout_grid)
+      endif
+      call subcol_field_avg(vtrmi,     ngrdcol, lchnk, vtrmiout_grid)
+      if (micro_mg_version > 1) then
+         call subcol_field_avg(ums,       ngrdcol, lchnk, umsout_grid)
+      endif
+
       if (micro_mg_version > 1) then
          call subcol_field_avg(cldmax,    ngrdcol, lchnk, cldmax_grid)
 
@@ -2582,6 +2656,23 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
 
       nc_grid = state_loc%q(:,:,ixnumliq)
       ni_grid = state_loc%q(:,:,ixnumice)
+
+      qcsedtenout_grid = qcsedten
+      if (micro_mg_version > 1) then
+         qrsedtenout_grid = qrsedten
+      endif
+      qisedtenout_grid = qisedten
+      if (micro_mg_version > 1) then
+         qssedtenout_grid = qssedten
+      endif
+      vtrmcout_grid    = vtrmc
+      if (micro_mg_version > 1) then
+         umrout_grid      = umr
+      endif
+      vtrmiout_grid    = vtrmi
+      if (micro_mg_version > 1) then
+         umsout_grid      = ums
+      endif
 
       if (micro_mg_version > 1) then
          cldmax_grid = cldmax
@@ -2952,6 +3043,18 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    if (qsnow_idx > 0)  qsout_grid_ptr = qsout_grid
    if (nrain_idx > 0)  nrout_grid_ptr = nrout_grid
    if (nsnow_idx > 0)  nsout_grid_ptr = nsout_grid
+   if (qcsedten_idx > 0)  qcsedtenout_grid_ptr = qcsedtenout_grid
+   if (qrsedten_idx > 0 .and. micro_mg_version > 1) &
+      qrsedtenout_grid_ptr = qrsedtenout_grid
+   if (qisedten_idx > 0)  qisedtenout_grid_ptr = qisedtenout_grid
+   if (qssedten_idx > 0 .and. micro_mg_version > 1) &
+      qssedtenout_grid_ptr = qssedtenout_grid
+   if (vtrmc_idx > 0)     vtrmcout_grid_ptr    = vtrmcout_grid
+   if (umr_idx > 0 .and. micro_mg_version > 1) &
+      umrout_grid_ptr      = umrout_grid
+   if (vtrmi_idx > 0)     vtrmiout_grid_ptr    = vtrmiout_grid
+   if (ums_idx > 0 .and. micro_mg_version > 1) &
+      umsout_grid_ptr      = umsout_grid
 
    ! --------------------------------------------- !
    ! General outfield calls for microphysics       !

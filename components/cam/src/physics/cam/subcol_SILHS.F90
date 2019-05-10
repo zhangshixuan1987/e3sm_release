@@ -48,7 +48,9 @@ module subcol_SILHS
    !-----
    ! Pbuf indicies
    integer :: thlm_idx, num_subcols_idx, pdf_params_idx, rcm_idx, rtm_idx, ice_supersat_idx, &
-              alst_idx, cld_idx, qrain_idx, qsnow_idx, nrain_idx, nsnow_idx, ztodt_idx
+              alst_idx, cld_idx, qrain_idx, qsnow_idx, nrain_idx, nsnow_idx, ztodt_idx, &
+              prec_pcw_idx, snow_pcw_idx, qcsedten_idx, qrsedten_idx, qisedten_idx, &
+              qssedten_idx, vtrmc_idx, umr_idx, vtrmi_idx, ums_idx
 
    logical :: subcol_SILHS_weight  ! if set, sets up weights for averaging subcolumns for SILHS
    integer :: subcol_SILHS_numsubcol ! number of subcolumns for this run
@@ -311,6 +313,16 @@ contains
       alst_idx = pbuf_get_index('ALST')  ! SILHS expects clubb's cloud_frac liq stratus fraction
       ztodt_idx = pbuf_get_index('ZTODT')
       ice_supersat_idx = pbuf_get_index('ISS_FRAC')
+      prec_pcw_idx = pbuf_get_index('PREC_PCW')
+      snow_pcw_idx = pbuf_get_index('SNOW_PCW')
+      qcsedten_idx = pbuf_get_index('QCSEDTEN')
+      qrsedten_idx = pbuf_get_index('QRSEDTEN')
+      qisedten_idx = pbuf_get_index('QISEDTEN')
+      qssedten_idx = pbuf_get_index('QSSEDTEN')
+      vtrmc_idx = pbuf_get_index('VTRMC')
+      umr_idx = pbuf_get_index('UMR')
+      vtrmi_idx = pbuf_get_index('VTRMI')
+      ums_idx = pbuf_get_index('UMS')
      
       !-------------------------------
       ! Set up SILHS hydrometeors #KTCtodo: move microphys specification to config time,
@@ -1748,6 +1760,273 @@ contains
 
      return
    end subroutine subcol_SILHS_massless_droplet_destroyer
+
+   !============================================================================
+   subroutine subcol_SILHS_fill_holes( state, ptend, pbuf )
+
+     ! Description:
+     ! Stops holes from forming in a hydrometeor mixing ratio by reducing the
+     ! microphysics tendency of that hydrometeor mixing ratio which would
+     ! otherwise cause that hydrometeor mixing ratio to have a negative value
+     ! once the microphysics tendency is applied.  This code is used to prevent
+     ! holes in water mass, not number concentration.
+     !
+     ! This subroutine is called after microphysics has completed and after
+     ! microphysics fields from subcolumns have been averaged back to grid
+     ! columns, but before the grid-column microphysics tendencies have been
+     ! applied in physics_update.  This code is meant for use with the SILHS
+     ! subcolumn approach.  This code needs to be applied to grid columns, not
+     ! subcolumns.
+     !
+     ! This code adjusts the tendencies (ptend) before they are used to update
+     ! the grid mean fields (state variables).
+     !
+     ! The column-integrated total water needs to be conserved during
+     ! microphysics.  The conserved amount includes the amount of water that
+     ! precipitated to the ground from sedimentation during microphysics.
+     ! The conservation equation for each grid column is:
+     !
+     ! SUM(k=top_lev:pver) ( rv_start(k) + rc_start(k) + rr_start(k)
+     !                       + ri_start(k) + rs_start(k) ) * pdel(k) / g
+     ! = SUM(k=top_lev:pver) ( rv(k) + rc(k) + rr(k) + ri(k) + rs(k) )
+     !                       * pdel(k) / g
+     !   + prect * dt * 1000;
+     !
+     ! where rv_start, rc_start, rr_start, ri_start, and rs_start are water
+     ! vapor, cloud water, rain water, cloud ice, and snow mixing ratios before
+     ! microphysics is called; rv, rc, rr, ri, and rs are water vapor, cloud
+     ! water, rain water, cloud ice, and snow mixing ratios after being updated
+     ! by microphysics; pdel is the pressure difference between vertical levels,
+     ! g is gravity, and prect * dt * 1000 is the total amount of water (from
+     ! all precipitating hydrometeors) that sedimented to the ground during
+     ! microphysics (dt is the microphysics substep time).  The units of
+     ! column-integrated total water are kg (water) / m^2.
+     !
+     ! All the updated hydrometeor fields are related to the hydrometeor fields
+     ! at the start by:
+     !
+     ! rv(k) = rv_start(k) + rv_tend(k) * dt;
+     ! rc(k) = rc_start(k) + rc_tend(k) * dt;
+     ! rr(k) = rr_start(k) + rr_tend(k) * dt;
+     ! ri(k) = ri_start(k) + ri_tend(k) * dt; and
+     ! rs(k) = rs_start(k) + rs_tend(k) * dt;
+     !
+     ! where rv_tend, rc_tend, rr_tend, ri_tend, and rs_tend are water vapor,
+     ! cloud water, rain water, cloud ice, and snow mixing ratio tendencies
+     ! from microphysics, which includes the sum of microphysics process rates
+     ! and sedimentation.  When these equations are applied to the equation
+     ! for column-integrated total water, that equation becomes:
+     !
+     ! SUM(k=top_lev:pver) ( rv_tend(k) + rc_tend(k) + rr_tend(k)
+     !                       + ri_tend(k) + rs_tend(k) ) * dt * pdel(k) / g
+     ! + prect * dt * 1000 = 0.
+     !
+     ! As stated above, the hydrometeor tendencies are the sum of tendencies
+     ! from microphysics process rates and tendencies from sedimentation:
+     !
+     ! rv_tend(k) = rv_mc_tend(k);
+     ! rc_tend(k) = rc_mc_tend(k) + rc_sed_tend(k);
+     ! rr_tend(k) = rr_mc_tend(k) + rr_sed_tend(k);
+     ! ri_tend(k) = ri_mc_tend(k) + ri_sed_tend(k); and
+     ! rs_tend(k) = rs_mc_tend(k) + rs_sed_tend(k);
+     !
+     ! where rv_mc_tend, rc_mc_tend, rr_mc_tend, ri_mc_tend, and rs_mc_tend are
+     ! the tendencies of water vapor, cloud water, rain water, cloud ice, and
+     ! snow from microphysics process rates, and rc_sed_tend, rr_sed_tend,
+     ! ri_sed_tend, and rs_sed_tend are the tendencies of cloud water,
+     ! rain water, cloud ice, and snow from sedimentation.  When these equations
+     ! are applied to the equation for column-integrated total water, that
+     ! equation becomes:
+     !
+     ! SUM(k=top_lev:pver) ( rv_mc_tend(k) + rc_mc_tend(k) + rr_mc_tend(k)
+     !                       + ri_mc_tend(k) + rs_mc_tend(k) )
+     !                     * dt * pdel(k) / g
+     ! + SUM(k=top_lev:pver) ( rc_sed_tend(k) + rr_sed_tend(k) + ri_sed_tend(k)
+     !                         + rs_sed_tend(k) ) * dt * pdel(k) / g
+     ! + prect * dt * 1000 = 0.
+     !
+     ! At any vertical level, the tendencies from microphysics process rates
+     ! (mc_tend variables) must balance:
+     !
+     ! rv_mc_tend(k) + rc_mc_tend(k) + rr_mc_tend(k)
+     ! + ri_mc_tend(k) + rs_mc_tend(k) = 0; for all k from top_lev to pver.
+     !
+     ! The column-integrated total water equation can be applied to
+     ! sedimentation:
+     !
+     ! SUM(k=top_lev:pver) ( rc_sed_tend(k) + rr_sed_tend(k) + ri_sed_tend(k)
+     !                       + rs_sed_tend(k) ) * dt * pdel(k) / g
+     ! + prect * dt * 1000 = 0.
+     !
+     ! The total precipitation rate, prect, can be split into liquid
+     ! precipitation rate, precl, and frozen precipitation rate, preci:
+     !
+     ! prect = precl + preci.
+     !
+     ! The microphysics code outputs prect and preci, so precl can be calculated
+     ! by precl = prect - preci.  The column-integrated total water equation can
+     ! be split into:
+     !
+     ! SUM(k=top_lev:pver) ( rc_sed_tend(k) + rr_sed_tend(k) )
+     !                     * dt * pdel(k) / g
+     ! + precl * dt * 1000 = 0; and
+     !
+     ! SUM(k=top_lev:pver) ( ri_sed_tend(k) + rs_sed_tend(k) )
+     !                     * dt * pdel(k) / g
+     ! + preci * dt * 1000 = 0.
+     !
+     ! Overall, the conservation methods used in this subroutine are:
+     !
+     ! 1) When adjusting the tendencies from microphysics process rates,
+     !    conserve:
+     !
+     !    rv_mc_tend(k) + rc_mc_tend(k) + rr_mc_tend(k)
+     !    + ri_mc_tend(k) + rs_mc_tend(k) = 0; for all k from top_lev to pver.
+     !
+     ! 2) When adjusting the tendencies from microphysics process rates, adjust
+     !    dry static energy appropriately.  The change in dry static energy
+     !    is necessary because of phase changes.  This "puts back" the extra dry
+     !    static energy that was "taken out" when an excessive phase-changing
+     !    process rate was produced by microphysics.
+     !
+     ! 3) When adjusting the hydrometeor tendency from sedimentation of a
+     !    liquid hydrometeor (cloud water or rain water), conserve:
+     !
+     !    SUM(k=top_lev:pver) ( rc_sed_tend(k) + rr_sed_tend(k) )
+     !                        * dt * pdel(k) / g
+     !    + precl * dt * 1000 = 0.
+     !
+     ! 4) When adjusting the hydrometeor tendency from sedimentation of a
+     !    frozen hydrometeor (cloud ice or snow), conserve:
+     !
+     !    SUM(k=top_lev:pver) ( ri_sed_tend(k) + rs_sed_tend(k) )
+     !                        * dt * pdel(k) / g
+     !    + preci * dt * 1000 = 0.
+
+     !----------------------------------------------------------------------
+
+     use physics_buffer, only: &
+         physics_buffer_desc, &
+         pbuf_get_field
+
+     use ppgrid, only: &
+         pcols
+
+     implicit none
+
+     ! Input Variables
+     type(physics_state), intent(in) :: state       ! Physics state variables
+     type(physics_buffer_desc), pointer :: pbuf(:)  ! Physics buffer
+
+     ! Input/Output Variables
+     type(physics_ptend),  intent(inout) :: ptend  ! Parameterization tendencies
+
+     ! Local Variables
+     real(r8), dimension(pcols,pver) :: &
+       rv_start, & ! Water vapor mixing ratio at start of microphysics  [kg/kg]
+       rc_start, & ! Cloud water mixing ratio at start of microphysics  [kg/kg]
+       rr_start, & ! Rain water mixing ratio at start of microphysics   [kg/kg]
+       ri_start, & ! Cloud ice mixing ratio at start of microphysics    [kg/kg]
+       rs_start    ! Snow mixing ratio at start of microphysics         [kg/kg]
+
+     real(r8), dimension(pcols,pver) :: &
+       rv_tend, & ! Water vapor mixing ratio tendency  [kg/kg/s]
+       rc_tend, & ! Cloud water mixing ratio tendency  [kg/kg/s]
+       rr_tend, & ! Rain water mixing ratio tendency   [kg/kg/s]
+       ri_tend, & ! Cloud ice mixing ratio tendency    [kg/kg/s]
+       rs_tend    ! Snow mixing ratio tendency         [kg/kg/s]
+
+     real(r8), dimension(:), pointer :: &
+       prect, & ! Total precipitation rate (surface)        [m/s]
+       preci    ! Ice-phase precipitation rate (surface)    [m/s]
+
+     real(r8), dimension(:,:), pointer :: &
+       qcsedten, & ! Mean cloud water sedimentation tendency    [kg/kg/s]
+       qrsedten, & ! Mean rain water sedimentation tendency     [kg/kg/s]
+       qisedten, & ! Mean cloud ice sedimentation tendency      [kg/kg/s]
+       qssedten, & ! Mean snow sedimentation tendency           [kg/kg/s]
+       vtrmc,    & ! Mean cloud water sedimentation velocity    [m/s]
+       umr,      & ! Mean rain water sedimentation velocity     [m/s]
+       vtrmi,    & ! Mean cloud ice sedimentation velocity      [m/s]
+       ums         ! Mean snow sedimentation velocity           [m/s]
+
+     integer :: ixcldice, ixcldliq, ixrain, ixsnow ! Hydrometeor indices
+
+     integer :: ncol  ! Number of grid columns
+
+     integer :: icol, k  ! Loop indices
+
+     logical :: l_check_water_conserv ! Flag to perform a water conservation check
+
+
+     ! Get indices for hydrometeor fields.
+     call cnst_get_ind('CLDICE', ixcldice)
+     call cnst_get_ind('CLDLIQ', ixcldliq)
+     call cnst_get_ind('RAINQM', ixrain, abort=.false.)
+     call cnst_get_ind('SNOWQM', ixsnow, abort=.false.)
+
+     ! Get fields from the pbuf.
+     call pbuf_get_field(pbuf, prec_pcw_idx, prect)
+     call pbuf_get_field(pbuf, snow_pcw_idx, preci)
+     call pbuf_get_field(pbuf, qcsedten_idx, qcsedten)
+     call pbuf_get_field(pbuf, qrsedten_idx, qrsedten)
+     call pbuf_get_field(pbuf, qisedten_idx, qisedten)
+     call pbuf_get_field(pbuf, qssedten_idx, qssedten)
+     call pbuf_get_field(pbuf, vtrmc_idx, vtrmc)
+     call pbuf_get_field(pbuf, umr_idx, umr)
+     call pbuf_get_field(pbuf, vtrmi_idx, vtrmi)
+     call pbuf_get_field(pbuf, ums_idx, ums)
+
+     ! Get the number of grid columns.
+     ncol = state%ncol
+
+     ! The fields within state haven't been updated yet, since this is before
+     ! the call to physics_update.
+     rv_start = state%q(:,:,1)
+     rc_start = state%q(:,:,ixcldliq)
+     if ( ixrain > 0 ) then
+        rr_start = state%q(:,:,ixrain)
+     endif
+     ri_start = state%q(:,:,ixcldice)
+     if ( ixsnow > 0 ) then
+        rs_start = state%q(:,:,ixsnow)
+     endif
+
+     ! Unpack the current total tendencies for hydrometeor mixing ratio fields.
+     rv_tend = ptend%q(:,:,1)
+     rc_tend = ptend%q(:,:,ixcldliq)
+     if ( ixrain > 0 ) then
+        rr_tend = ptend%q(:,:,ixrain)
+     endif
+     ri_tend = ptend%q(:,:,ixcldice)
+     if ( ixsnow > 0 ) then
+        rs_tend = ptend%q(:,:,ixsnow)
+     endif
+
+     if ( l_check_water_conserv ) then
+     endif ! l_check_water_conserv
+
+     ! Loop over all columns, performing any tendency adjustments one column
+     ! at a time.
+     do icol = 1, ncol
+
+        ! Calculate the hydrometeor mixing ratios as they would be with the
+        ! current tendency.
+        do k = 1, pver
+
+
+
+        enddo ! k = 1, pver
+
+     enddo ! icol = 1, ncol
+
+     if ( l_check_water_conserv ) then
+     endif ! l_check_water_conserv
+
+
+     return
+
+   end subroutine subcol_SILHS_fill_holes
 
 #endif
    

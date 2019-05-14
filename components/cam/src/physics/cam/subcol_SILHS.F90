@@ -1762,7 +1762,11 @@ contains
    end subroutine subcol_SILHS_massless_droplet_destroyer
 
    !============================================================================
-   subroutine subcol_SILHS_fill_holes( state, ptend, pbuf )
+   subroutine subcol_SILHS_fill_holes_conserv( state, dt, &
+                                               cld_macmic_num_steps, &
+                                               ptend, pbuf )
+
+     ! The William F. Buckley Jr. Conservative Hole Filler.
 
      ! Description:
      ! Stops holes from forming in a hydrometeor mixing ratio by reducing the
@@ -1912,14 +1916,22 @@ contains
      use ppgrid, only: &
          pcols
 
+     use constituents, only: &
+         qmin
+
+     use ref_pres, only: &
+         top_lev => trop_cloud_top_lev
+
      implicit none
 
      ! Input Variables
-     type(physics_state), intent(in) :: state       ! Physics state variables
-     type(physics_buffer_desc), pointer :: pbuf(:)  ! Physics buffer
+     type(physics_state), intent(in) :: state     ! Physics state variables
+     real(r8), intent(in) :: dt                   ! Time step duration
+     integer, intent(in) :: cld_macmic_num_steps  ! Number of substeps 
 
      ! Input/Output Variables
      type(physics_ptend),  intent(inout) :: ptend  ! Parameterization tendencies
+     type(physics_buffer_desc), pointer :: pbuf(:) ! Physics buffer
 
      ! Local Variables
      real(r8), dimension(pcols,pver) :: &
@@ -1941,14 +1953,47 @@ contains
        preci    ! Ice-phase precipitation rate (surface)    [m/s]
 
      real(r8), dimension(:,:), pointer :: &
-       qcsedten, & ! Mean cloud water sedimentation tendency    [kg/kg/s]
-       qrsedten, & ! Mean rain water sedimentation tendency     [kg/kg/s]
-       qisedten, & ! Mean cloud ice sedimentation tendency      [kg/kg/s]
-       qssedten, & ! Mean snow sedimentation tendency           [kg/kg/s]
-       vtrmc,    & ! Mean cloud water sedimentation velocity    [m/s]
-       umr,      & ! Mean rain water sedimentation velocity     [m/s]
-       vtrmi,    & ! Mean cloud ice sedimentation velocity      [m/s]
-       ums         ! Mean snow sedimentation velocity           [m/s]
+       rc_sed_tend, & ! Mean cloud water sedimentation tendency    [kg/kg/s]
+       rr_sed_tend, & ! Mean rain water sedimentation tendency     [kg/kg/s]
+       ri_sed_tend, & ! Mean cloud ice sedimentation tendency      [kg/kg/s]
+       rs_sed_tend, & ! Mean snow sedimentation tendency           [kg/kg/s]
+       vtrmc,       & ! Mean cloud water sedimentation velocity    [m/s]
+       umr,         & ! Mean rain water sedimentation velocity     [m/s]
+       vtrmi,       & ! Mean cloud ice sedimentation velocity      [m/s]
+       ums            ! Mean snow sedimentation velocity           [m/s]
+
+     real(r8), dimension(pcols,pver) :: &
+       rv_mc_tend, & ! Water vapor mixing ratio microphysics tendency  [kg/kg/s]
+       rc_mc_tend, & ! Cloud water mixing ratio microphysics tendency  [kg/kg/s]
+       rr_mc_tend, & ! Rain water mixing ratio microphysics tendency   [kg/kg/s]
+       ri_mc_tend, & ! Cloud ice mixing ratio microphysics tendency    [kg/kg/s]
+       rs_mc_tend    ! Snow mixing ratio microphysics tendency         [kg/kg/s]
+
+     real(r8), dimension(pcols,pver) :: &
+       rc_sed_tend_adj, & ! Adjusted cloud water sedimentation tend.   [kg/kg/s]
+       rr_sed_tend_adj, & ! Adjusted rain water sedimentation tendency [kg/kg/s]
+       ri_sed_tend_adj, & ! Adjusted cloud ice sedimentation tendency  [kg/kg/s]
+       rs_sed_tend_adj    ! Adjusted snow sedimentation tendency       [kg/kg/s]
+
+     real(r8) :: &
+       rv_curr, & ! Current water vapor mixing ratio    [kg/kg]
+       rc_curr, & ! Current cloud water mixing ratio    [kg/kg]
+       rr_curr, & ! Current rain water mixing ratio     [kg/kg]
+       ri_curr, & ! Current cloud ice mixing ratio      [kg/kg]
+       rs_curr    ! Current snow mixing ratio           [kg/kg]
+
+     logical :: &
+       l_pos_rv_mc_tend, & ! Flag for positive water vapor mixing ratio mc tend.
+       l_pos_rc_mc_tend, & ! Flag for positive cloud water mixing ratio mc tend.
+       l_pos_rr_mc_tend, & ! Flag for positive rain water mixing ratio mc tend.
+       l_pos_ri_mc_tend, & ! Flag for positive cloud ice mixing ratio mc tend.
+       l_pos_rs_mc_tend    ! Flag for positive snow mixing ratio mc tend.
+
+     real(r8) :: &
+       mc_tend_max_mag,     & ! Max. allowable mag. of (neg.) mc tend [kg/kg/s]
+       mc_tend_correction,  & ! Amnt. correction necessary to mc tend [kg/kg/s]
+       total_mc_positive,   & ! Total of all positive mc tendencies   [kg/kg/s]
+       mc_correction_ratio    ! Ratio: mc_tend_correction/total_mc_positive [-]
 
      integer :: ixcldice, ixcldliq, ixrain, ixsnow ! Hydrometeor indices
 
@@ -1956,7 +2001,19 @@ contains
 
      integer :: icol, k  ! Loop indices
 
-     logical :: l_check_water_conserv ! Flag to perform a water conservation check
+     logical, parameter :: &
+       l_check_water_conserv = .true. ! Flag to perform water conservation check
+
+     ! Vertically-integrated grand total water (rv+rc+rr+ri+rs)    [kg/m^2]
+     real(r8), dimension(pcols) :: &
+       grand_total_water_column_start,  & ! Column integral at start
+       grand_total_water_column_finish    ! Column integral at finish
+
+     real(r8), dimension(pcols) :: &
+       tot_rel_err ! Relative error in vertically-integrated grand total water
+
+     real(r8), parameter :: &
+       err_thresh = 1.0e-15_r8  ! Threshold of relative error
 
 
      ! Get indices for hydrometeor fields.
@@ -1965,20 +2022,46 @@ contains
      call cnst_get_ind('RAINQM', ixrain, abort=.false.)
      call cnst_get_ind('SNOWQM', ixsnow, abort=.false.)
 
+     ! Get the number of grid columns.
+     ncol = state%ncol
+
+     ! Calculate total water in each column.
+     ! This calculation is the vertically-integrated grand total water
+     ! in each grid column before microphysics began.
+     if ( l_check_water_conserv ) then
+        do icol = 1, ncol
+           grand_total_water_column_start(icol) = 0.0_r8
+           do k = top_lev, pver
+              grand_total_water_column_start(icol) &
+              = grand_total_water_column_start(icol) &
+                + ( state%q(icol,k,1) + state%q(icol,k,ixcldliq) &
+                    + state%q(icol,k,ixcldice) ) &
+                  * state%pdel(icol,k) / gravit
+              if ( ixrain > 0 ) then
+                 grand_total_water_column_start(icol) &
+                 = grand_total_water_column_start(icol) &
+                   + state%q(icol,k,ixrain) * state%pdel(icol,k) / gravit
+              endif
+              if ( ixsnow > 0 ) then
+                 grand_total_water_column_start(icol) &
+                 = grand_total_water_column_start(icol) &
+                   + state%q(icol,k,ixsnow) * state%pdel(icol,k) / gravit
+              endif
+           enddo ! k = top_lev, pver
+        enddo ! icol = 1, ncol
+     endif ! l_check_water_conserv
+
      ! Get fields from the pbuf.
      call pbuf_get_field(pbuf, prec_pcw_idx, prect)
      call pbuf_get_field(pbuf, snow_pcw_idx, preci)
-     call pbuf_get_field(pbuf, qcsedten_idx, qcsedten)
-     call pbuf_get_field(pbuf, qrsedten_idx, qrsedten)
-     call pbuf_get_field(pbuf, qisedten_idx, qisedten)
-     call pbuf_get_field(pbuf, qssedten_idx, qssedten)
+     call pbuf_get_field(pbuf, qcsedten_idx, rc_sed_tend)
+     call pbuf_get_field(pbuf, qrsedten_idx, rr_sed_tend)
+     call pbuf_get_field(pbuf, qisedten_idx, ri_sed_tend)
+     call pbuf_get_field(pbuf, qssedten_idx, rs_sed_tend)
      call pbuf_get_field(pbuf, vtrmc_idx, vtrmc)
      call pbuf_get_field(pbuf, umr_idx, umr)
      call pbuf_get_field(pbuf, vtrmi_idx, vtrmi)
      call pbuf_get_field(pbuf, ums_idx, ums)
-
-     ! Get the number of grid columns.
-     ncol = state%ncol
 
      ! The fields within state haven't been updated yet, since this is before
      ! the call to physics_update.
@@ -2003,30 +2086,656 @@ contains
         rs_tend = ptend%q(:,:,ixsnow)
      endif
 
-     if ( l_check_water_conserv ) then
-     endif ! l_check_water_conserv
+     ! The total hydrometeor tendencies are the sum of microphysics process
+     ! rates and sedimentation rates.  After microphysics was completed, the
+     ! total hydrometeor tendenices were multiplied by 1 / cld_macmic_num_steps
+     ! in a call to physics_ptend_scale in order to account for macrophysics and
+     ! microphysics sub-stepping.  When the tendencies are added back into the
+     ! state variables in the call to physics_update, the normal model time step
+     ! duration can be used (ztodt).
+     !
+     ! In order to extract the scaled microphysics process rates from the total
+     ! tendencies, the sedimentation rates that are output from microphysics
+     ! must also be scaled in the same manner.
+     rc_sed_tend_adj = ( 1.0_r8 / cld_macmic_num_steps ) * rc_sed_tend
+     if ( ixrain > 0 ) then
+        rr_sed_tend_adj = ( 1.0_r8 / cld_macmic_num_steps ) * rr_sed_tend
+     endif
+     ri_sed_tend_adj = ( 1.0_r8 / cld_macmic_num_steps ) * ri_sed_tend
+     if ( ixsnow > 0 ) then
+        rs_sed_tend_adj = ( 1.0_r8 / cld_macmic_num_steps ) * rs_sed_tend
+     endif
+
+     ! Calculate the microphysics process tendencies by subtracting the
+     ! sedimentation tendencies from the overall tendencies.
+     rv_mc_tend = rv_tend
+     rc_mc_tend = rc_tend - rc_sed_tend_adj
+     if ( ixrain > 0 ) then
+        rr_mc_tend = rr_tend - rr_sed_tend_adj
+     endif
+     ri_mc_tend = ri_tend - ri_sed_tend_adj
+     if ( ixsnow > 0 ) then
+        rs_mc_tend = rs_tend - rs_sed_tend_adj
+     endif
 
      ! Loop over all columns, performing any tendency adjustments one column
      ! at a time.
      do icol = 1, ncol
 
-        ! Calculate the hydrometeor mixing ratios as they would be with the
-        ! current tendency.
-        do k = 1, pver
+        ! Loop over all vertical levels, performing any microphysics process
+        ! tendency adjustments one level at a time.
+        do k = top_lev, pver
 
+           ! Find which hydrometeors have positive microphysics process
+           ! tendencies at this level.
+           if ( rv_mc_tend(icol,k) >= 0.0_r8 ) then
+              l_pos_rv_mc_tend = .true.
+           else
+              l_pos_rv_mc_tend = .false.
+           endif
+           if ( rc_mc_tend(icol,k) >= 0.0_r8 ) then
+              l_pos_rc_mc_tend = .true.
+           else
+              l_pos_rc_mc_tend = .false.
+           endif
+           if ( ixrain > 0 ) then
+              if ( rr_mc_tend(icol,k) >= 0.0_r8 ) then
+                 l_pos_rr_mc_tend = .true.
+              else
+                 l_pos_rr_mc_tend = .false.
+              endif
+           endif
+           if ( ri_mc_tend(icol,k) >= 0.0_r8 ) then
+              l_pos_ri_mc_tend = .true.
+           else
+              l_pos_ri_mc_tend = .false.
+           endif
+           if ( ixsnow > 0 ) then
+              if ( rs_mc_tend(icol,k) >= 0.0_r8 ) then
+                 l_pos_rs_mc_tend = .true.
+              else
+                 l_pos_rs_mc_tend = .false.
+              endif
+           endif
 
+           !!! Check for holes in water vapor mixing ratio
+           if ( .not. l_pos_rv_mc_tend ) then
+
+              ! Calculate the water vapor mixing ratio as it would be with the
+              ! current microphysics process tendency.
+              rv_curr = rv_start(icol,k) + rv_mc_tend(icol,k) * dt
+
+              if ( rv_curr < qmin(1) ) then
+
+                 ! Microphysics processes are causing a hole in water vapor
+                 ! mixing ratio.
+
+                 ! Calculate the maximum allowable magnitude of (negative) water
+                 ! vapor microphysics process tendency.
+                 mc_tend_max_mag = ( qmin(1) - rv_start(icol,k) ) / dt
+
+                 ! Calculate the amount of the correction that needs to be made
+                 ! to the water vapor mixing ratio microphysics process
+                 ! tendency.  This number is positive.
+                 mc_tend_correction = mc_tend_max_mag - rv_mc_tend(icol,k)
+
+                 ! Calculate the total amount of positive microphysics process
+                 ! tendencies for all hydrometeor mixing ratios.
+                 total_mc_positive = 0.0_r8
+                 if ( l_pos_rc_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rc_mc_tend(icol,k)
+                 endif
+                 if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rr_mc_tend(icol,k)
+                 endif
+                 if ( l_pos_ri_mc_tend ) then
+                    total_mc_positive = total_mc_positive + ri_mc_tend(icol,k)
+                 endif
+                 if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rs_mc_tend(icol,k)
+                 endif
+
+                 ! Calculate the correction ratio.
+                 ! In principal, this should never be greater than 1, but this
+                 ! is limited at 1 to be safe.
+                 mc_correction_ratio &
+                 = min( mc_tend_correction &
+                        / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
+
+                 ! Adjust (decrease) the tendencies of all positive hydrometeor
+                 ! mixing ratio tendencies to balance the adjustment (increase)
+                 ! to the excessively negative water vapor mixing ratio.
+                 ! Transfer dry static energy appropriately (in response to the
+                 ! excessive depletion of water vapor).
+                 if ( l_pos_rc_mc_tend ) then
+                    ! Changing cloud water to water vapor cools and reduces
+                    ! dry static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      - latvap * mc_correction_ratio * rc_mc_tend(icol,k)
+                    ! Update cloud water mixing ratio microphysics tendency.
+                    rc_mc_tend(icol,k) &
+                    = rc_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
+                    ! Changing rain water to water vapor cools and reduces
+                    ! dry static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      - latvap * mc_correction_ratio * rr_mc_tend(icol,k)
+                    ! Update rain water mixing ratio microphysics tendency.
+                    rr_mc_tend(icol,k) &
+                    = rr_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( l_pos_ri_mc_tend ) then
+                    ! Changing cloud ice to water vapor cools and reduces
+                    ! dry static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      - ( latvap + latice ) &
+                        * mc_correction_ratio * ri_mc_tend(icol,k)
+                    ! Update cloud ice mixing ratio microphysics tendency.
+                    ri_mc_tend(icol,k) &
+                    = ri_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
+                    ! Changing snow to water vapor cools and reduces dry
+                    ! static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      - ( latvap + latice ) &
+                        * mc_correction_ratio * rs_mc_tend(icol,k)
+                    ! Update snow mixing ratio microphysics tendency.
+                    rs_mc_tend(icol,k) &
+                    = rs_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+
+                 ! Reset water vapor mixing ratio microphysics process
+                 ! tendency to the maximum magnitude (negative) amount allowed.
+                 rv_mc_tend(icol,k) = mc_tend_max_mag
+
+              endif ! rv_curr < qmin(1)
+
+           endif ! .not. l_pos_rv_mc_tend
+
+           !!! Check for holes in cloud water mixing ratio
+           if ( .not. l_pos_rc_mc_tend ) then
+
+              ! Calculate the cloud water mixing ratio as it would be with the
+              ! current microphysics process tendency.
+              rc_curr = rc_start(icol,k) + rc_mc_tend(icol,k) * dt
+
+              if ( rc_curr < qmin(ixcldliq) ) then
+
+                 ! Microphysics processes are causing a hole in cloud water
+                 ! mixing ratio.
+
+                 ! Calculate the maximum allowable magnitude of (negative) cloud
+                 ! water microphysics process tendency.
+                 mc_tend_max_mag = ( qmin(ixcldliq) - rc_start(icol,k) ) / dt
+
+                 ! Calculate the amount of the correction that needs to be made
+                 ! to the cloud water mixing ratio microphysics process
+                 ! tendency.  This number is positive.
+                 mc_tend_correction = mc_tend_max_mag - rc_mc_tend(icol,k)
+
+                 ! Calculate the total amount of positive microphysics process
+                 ! tendencies for all hydrometeor mixing ratios.
+                 total_mc_positive = 0.0_r8
+                 if ( l_pos_rv_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rv_mc_tend(icol,k)
+                 endif
+                 if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rr_mc_tend(icol,k)
+                 endif
+                 if ( l_pos_ri_mc_tend ) then
+                    total_mc_positive = total_mc_positive + ri_mc_tend(icol,k)
+                 endif
+                 if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rs_mc_tend(icol,k)
+                 endif
+
+                 ! Calculate the correction ratio.
+                 ! In principal, this should never be greater than 1, but this
+                 ! is limited at 1 to be safe.
+                 mc_correction_ratio &
+                 = min( mc_tend_correction &
+                        / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
+
+                 ! Adjust (decrease) the tendencies of all positive hydrometeor
+                 ! mixing ratio tendencies to balance the adjustment (increase)
+                 ! to the excessively negative cloud water mixing ratio.
+                 ! Transfer dry static energy appropriately (in response to the
+                 ! excessive depletion of cloud water).
+                 if ( l_pos_rv_mc_tend ) then
+                    ! Changing water vapor to cloud water heats and increases
+                    ! dry static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      + latvap * mc_correction_ratio * rv_mc_tend(icol,k)
+                    ! Update water vapor mixing ratio microphysics tendency.
+                    rv_mc_tend(icol,k) &
+                    = rv_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
+                    ! Changing rain water to cloud water does not change
+                    ! dry static energy.
+                    ! Update rain water mixing ratio microphysics tendency.
+                    rr_mc_tend(icol,k) &
+                    = rr_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( l_pos_ri_mc_tend ) then
+                    ! Changing cloud ice to cloud water cools and reduces
+                    ! dry static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      - latice * mc_correction_ratio * ri_mc_tend(icol,k)
+                    ! Update cloud ice mixing ratio microphysics tendency.
+                    ri_mc_tend(icol,k) &
+                    = ri_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
+                    ! Changing snow to cloud water cools and reduces dry
+                    ! static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      - latice * mc_correction_ratio * rs_mc_tend(icol,k)
+                    ! Update snow mixing ratio microphysics tendency.
+                    rs_mc_tend(icol,k) &
+                    = rs_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+
+                 ! Reset cloud water mixing ratio microphysics process
+                 ! tendency to the maximum magnitude (negative) amount allowed.
+                 rc_mc_tend(icol,k) = mc_tend_max_mag
+
+              endif ! rc_curr < qmin(ixcldliq)
+
+           endif ! .not. l_pos_rc_mc_tend
+
+           !!! Check for holes in rain water mixing ratio
+           if ( ixrain > 0 .and. ( .not. l_pos_rr_mc_tend ) ) then
+
+              ! Calculate the rain water mixing ratio as it would be with the
+              ! current microphysics process tendency.
+              rr_curr = rr_start(icol,k) + rr_mc_tend(icol,k) * dt
+
+              if ( rr_curr < qmin(ixrain) ) then
+
+                 ! Microphysics processes are causing a hole in rain water
+                 ! mixing ratio.
+
+                 ! Calculate the maximum allowable magnitude of (negative) rain
+                 ! water microphysics process tendency.
+                 mc_tend_max_mag = ( qmin(ixrain) - rr_start(icol,k) ) / dt
+
+                 ! Calculate the amount of the correction that needs to be made
+                 ! to the rain water mixing ratio microphysics process
+                 ! tendency.  This number is positive.
+                 mc_tend_correction = mc_tend_max_mag - rr_mc_tend(icol,k)
+
+                 ! Calculate the total amount of positive microphysics process
+                 ! tendencies for all hydrometeor mixing ratios.
+                 total_mc_positive = 0.0_r8
+                 if ( l_pos_rv_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rv_mc_tend(icol,k)
+                 endif
+                 if ( l_pos_rc_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rc_mc_tend(icol,k)
+                 endif
+                 if ( l_pos_ri_mc_tend ) then
+                    total_mc_positive = total_mc_positive + ri_mc_tend(icol,k)
+                 endif
+                 if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rs_mc_tend(icol,k)
+                 endif
+
+                 ! Calculate the correction ratio.
+                 ! In principal, this should never be greater than 1, but this
+                 ! is limited at 1 to be safe.
+                 mc_correction_ratio &
+                 = min( mc_tend_correction &
+                        / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
+
+                 ! Adjust (decrease) the tendencies of all positive hydrometeor
+                 ! mixing ratio tendencies to balance the adjustment (increase)
+                 ! to the excessively negative rain water mixing ratio.
+                 ! Transfer dry static energy appropriately (in response to the
+                 ! excessive depletion of rain water).
+                 if ( l_pos_rv_mc_tend ) then
+                    ! Changing water vapor to rain water heats and increases
+                    ! dry static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      + latvap * mc_correction_ratio * rv_mc_tend(icol,k)
+                    ! Update water vapor mixing ratio microphysics tendency.
+                    rv_mc_tend(icol,k) &
+                    = rv_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( l_pos_rc_mc_tend ) then
+                    ! Changing cloud water to rain water does not change
+                    ! dry static energy.
+                    ! Update cloud water mixing ratio microphysics tendency.
+                    rc_mc_tend(icol,k) &
+                    = rc_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( l_pos_ri_mc_tend ) then
+                    ! Changing cloud ice to rain water cools and reduces
+                    ! dry static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      - latice * mc_correction_ratio * ri_mc_tend(icol,k)
+                    ! Update cloud ice mixing ratio microphysics tendency.
+                    ri_mc_tend(icol,k) &
+                    = ri_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
+                    ! Changing snow to rain water cools and reduces dry
+                    ! static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      - latice * mc_correction_ratio * rs_mc_tend(icol,k)
+                    ! Update snow mixing ratio microphysics tendency.
+                    rs_mc_tend(icol,k) &
+                    = rs_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+
+                 ! Reset rain water mixing ratio microphysics process
+                 ! tendency to the maximum magnitude (negative) amount allowed.
+                 rr_mc_tend(icol,k) = mc_tend_max_mag
+
+              endif ! rr_curr < qmin(ixrain)
+
+           endif ! ixrain > 0 .and. ( .not. l_pos_rr_mc_tend )
+
+           !!! Check for holes in cloud ice mixing ratio
+           if ( .not. l_pos_ri_mc_tend ) then
+
+              ! Calculate the cloud ice mixing ratio as it would be with the
+              ! current microphysics process tendency.
+              ri_curr = ri_start(icol,k) + ri_mc_tend(icol,k) * dt
+
+              if ( ri_curr < qmin(ixcldice) ) then
+
+                 ! Microphysics processes are causing a hole in cloud ice
+                 ! mixing ratio.
+
+                 ! Calculate the maximum allowable magnitude of (negative) cloud
+                 ! ice microphysics process tendency.
+                 mc_tend_max_mag = ( qmin(ixcldice) - ri_start(icol,k) ) / dt
+
+                 ! Calculate the amount of the correction that needs to be made
+                 ! to the cloud ice mixing ratio microphysics process
+                 ! tendency.  This number is positive.
+                 mc_tend_correction = mc_tend_max_mag - ri_mc_tend(icol,k)
+
+                 ! Calculate the total amount of positive microphysics process
+                 ! tendencies for all hydrometeor mixing ratios.
+                 total_mc_positive = 0.0_r8
+                 if ( l_pos_rv_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rv_mc_tend(icol,k)
+                 endif
+                 if ( l_pos_rc_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rc_mc_tend(icol,k)
+                 endif
+                 if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rr_mc_tend(icol,k)
+                 endif
+                 if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rs_mc_tend(icol,k)
+                 endif
+
+                 ! Calculate the correction ratio.
+                 ! In principal, this should never be greater than 1, but this
+                 ! is limited at 1 to be safe.
+                 mc_correction_ratio &
+                 = min( mc_tend_correction &
+                        / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
+
+                 ! Adjust (decrease) the tendencies of all positive hydrometeor
+                 ! mixing ratio tendencies to balance the adjustment (increase)
+                 ! to the excessively negative cloud ice mixing ratio.
+                 ! Transfer dry static energy appropriately (in response to the
+                 ! excessive depletion of cloud ice).
+                 if ( l_pos_rv_mc_tend ) then
+                    ! Changing water vapor to cloud ice heats and increases
+                    ! dry static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      + ( latvap + latice ) &
+                        * mc_correction_ratio * rv_mc_tend(icol,k)
+                    ! Update water vapor mixing ratio microphysics tendency.
+                    rv_mc_tend(icol,k) &
+                    = rv_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( l_pos_rc_mc_tend ) then
+                    ! Changing cloud water to cloud ice heats and increases
+                    ! dry static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      + latice * mc_correction_ratio * rc_mc_tend(icol,k)
+                    ! Update cloud water mixing ratio microphysics tendency.
+                    rc_mc_tend(icol,k) &
+                    = rc_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
+                    ! Changing rain water to cloud ice heats and increases
+                    ! dry static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      + latice * mc_correction_ratio * rr_mc_tend(icol,k)
+                    ! Update rain water mixing ratio microphysics tendency.
+                    rr_mc_tend(icol,k) &
+                    = rr_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
+                    ! Changing snow to cloud ice does not change dry static
+                    ! energy.
+                    ! Update snow mixing ratio microphysics tendency.
+                    rs_mc_tend(icol,k) &
+                    = rs_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+
+                 ! Reset cloud ice mixing ratio microphysics process
+                 ! tendency to the maximum magnitude (negative) amount allowed.
+                 ri_mc_tend(icol,k) = mc_tend_max_mag
+
+              endif ! ri_curr < qmin(ixcldice)
+
+           endif ! .not. l_pos_ri_mc_tend
+
+           !!! Check for holes in snow mixing ratio
+           if ( ixsnow > 0 .and. ( .not. l_pos_rs_mc_tend ) ) then
+
+              ! Calculate the snow mixing ratio as it would be with the
+              ! current microphysics process tendency.
+              rs_curr = rs_start(icol,k) + rs_mc_tend(icol,k) * dt
+
+              if ( rs_curr < qmin(ixsnow) ) then
+
+                 ! Microphysics processes are causing a hole in snow mixing
+                 ! ratio.
+
+                 ! Calculate the maximum allowable magnitude of (negative) snow
+                 ! microphysics process tendency.
+                 mc_tend_max_mag = ( qmin(ixsnow) - rs_start(icol,k) ) / dt
+
+                 ! Calculate the amount of the correction that needs to be made
+                 ! to the snow mixing ratio microphysics process tendency.
+                 ! This number is positive.
+                 mc_tend_correction = mc_tend_max_mag - rs_mc_tend(icol,k)
+
+                 ! Calculate the total amount of positive microphysics process
+                 ! tendencies for all hydrometeor mixing ratios.
+                 total_mc_positive = 0.0_r8
+                 if ( l_pos_rv_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rv_mc_tend(icol,k)
+                 endif
+                 if ( l_pos_rc_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rc_mc_tend(icol,k)
+                 endif
+                 if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
+                    total_mc_positive = total_mc_positive + rr_mc_tend(icol,k)
+                 endif
+                 if ( l_pos_ri_mc_tend ) then
+                    total_mc_positive = total_mc_positive + ri_mc_tend(icol,k)
+                 endif
+
+                 ! Calculate the correction ratio.
+                 ! In principal, this should never be greater than 1, but this
+                 ! is limited at 1 to be safe.
+                 mc_correction_ratio &
+                 = min( mc_tend_correction &
+                        / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
+
+                 ! Adjust (decrease) the tendencies of all positive hydrometeor
+                 ! mixing ratio tendencies to balance the adjustment (increase)
+                 ! to the excessively negative snow mixing ratio.
+                 ! Transfer dry static energy appropriately (in response to the
+                 ! excessive depletion of snow).
+                 if ( l_pos_rv_mc_tend ) then
+                    ! Changing water vapor to snow heats and increases dry
+                    ! static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      + ( latvap + latice ) &
+                        * mc_correction_ratio * rv_mc_tend(icol,k)
+                    ! Update water vapor mixing ratio microphysics tendency.
+                    rv_mc_tend(icol,k) &
+                    = rv_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( l_pos_rc_mc_tend ) then
+                    ! Changing cloud water to snow heats and increases dry
+                    ! static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      + latice * mc_correction_ratio * rc_mc_tend(icol,k)
+                    ! Update cloud water mixing ratio microphysics tendency.
+                    rc_mc_tend(icol,k) &
+                    = rc_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
+                    ! Changing rain water to snow heats and increases dry
+                    ! static energy.
+                    ptend%s(icol,k) &
+                    = ptend%s(icol,k) &
+                      + latice * mc_correction_ratio * rr_mc_tend(icol,k)
+                    ! Update rain water mixing ratio microphysics tendency.
+                    rr_mc_tend(icol,k) &
+                    = rr_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+                 if ( l_pos_ri_mc_tend ) then
+                    ! Changing cloud ice to snow does not change dry static
+                    ! energy.
+                    ! Update cloud ice mixing ratio microphysics tendency.
+                    ri_mc_tend(icol,k) &
+                    = ri_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
+                 endif
+
+                 ! Reset snow mixing ratio microphysics process tendency to the
+                 ! maximum magnitude (negative) amount allowed.
+                 rs_mc_tend(icol,k) = mc_tend_max_mag
+
+              endif ! rs_curr < qmin(ixsnow)
+
+           endif ! ixsnow > 0 .and. ( .not. l_pos_rs_mc_tend )
 
         enddo ! k = 1, pver
 
      enddo ! icol = 1, ncol
 
+     ! Calculate the new overall tendencies by adding the sedimentation
+     ! tendencies back onto the new microphysics process tendencies.
+     rv_tend = rv_mc_tend
+     rc_tend = rc_mc_tend + rc_sed_tend_adj
+     if ( ixrain > 0 ) then
+        rr_tend = rr_mc_tend + rr_sed_tend_adj
+     endif
+     ri_tend = ri_mc_tend + ri_sed_tend_adj
+     if ( ixsnow > 0 ) then
+        rs_tend = rs_mc_tend + rs_sed_tend_adj
+     endif
+
+     !!! New sedimentation adjustment code goes here
+
+     ! Pack the current total tendencies for hydrometeor mixing ratio fields.
+     ptend%q(:,:,1) = rv_tend
+     ptend%q(:,:,ixcldliq) = rc_tend
+     if ( ixrain > 0 ) then
+        ptend%q(:,:,ixrain) = rr_tend
+     endif
+     ptend%q(:,:,ixcldice) = ri_tend
+     if ( ixsnow > 0 ) then
+        ptend%q(:,:,ixsnow) = rs_tend
+     endif
+
      if ( l_check_water_conserv ) then
+
+        ! Calculate total water in each grid column.
+        ! This calculation is the vertically-integrated grand total water
+        ! in each grid column updated for all microphysics and hole filling.
+        ! This includes the amount that precipitated to the surface.
+        do icol = 1, ncol
+           grand_total_water_column_finish(icol) = 0.0_r8
+           do k = top_lev, pver
+              grand_total_water_column_finish(icol) &
+              = grand_total_water_column_finish(icol) &
+                + ( state%q(icol,k,1) &
+                    + ptend%q(icol,k,1) * dt &
+                    + state%q(icol,k,ixcldliq) &
+                    + ptend%q(icol,k,ixcldliq) * dt &
+                    + state%q(icol,k,ixcldice) &
+                    + ptend%q(icol,k,ixcldice) * dt ) &
+                  * state%pdel(icol,k) / gravit
+              if ( ixrain > 0 ) then
+                 grand_total_water_column_finish(icol) &
+                 = grand_total_water_column_finish(icol) &
+                   + ( state%q(icol,k,ixrain) + ptend%q(icol,k,ixrain) * dt ) &
+                     * state%pdel(icol,k) / gravit
+              endif
+              if ( ixsnow > 0 ) then
+                 grand_total_water_column_finish(icol) &
+                 = grand_total_water_column_finish(icol) &
+                   + ( state%q(icol,k,ixsnow) + ptend%q(icol,k,ixsnow) * dt ) &
+                     * state%pdel(icol,k) / gravit
+              endif
+           enddo ! k = top_lev, pver
+           grand_total_water_column_finish(icol) &
+           = grand_total_water_column_finish(icol) &
+             + prect(icol) * ( dt / cld_macmic_num_steps ) * 1000.0_r8
+        enddo ! icol = 1, ncol
+
+        ! Calculate the total relative error in each grid column.
+        do icol = 1, ncol
+           tot_rel_err(icol) &
+           = abs( ( grand_total_water_column_finish(icol) &
+                    - grand_total_water_column_start(icol) ) ) &
+             / min( grand_total_water_column_finish(icol), &
+                    grand_total_water_column_start(icol) )
+        enddo ! icol = 1, ncol
+
+        ! Print an error message if any total relative error is found to be
+        ! greater than the threshold.
+        if ( any( tot_rel_err >= err_thresh ) ) then
+           print *, "Water conservation error reported in hole filling"
+           do icol = 1, ncol
+              if ( tot_rel_err(icol) >= err_thresh ) then
+                 print *, "Column = ", icol, &
+                          "Relative error = ", tot_rel_err(icol), &
+                          "Column-integrated grand total water at start = ", &
+                          grand_total_water_column_start(icol), &
+                          "Column-integrated grand total water at finish = ", &
+                          grand_total_water_column_finish(icol)
+              endif ! tot_rel_err(icol) >= err_thresh
+           enddo ! icol = 1, ncol
+        endif ! any( tot_rel_err >= err_thresh )
+
      endif ! l_check_water_conserv
 
 
      return
 
-   end subroutine subcol_SILHS_fill_holes
+   end subroutine subcol_SILHS_fill_holes_conserv
 
 #endif
    

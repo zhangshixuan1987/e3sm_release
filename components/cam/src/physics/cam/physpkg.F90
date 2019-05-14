@@ -1835,7 +1835,9 @@ subroutine tphysbc (ztodt,               &
     use phys_control,    only: use_qqflx_fixer, use_mass_borrower
 
 #if defined(UWM_MISC) && defined(SILHS)
-    use subcol_SILHS,    only: subcol_SILHS_var_covar_driver, subcol_SILHS_massless_droplet_destroyer
+    use subcol_SILHS,    only: subcol_SILHS_var_covar_driver, &
+                               subcol_SILHS_massless_droplet_destroyer, &
+                               subcol_SILHS_fill_holes_conserv
 #endif
 
     implicit none
@@ -2550,6 +2552,16 @@ end if
           call outfld('INEGCLPTEND', icecliptend, pcols, lchnk   )
           call outfld('LNEGCLPTEND', liqcliptend, pcols, lchnk   )
           call outfld('VNEGCLPTEND', vapcliptend, pcols, lchnk   )
+
+          if ( use_subcol_microp .and. .false. ) then
+             ! Call the conservative hole filler.
+             ! Hole filling is only necessary when using subcolumns.
+             ! Note:  this needs to be called after physics_ptend_scale but
+             !        before physics_update.
+             call subcol_SILHS_fill_holes_conserv( state, ztodt, &
+                                                   cld_macmic_num_steps, &
+                                                   ptend, pbuf )
+          endif ! use_subcol_microp
 
           call physics_update (state, ptend, ztodt, tend, chunk_smry, do_hole_fill=.true.)
           call check_energy_chng(state, tend, "microp_tend", nstep, ztodt, &

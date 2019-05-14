@@ -35,7 +35,9 @@ module subcol_SILHS
    public :: subcol_readnl_SILHS    ! SILHS namelist reader
    public :: subcol_ptend_avg_SILHS
 #ifdef SILHS
-   public :: subcol_SILHS_var_covar_driver, subcol_SILHS_massless_droplet_destroyer
+   public :: subcol_SILHS_var_covar_driver, &
+             subcol_SILHS_massless_droplet_destroyer, &
+             subcol_SILHS_fill_holes_conserv
    private :: Abs_Temp_profile
    private :: StaticEng_profile
    ! Calc subcol mean ! Calc subcol variance

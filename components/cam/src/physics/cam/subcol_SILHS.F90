@@ -2015,7 +2015,7 @@ contains
        tot_rel_err ! Relative error in vertically-integrated grand total water
 
      real(r8), parameter :: &
-       err_thresh = 1.0e-15_r8  ! Threshold of relative error
+       err_thresh = 1.0e-14_r8  ! Threshold of relative error
 
 
      ! Get indices for hydrometeor fields.
@@ -2252,9 +2252,12 @@ contains
                     = rs_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
                  endif
 
-                 ! Reset water vapor mixing ratio microphysics process
-                 ! tendency to the maximum magnitude (negative) amount allowed.
-                 rv_mc_tend(icol,k) = mc_tend_max_mag
+                 ! Calculate the new water vapor mixing ratio microphysics
+                 ! process tendency.  This should be equal to the maximum
+                 ! magnitude (negative) amount allowed, mc_tend_max_mag.
+                 rv_mc_tend(icol,k) &
+                 = rv_mc_tend(icol,k) &
+                   + mc_correction_ratio * total_mc_positive
 
               endif ! rv_curr < qmin(1)
 
@@ -2347,9 +2350,12 @@ contains
                     = rs_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
                  endif
 
-                 ! Reset cloud water mixing ratio microphysics process
-                 ! tendency to the maximum magnitude (negative) amount allowed.
-                 rc_mc_tend(icol,k) = mc_tend_max_mag
+                 ! Calculate the new cloud water mixing ratio microphysics
+                 ! process tendency.  This should be equal to the maximum
+                 ! magnitude (negative) amount allowed, mc_tend_max_mag.
+                 rc_mc_tend(icol,k) &
+                 = rc_mc_tend(icol,k) &
+                   + mc_correction_ratio * total_mc_positive
 
               endif ! rc_curr < qmin(ixcldliq)
 
@@ -2442,9 +2448,12 @@ contains
                     = rs_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
                  endif
 
-                 ! Reset rain water mixing ratio microphysics process
-                 ! tendency to the maximum magnitude (negative) amount allowed.
-                 rr_mc_tend(icol,k) = mc_tend_max_mag
+                 ! Calculate the new rain water mixing ratio microphysics
+                 ! process tendency.  This should be equal to the maximum
+                 ! magnitude (negative) amount allowed, mc_tend_max_mag.
+                 rr_mc_tend(icol,k) &
+                 = rr_mc_tend(icol,k) &
+                   + mc_correction_ratio * total_mc_positive
 
               endif ! rr_curr < qmin(ixrain)
 
@@ -2538,9 +2547,12 @@ contains
                     = rs_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
                  endif
 
-                 ! Reset cloud ice mixing ratio microphysics process
-                 ! tendency to the maximum magnitude (negative) amount allowed.
-                 ri_mc_tend(icol,k) = mc_tend_max_mag
+                 ! Calculate the new cloud ice mixing ratio microphysics
+                 ! process tendency.  This should be equal to the maximum
+                 ! magnitude (negative) amount allowed, mc_tend_max_mag.
+                 ri_mc_tend(icol,k) &
+                 = ri_mc_tend(icol,k) &
+                   + mc_correction_ratio * total_mc_positive
 
               endif ! ri_curr < qmin(ixcldice)
 
@@ -2634,9 +2646,12 @@ contains
                     = ri_mc_tend(icol,k) * ( 1.0_r8 - mc_correction_ratio )
                  endif
 
-                 ! Reset snow mixing ratio microphysics process tendency to the
-                 ! maximum magnitude (negative) amount allowed.
-                 rs_mc_tend(icol,k) = mc_tend_max_mag
+                 ! Calculate the new snow mixing ratio microphysics process
+                 ! tendency.  This should be equal to the maximum magnitude
+                 ! (negative) amount allowed, mc_tend_max_mag.
+                 rs_mc_tend(icol,k) &
+                 = rs_mc_tend(icol,k) &
+                   + mc_correction_ratio * total_mc_positive
 
               endif ! rs_curr < qmin(ixsnow)
 
@@ -2739,6 +2754,359 @@ contains
 
    end subroutine subcol_SILHS_fill_holes_conserv
 
+   !============================================================================
+   subroutine fill_holes_sedimentation( dt, cld_macmic_num_steps, ncol, &
+                                        hm_start, pdel, fallspeed_m_per_s, &
+                                        zi, qmin_hm, hm_tend, prec )
+
+     ! Description:
+     ! After hydrometeor tendencies from microphysics processes were adjusted
+     ! so that holes don't form in a hydrometeor field from microphysics
+     ! processes, the sedimentation tendency was added back on to produce an
+     ! updated total microphysics tendency.  The first-order "up-gravity"
+     ! sedimentation method that was originally used is positive definite.
+     ! However, since the microphysics process tendencies were altered so that
+     ! holes don't form, it is possible that adding the old sedimentation
+     ! tendencies back onto the new microphysics process tendencies could
+     ! produce new total microphysics tendencies that cause holes to form.
+     !
+     ! In this subroutine, holes in a hydrometeor field are checked for after
+     ! the updated microphysics tendency is applied.  If any are found, they are
+     ! filled from positive hydrometeor mass found at grid levels below where
+     ! the hole is found.  The levels that are used to fill are within range
+     ! based on fallspeed of the hydrometeor.  If the level that contains the
+     ! hole is within proximity to the surface, then the water that sedimented
+     ! to the surface can be used to fill the hole, as well.
+
+     !----------------------------------------------------------------------
+
+     use ppgrid, only: &
+         pcols
+
+     use ref_pres, only: &
+         top_lev => trop_cloud_top_lev
+
+     implicit none
+
+     ! Input Variables
+     real(r8), intent(in) :: dt                   ! Time step duration
+     integer, intent(in) :: cld_macmic_num_steps  ! Number of substeps 
+     integer, intent(in) :: ncol                  ! Number of grid columns
+
+     real(r8), dimension(pcols,pver), intent(in) :: &
+       hm_start, & ! Hydrometeor mixing ratio at start of microphysics  [kg/kg]
+       pdel        ! Pressure difference between grid levels            [Pa]
+
+     real(r8), dimension(pcols,pver), intent(in) :: &
+       fallspeed_m_per_s    ! Hydrometeor mixing ratio fall speed     [m/s]
+
+     real(r8), dimension(pcols,pverp), intent(in) :: &
+       zi    ! Height of momentum (interface) grid levels    [m]
+
+     real(r8), intent(in) :: &
+       qmin_hm    ! Minimum threshold value of hydrometeor mixing ratio  [kg/kg]
+
+     ! Input/Output Variables
+     real(r8), dimension(pcols,pver), intent(inout) :: &
+       hm_tend    ! Hydrometeor mixing ratio tendency  [kg/kg/s]
+
+     real(r8), dimension(pcols), intent(inout) :: &
+       prec    ! Precipitation rate (surface)        [m/s]
+
+     ! Local Variables
+     real(r8), dimension(pver) :: &
+       hm_update, & ! Hydrometeor mixing ratio; start of sed. hole fill  [kg/kg]
+       hm_curr      ! Current value of hydrometeor mixing ratio          [kg/kg]
+
+     real(r8) :: &
+       total_hole,          & ! Total mass of hole in hydrometeor       [kg/m^2]
+       total_fill_mass,     & ! Total mass available to fill hole       [kg/m^2]
+       hole_fillmass_ratio, & ! Ratio: total_hole / total_fill_mass     [-]
+       fallspeed_Pa_per_s,  & ! Hydrometeor mixing ratio fall speed     [Pa/s]
+       total_fall_Pa,       & ! Pressure "distance" hydrometeor fell    [Pa]
+       sum_pdel               ! Sum of pdel over levels                 [Pa]
+
+     logical, dimension(pver) :: &
+       l_pos_hm  ! Flag for a hydrometeor having a positive (>= qmin_hm) value
+
+     ! Flag for whether surface precipitation mass needs to be included in
+     ! the total_fill_mass for hole filling.
+     logical :: l_reached_surface
+
+     integer :: icol  ! Grid column index
+
+     integer :: k, idx  ! Vertical grid level indices
+
+     ! Index of the lowest vertical grid level that needs to be included in the
+     ! total_fill_mass for hole filling.
+     integer :: lowest_level_idx
+
+
+     ! Loop over all columns, performing any adjustments one column at a time.
+     do icol = 1, ncol
+
+        ! Calculate the updated value of the hydrometeor field based on the
+        ! updated microphysics tendency.  Since the original sedimentation
+        ! tendency has been added to the updated microphysics process tendency
+        ! to produce the updated total microphysics tendency (hm_tend), the
+        ! updated value of the hydrometeor field (hm_update) could be negative.
+        hm_update = hm_start(icol,:) + hm_tend(icol,:) * dt
+        hm_curr = hm_update
+
+        ! Check for any holes in the vertical profile
+        if ( any( hm_curr(top_lev:pver) < qmin_hm ) ) then
+
+           ! At least one hole is found in this hydrometeor species in this
+           ! grid column.  The holes must be filled conservatively.
+
+           ! Check which levels have values of the hydrometeor that are at or
+           ! above the minimum threshold value.
+           do k = top_lev, pver
+              if ( hm_curr(k) >= qmin_hm ) then
+                l_pos_hm(k) = .true.
+              else ! hm_curr < qmin_hm
+                l_pos_hm(k) = .false.
+              endif ! hm_curr >= qmin_hm
+           enddo ! k = top_lev, pver
+
+           do k = pver, top_lev, -1
+
+              if ( .not. l_pos_hm(k) ) then
+
+                 ! A hole is found in the hydrometeor at this grid level.
+                 if ( k == pver ) then
+
+                    ! A hole is found at the lowermost level.
+                    ! The only place the hydrometeor could have sedimented
+                    ! to is the surface, so fill from only the surface.
+
+                    ! Calculate the total hydrometeor mass of the hole that
+                    ! needs to be filled.
+                    ! The value of the hydrometeor mixing ratio is negative,
+                    ! but total_hole is positive.
+                    total_hole &
+                    = ( qmin_hm - hm_curr(k) ) * pdel(icol,k) / gravit
+
+                    ! Calculate the available amount of hydrometeor mass to
+                    ! fill the hole.
+                    total_fill_mass &
+                    = prec(icol) * ( dt / cld_macmic_num_steps ) * 1000.0_r8
+
+                    ! Calculate the ratio of total hole to total fill mass.
+                    ! This should not exceed 1, but use thresholding to be safe.
+                    hole_fillmass_ratio &
+                    = min( total_hole / max( total_fill_mass, 1.0e-30 ), &
+                           1.0_r8 )
+
+                    ! Modify (reduce) the amount of surface precipitation in
+                    ! order to fill the hole.  Since dt, cld_macmic_num_steps,
+                    ! and 1000 are all constants, the only variable that needs
+                    ! to be modified proportionately is prec.
+                    prec(icol) = prec(icol) * ( 1.0_r8 - hole_fillmass_ratio )
+
+                    ! Update the value of the hydrometeor at the level where the
+                    ! hole was found.  Mathematically, as long as the available
+                    ! mass was able to fill the entire hole, the new value of
+                    ! the hydrometeor mixing ratio (hm_curr) should be 0.
+                    hm_curr(k) &
+                    = hm_curr(k) &
+                      + hole_fillmass_ratio * total_fill_mass &
+                        * gravit / pdel(icol,k)
+
+                 else ! top_lev <= k < pver
+
+                    ! Calculate the hydrometeor fallspeed in Pa/s.
+                    ! In MG2, the equation for this is given by:
+                    !
+                    ! fallspeed([Pa/s]) = g * rho * fallspeed([m/s]).
+                    !
+                    ! The value of rho is typically calculated from the
+                    ! hydrostatic approximation:
+                    !
+                    ! rho = - ( 1 / g ) * dp/dz.
+                    !
+                    ! The equation for fallspeed in Pa/s becomes:
+                    !
+                    ! fallspeed([Pa/s]) = - dp/dz * fallspeed([m/s]).
+                    fallspeed_Pa_per_s &
+                    = fallspeed_m_per_s(icol,k) &
+                      * pdel(icol,k) / ( zi(icol,k) - zi(icol,k+1) )
+
+                    ! Calculate the fall "distance" in Pa.
+                    ! The time duration used is the macrophysics/microphysics
+                    ! substep time, which is the model timestep duration
+                    ! divided by the number of macmic steps.
+                    total_fall_Pa &
+                    = fallspeed_Pa_per_s * ( dt / cld_macmic_num_steps )
+
+                    ! Find the index of the vertical level that the hydrometeor
+                    ! sedimented to in one macmic substep.  It must sediment
+                    ! at least one level.
+                    sum_pdel = 0.0_r8
+                    idx = k + 1
+                    do
+                       ! Update the total pressure difference between the
+                       ! level of origin and the current level.
+                       sum_pdel = sum_pdel + pdel(icol,idx)
+                       if ( sum_pdel >= total_fall_Pa ) then
+                          ! The total pressure difference between the level of
+                          ! origin and the current level exceeds the total
+                          ! hydrometeor fall "distance" (in Pa).
+                          lowest_level_idx = idx
+                          l_reached_surface = .false.
+                          exit
+                       else ! sum_pdel < total_fall_Pa
+                          ! The total hydrometeor fall "distance" (in Pa)
+                          ! exceeds the total pressure difference between the
+                          ! level of origin and the current level.
+                          if ( idx == pver ) then
+                             ! The lowest level of the model has been reached.
+                             ! The hydrometeor sedimented to the surface.
+                             lowest_level_idx = pver
+                             l_reached_surface = .true.
+                             exit
+                          else ! idx < pver
+                             ! Increment idx and keep going.
+                             idx = idx + 1
+                          endif ! idx == pver
+                       endif ! sum_pdel >= total_fall_Pa
+                    enddo
+
+                    ! Calculate the total hydrometeor mass of the hole that
+                    ! needs to be filled.
+                    ! The value of the hydrometeor mixing ratio is negative,
+                    ! but total_hole is positive.
+                    total_hole &
+                    = ( qmin_hm - hm_curr(k) ) * pdel(icol,k) / gravit
+
+                    ! Calculate the available amount of hydrometeor mass to
+                    ! fill the hole.
+                    total_fill_mass = 0.0_r8
+                    if ( l_reached_surface ) then
+                       ! The hydrometeor sedimented to the surface, so
+                       ! automatically loop down to pver and include the
+                       ! surface mass.
+                       do idx = k+1, pver, 1
+                          if ( l_pos_hm(idx) ) then
+                             total_fill_mass &
+                             = total_fill_mass &
+                               + ( hm_curr(idx) - qmin_hm ) &
+                                 * pdel(icol,idx) / gravit
+                          endif ! l_pos_hm(idx)
+                       enddo ! idx = k+1, pver, 1
+                       ! Contribution to total fill mass from the surface.
+                       total_fill_mass &
+                       = total_fill_mass &
+                         + prec(icol) * ( dt / cld_macmic_num_steps ) &
+                           * 1000.0_r8
+                    else ! .not. l_reached_surface
+                       ! The hydrometeor sedimented to lowest_level_idx.
+                       idx = k + 1
+                       do
+                          if ( l_pos_hm(idx) ) then
+                             total_fill_mass &
+                             = total_fill_mass &
+                               + ( hm_curr(idx) - qmin_hm ) &
+                                 * pdel(icol,idx) / gravit
+                          endif ! l_pos_hm(idx)
+                          if ( idx >= lowest_level_idx ) then
+                             ! Check if enough mass has been gathered in
+                             ! total_fill_mass to fill the hole.
+                             if ( total_fill_mass >= total_hole ) then
+                                ! There has been enough total_fill_mass
+                                ! gathered to completely fill the hole.
+                                lowest_level_idx = idx
+                                exit
+                             else ! total_fill_mass < total_hole
+                                ! Even though lowest_level_idx has been reached,
+                                ! more total_fill_mass needs to be added in
+                                ! order to completely fill the hole, so keep
+                                ! going.
+                                if ( idx == pver ) then
+                                   ! The lowest vertical level has already been
+                                   ! reached, so go to the surface.
+                                   lowest_level_idx = pver
+                                   l_reached_surface = .true.
+                                   ! Contribution to total fill mass from the
+                                   ! surface.
+                                   total_fill_mass &
+                                   = total_fill_mass &
+                                     + prec(icol) &
+                                       * ( dt / cld_macmic_num_steps ) &
+                                       * 1000.0_r8
+                                   exit
+                                else ! idx < pver
+                                   ! Haven't reached pver yet, so increment
+                                   ! and keep going.
+                                   idx = idx + 1
+                                endif ! idx == pver
+                             endif ! total_fill_mass >= total_hole
+                          else ! idx < lowest_level_idx
+                             ! Haven't reached lowest_level_idx yet, so increment
+                             ! and keep going.
+                             idx = idx + 1
+                          endif ! idx >= lowest_level_idx
+                       enddo
+                    endif ! l_reached_surface
+
+                    ! Calculate the ratio of total hole to total fill mass.
+                    ! This should not exceed 1, but use thresholding to be safe.
+                    hole_fillmass_ratio &
+                    = min( total_hole / max( total_fill_mass, 1.0e-30 ), &
+                           1.0_r8 )
+
+                    ! Modify (reduce) the amount of the hydrometeor at levels
+                    ! that were used to fill the hole.
+                    do idx = k+1, lowest_level_idx
+                       if ( l_pos_hm(idx) ) then
+                          ! Since pver at a grid level does not change and
+                          ! gravit is constant, the only variable that needs to
+                          ! be modified proportionately is hm_curr.
+                          hm_curr(idx) &
+                          = qmin_hm &
+                            + ( hm_curr(idx) - qmin_hm ) &
+                              * ( 1.0_r8 - hole_fillmass_ratio )
+                       endif ! l_pos_hm(idx)
+                    enddo ! idx = k+1, lowest_level_idx
+
+                    if ( l_reached_surface ) then
+                       ! Modify (reduce) the amount of surface precipitation in
+                       ! order to fill the hole.
+                       ! Since dt, cld_macmic_num_steps, and 1000 are all
+                       ! constants, the only variable that needs to be modified
+                       ! proportionately is prec.
+                       prec(icol) &
+                       = prec(icol) * ( 1.0_r8 - hole_fillmass_ratio )
+                    endif ! l_reached_surface
+
+                    ! Update the value of the hydrometeor at the level where the
+                    ! hole was found.  Mathematically, as long as the available
+                    ! mass was able to fill the entire hole, the new value of
+                    ! the hydrometeor mixing ratio (hm_curr) should be 0.
+                    hm_curr(k) &
+                    = hm_curr(k) &
+                      + hole_fillmass_ratio * total_fill_mass &
+                        * gravit / pdel(icol,k)
+
+                 endif ! k == pver
+
+              endif ! .not. l_pos_hm(k)
+
+           enddo ! k = pver, top_lev, -1
+
+        endif ! any( hm_curr(top_lev:pver) < qmin_hm )
+
+        ! Update the value of total microphysics tendency after hole filling.
+        hm_tend(icol,:) = hm_tend(icol,:) + ( hm_curr - hm_update ) / dt
+
+     enddo ! icol = 1, ncol
+
+
+     return
+
+   end subroutine fill_holes_sedimentation
+
+   !============================================================================
 #endif
    
 end module subcol_SILHS 

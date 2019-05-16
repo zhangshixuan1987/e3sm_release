@@ -43,6 +43,7 @@ module subcol_SILHS
    ! Calc subcol mean ! Calc subcol variance
    private :: meansc
    private :: stdsc
+   private :: fill_holes_sedimentation
 #endif
 
    !-----
@@ -1997,11 +1998,29 @@ contains
        total_mc_positive,   & ! Total of all positive mc tendencies   [kg/kg/s]
        mc_correction_ratio    ! Ratio: mc_tend_correction/total_mc_positive [-]
 
+     real(r8), dimension(pcols) :: &
+       precl    ! Liquid-phase precipitation rate (surface)        [m/s]
+
+     ! Budgeting terms for hole filling.
+     ! These variables are for use in stats output.
+     real(r8), dimension(pcols,pver) :: &
+       rv_hf_tend, & ! Water vapor mixing ratio hole-filling tendency  [kg/kg/s]
+       rc_hf_tend, & ! Cloud water mixing ratio hole-filling tendency  [kg/kg/s]
+       rr_hf_tend, & ! Rain water mixing ratio hole-filling tendency   [kg/kg/s]
+       ri_hf_tend, & ! Cloud ice mixing ratio hole-filling tendency    [kg/kg/s]
+       rs_hf_tend    ! Snow mixing ratio hole-filling tendency         [kg/kg/s]
+
      integer :: ixcldice, ixcldliq, ixrain, ixsnow ! Hydrometeor indices
 
      integer :: ncol  ! Number of grid columns
 
      integer :: icol, k  ! Loop indices
+
+     ! Flag to perform hole filling after the original sedimentation tendency
+     ! is added back on to the new microphysics process tendency.  This calls
+     ! the sedimentation hole filler.
+     logical, parameter :: &
+       l_sed_hole_fill = .true.
 
      logical, parameter :: &
        l_check_water_conserv = .true. ! Flag to perform water conservation check
@@ -2673,7 +2692,68 @@ contains
         rs_tend = rs_mc_tend + rs_sed_tend_adj
      endif
 
-     !!! New sedimentation adjustment code goes here
+     ! Now that the original sedimentation tendency has been added to the
+     ! new microphysics process tendency, the new total microphysics tendency
+     ! can still cause holes to form.  These holes can be filled conservatively
+     ! using the sedimentation hole filler.
+     if ( l_sed_hole_fill ) then
+
+        ! Calculate liquid precipitation rate (precl) from the total
+        ! precipitation rate (prect) and the frozen preciptation rate (preci).
+        ! This should never be negative, but just to be safe, threshold at 0.
+        precl = max( prect - preci, 0.0_r8 )
+
+        ! Call the sedimentation hole filler for cloud water mixing ratio.
+        ! This can update rc_tend and precl.
+        call fill_holes_sedimentation( dt, cld_macmic_num_steps, ncol, &
+                                       rc_start, state%pdel, vtrmc, &
+                                       state%zi, qmin(ixcldliq), &
+                                       rc_tend, precl )
+
+        ! Call the sedimentation hole filler for rain water mixing ratio.
+        ! This can update rr_tend and precl.
+        if ( ixrain > 0 ) then
+           call fill_holes_sedimentation( dt, cld_macmic_num_steps, ncol, &
+                                          rr_start, state%pdel, umr, &
+                                          state%zi, qmin(ixrain), &
+                                          rr_tend, precl )
+        endif ! ixrain > 0
+
+        ! Call the sedimentation hole filler for cloud ice mixing ratio.
+        ! This can update ri_tend and preci.
+        call fill_holes_sedimentation( dt, cld_macmic_num_steps, ncol, &
+                                       ri_start, state%pdel, vtrmi, &
+                                       state%zi, qmin(ixcldice), &
+                                       ri_tend, preci )
+
+        ! Call the sedimentation hole filler for snow mixing ratio.
+        ! This can update rs_tend and preci.
+        if ( ixsnow > 0 ) then
+           call fill_holes_sedimentation( dt, cld_macmic_num_steps, ncol, &
+                                          rs_start, state%pdel, ums, &
+                                          state%zi, qmin(ixsnow), &
+                                          rs_tend, preci )
+        endif ! ixsnow > 0
+
+        ! Update the total precipitation rate (prect) from the updated liquid
+        ! precipitation rate (precl) and the updated frozen preciptation rate
+        ! (preci).
+        prect = precl + preci
+
+     endif ! l_sed_hole_fill
+
+     ! The updated total microphysics tendencies after hole filling have not
+     ! been used to update ptend yet, so record the budget terms for hole
+     ! filling first.
+     rv_hf_tend = rv_tend - ptend%q(:,:,1)
+     rc_hf_tend = rc_tend - ptend%q(:,:,ixcldliq)
+     if ( ixrain > 0 ) then
+        rr_hf_tend = rr_tend - ptend%q(:,:,ixrain)
+     endif ! ixrain > 0
+     ri_hf_tend = ri_tend - ptend%q(:,:,ixcldice)
+     if ( ixsnow > 0 ) then
+        rs_hf_tend = rs_tend - ptend%q(:,:,ixsnow)
+     endif ! ixsnow > 0
 
      ! Pack the current total tendencies for hydrometeor mixing ratio fields.
      ptend%q(:,:,1) = rv_tend

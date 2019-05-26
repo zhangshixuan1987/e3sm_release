@@ -1949,7 +1949,8 @@ contains
        rc_tend, & ! Cloud water mixing ratio tendency  [kg/kg/s]
        rr_tend, & ! Rain water mixing ratio tendency   [kg/kg/s]
        ri_tend, & ! Cloud ice mixing ratio tendency    [kg/kg/s]
-       rs_tend    ! Snow mixing ratio tendency         [kg/kg/s]
+       rs_tend, & ! Snow mixing ratio tendency         [kg/kg/s]
+       stend      ! Dry static energy tendency         [J/kg/s]
 
      real(r8), dimension(:), pointer :: &
        prect, & ! Total precipitation rate (surface)        [m/s]
@@ -2008,7 +2009,8 @@ contains
        rc_hf_tend, & ! Cloud water mixing ratio hole-filling tendency  [kg/kg/s]
        rr_hf_tend, & ! Rain water mixing ratio hole-filling tendency   [kg/kg/s]
        ri_hf_tend, & ! Cloud ice mixing ratio hole-filling tendency    [kg/kg/s]
-       rs_hf_tend    ! Snow mixing ratio hole-filling tendency         [kg/kg/s]
+       rs_hf_tend, & ! Snow mixing ratio hole-filling tendency         [kg/kg/s]
+       s_hf_tend     ! Dry static energy hole-filling tendency         [J/kg/s]
 
      integer :: ixcldice, ixcldliq, ixrain, ixsnow ! Hydrometeor indices
 
@@ -2023,15 +2025,21 @@ contains
        l_sed_hole_fill = .true.
 
      logical, parameter :: &
-       l_check_water_conserv = .true. ! Flag to perform water conservation check
+       l_check_conservation = .true. ! Flag to perform water conservation check
 
      ! Vertically-integrated grand total water (rv+rc+rr+ri+rs)    [kg/m^2]
      real(r8), dimension(pcols) :: &
        grand_total_water_column_start,  & ! Column integral at start
        grand_total_water_column_finish    ! Column integral at finish
 
+     ! Vertically-integrated total water energy    [J/m^2]
      real(r8), dimension(pcols) :: &
-       tot_rel_err ! Relative error in vertically-integrated grand total water
+       total_energy_column_start,  & ! Column integral at start
+       total_energy_column_finish    ! Column integral at finish
+
+     real(r8), dimension(pcols) :: &
+       tot_water_rel_err,  & ! Relative error: vert-integrated grand total water
+       tot_energy_rel_err    ! Relative error: vert-integrated total energy
 
      real(r8), parameter :: &
        err_thresh = 1.0e-14_r8  ! Threshold of relative error
@@ -2046,10 +2054,29 @@ contains
      ! Get the number of grid columns.
      ncol = state%ncol
 
-     ! Calculate total water in each column.
-     ! This calculation is the vertically-integrated grand total water
-     ! in each grid column before microphysics began.
-     if ( l_check_water_conserv ) then
+     ! Get fields from the pbuf.
+     call pbuf_get_field(pbuf, prec_pcw_idx, prect)
+     call pbuf_get_field(pbuf, snow_pcw_idx, preci)
+     call pbuf_get_field(pbuf, qcsedten_idx, rc_sed_tend)
+     call pbuf_get_field(pbuf, qrsedten_idx, rr_sed_tend)
+     call pbuf_get_field(pbuf, qisedten_idx, ri_sed_tend)
+     call pbuf_get_field(pbuf, qssedten_idx, rs_sed_tend)
+     call pbuf_get_field(pbuf, vtrmc_idx, vtrmc)
+     call pbuf_get_field(pbuf, umr_idx, umr)
+     call pbuf_get_field(pbuf, vtrmi_idx, vtrmi)
+     call pbuf_get_field(pbuf, ums_idx, ums)
+
+     ! Calculate liquid precipitation rate (precl) from the total precipitation
+     ! rate (prect) and the frozen preciptation rate (preci).  This should never
+     ! be negative, but just to be safe, threshold at 0.
+     precl = max( prect - preci, 0.0_r8 )
+
+     ! Perform total water and total energy conservation checks.
+     if ( l_check_conservation ) then
+
+        ! Calculate total water in each column.
+        ! This calculation is the vertically-integrated grand total water
+        ! in each grid column before microphysics began.
         do icol = 1, ncol
            grand_total_water_column_start(icol) = 0.0_r8
            do k = top_lev, pver
@@ -2070,19 +2097,57 @@ contains
               endif
            enddo ! k = top_lev, pver
         enddo ! icol = 1, ncol
-     endif ! l_check_water_conserv
 
-     ! Get fields from the pbuf.
-     call pbuf_get_field(pbuf, prec_pcw_idx, prect)
-     call pbuf_get_field(pbuf, snow_pcw_idx, preci)
-     call pbuf_get_field(pbuf, qcsedten_idx, rc_sed_tend)
-     call pbuf_get_field(pbuf, qrsedten_idx, rr_sed_tend)
-     call pbuf_get_field(pbuf, qisedten_idx, ri_sed_tend)
-     call pbuf_get_field(pbuf, qssedten_idx, rs_sed_tend)
-     call pbuf_get_field(pbuf, vtrmc_idx, vtrmc)
-     call pbuf_get_field(pbuf, umr_idx, umr)
-     call pbuf_get_field(pbuf, vtrmi_idx, vtrmi)
-     call pbuf_get_field(pbuf, ums_idx, ums)
+        ! Calculate total energy in each column.
+        ! This calculation is the vertically-integrated total energy in each
+        ! grid column before microphysics began.  Since, the microphysics code
+        ! does not directly change kinetic energy, 0.5 * ( u^2 + v^2 ), it can
+        ! be skipped as part of the energy conservation check.
+        !do icol = 1, ncol
+        !   total_energy_column_start(icol) = 0.0_r8
+        !   do k = top_lev, pver
+        !      total_energy_column_start(icol) &
+        !      = total_energy_column_start(icol) &
+        !        + ( state%s(icol,k) &
+        !            + ( latvap + latice ) * state%q(icol,k,1) &
+        !            + latice * state%q(icol,k,ixcldliq) ) &
+        !          * state%pdel(icol,k) / gravit
+        !      if ( ixrain > 0 ) then
+        !         total_energy_column_start(icol) &
+        !         = total_energy_column_start(icol) &
+        !           + latice * state%q(icol,k,ixrain) &
+        !             * state%pdel(icol,k) / gravit
+        !      endif
+        !   enddo ! k = top_lev, pver
+        !enddo ! icol = 1, ncol
+        ! This calculation is the vertically-integrated total energy in each
+        ! grid column after microphysics, but at the start of hole-filling.
+        do icol = 1, ncol
+           total_energy_column_start(icol) = 0.0_r8
+           do k = top_lev, pver
+              total_energy_column_start(icol) &
+              = total_energy_column_start(icol) &
+                + ( state%s(icol,k) + ptend%s(icol,k) * dt &
+                    + ( latvap + latice ) &
+                      * ( state%q(icol,k,1) + ptend%q(icol,k,1) * dt ) &
+                    + latice * ( state%q(icol,k,ixcldliq) &
+                                 + ptend%q(icol,k,ixcldliq) * dt ) ) &
+                  * state%pdel(icol,k) / gravit
+              if ( ixrain > 0 ) then
+                 total_energy_column_start(icol) &
+                 = total_energy_column_start(icol) &
+                   + latice * ( state%q(icol,k,ixrain) &
+                                + ptend%q(icol,k,ixrain) * dt ) &
+                     * state%pdel(icol,k) / gravit
+              endif
+              total_energy_column_start(icol) &
+              = total_energy_column_start(icol) &
+                + latice * precl(icol) &
+                  * ( dt / cld_macmic_num_steps ) * 1000.0_r8
+           enddo ! k = top_lev, pver
+        enddo ! icol = 1, ncol
+
+     endif ! l_check_conservation
 
      ! The fields within state haven't been updated yet, since this is before
      ! the call to physics_update.
@@ -2106,6 +2171,9 @@ contains
      if ( ixsnow > 0 ) then
         rs_tend = ptend%q(:,:,ixsnow)
      endif
+
+     ! Unpack the current tendency for dry static energy.
+     stend = ptend%s
 
      ! The total hydrometeor tendencies are the sum of microphysics process
      ! rates and sedimentation rates.  After microphysics was completed, the
@@ -2231,8 +2299,8 @@ contains
                  if ( l_pos_rc_mc_tend ) then
                     ! Changing cloud water to water vapor cools and reduces
                     ! dry static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       - latvap * mc_correction_ratio * rc_mc_tend(icol,k)
                     ! Update cloud water mixing ratio microphysics tendency.
                     rc_mc_tend(icol,k) &
@@ -2241,8 +2309,8 @@ contains
                  if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
                     ! Changing rain water to water vapor cools and reduces
                     ! dry static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       - latvap * mc_correction_ratio * rr_mc_tend(icol,k)
                     ! Update rain water mixing ratio microphysics tendency.
                     rr_mc_tend(icol,k) &
@@ -2251,8 +2319,8 @@ contains
                  if ( l_pos_ri_mc_tend ) then
                     ! Changing cloud ice to water vapor cools and reduces
                     ! dry static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       - ( latvap + latice ) &
                         * mc_correction_ratio * ri_mc_tend(icol,k)
                     ! Update cloud ice mixing ratio microphysics tendency.
@@ -2262,8 +2330,8 @@ contains
                  if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
                     ! Changing snow to water vapor cools and reduces dry
                     ! static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       - ( latvap + latice ) &
                         * mc_correction_ratio * rs_mc_tend(icol,k)
                     ! Update snow mixing ratio microphysics tendency.
@@ -2334,8 +2402,8 @@ contains
                  if ( l_pos_rv_mc_tend ) then
                     ! Changing water vapor to cloud water heats and increases
                     ! dry static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       + latvap * mc_correction_ratio * rv_mc_tend(icol,k)
                     ! Update water vapor mixing ratio microphysics tendency.
                     rv_mc_tend(icol,k) &
@@ -2351,8 +2419,8 @@ contains
                  if ( l_pos_ri_mc_tend ) then
                     ! Changing cloud ice to cloud water cools and reduces
                     ! dry static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       - latice * mc_correction_ratio * ri_mc_tend(icol,k)
                     ! Update cloud ice mixing ratio microphysics tendency.
                     ri_mc_tend(icol,k) &
@@ -2361,8 +2429,8 @@ contains
                  if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
                     ! Changing snow to cloud water cools and reduces dry
                     ! static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       - latice * mc_correction_ratio * rs_mc_tend(icol,k)
                     ! Update snow mixing ratio microphysics tendency.
                     rs_mc_tend(icol,k) &
@@ -2432,8 +2500,8 @@ contains
                  if ( l_pos_rv_mc_tend ) then
                     ! Changing water vapor to rain water heats and increases
                     ! dry static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       + latvap * mc_correction_ratio * rv_mc_tend(icol,k)
                     ! Update water vapor mixing ratio microphysics tendency.
                     rv_mc_tend(icol,k) &
@@ -2449,8 +2517,8 @@ contains
                  if ( l_pos_ri_mc_tend ) then
                     ! Changing cloud ice to rain water cools and reduces
                     ! dry static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       - latice * mc_correction_ratio * ri_mc_tend(icol,k)
                     ! Update cloud ice mixing ratio microphysics tendency.
                     ri_mc_tend(icol,k) &
@@ -2459,8 +2527,8 @@ contains
                  if ( ixsnow > 0 .and. l_pos_rs_mc_tend ) then
                     ! Changing snow to rain water cools and reduces dry
                     ! static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       - latice * mc_correction_ratio * rs_mc_tend(icol,k)
                     ! Update snow mixing ratio microphysics tendency.
                     rs_mc_tend(icol,k) &
@@ -2530,8 +2598,8 @@ contains
                  if ( l_pos_rv_mc_tend ) then
                     ! Changing water vapor to cloud ice heats and increases
                     ! dry static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       + ( latvap + latice ) &
                         * mc_correction_ratio * rv_mc_tend(icol,k)
                     ! Update water vapor mixing ratio microphysics tendency.
@@ -2541,8 +2609,8 @@ contains
                  if ( l_pos_rc_mc_tend ) then
                     ! Changing cloud water to cloud ice heats and increases
                     ! dry static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       + latice * mc_correction_ratio * rc_mc_tend(icol,k)
                     ! Update cloud water mixing ratio microphysics tendency.
                     rc_mc_tend(icol,k) &
@@ -2551,8 +2619,8 @@ contains
                  if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
                     ! Changing rain water to cloud ice heats and increases
                     ! dry static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       + latice * mc_correction_ratio * rr_mc_tend(icol,k)
                     ! Update rain water mixing ratio microphysics tendency.
                     rr_mc_tend(icol,k) &
@@ -2629,8 +2697,8 @@ contains
                  if ( l_pos_rv_mc_tend ) then
                     ! Changing water vapor to snow heats and increases dry
                     ! static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       + ( latvap + latice ) &
                         * mc_correction_ratio * rv_mc_tend(icol,k)
                     ! Update water vapor mixing ratio microphysics tendency.
@@ -2640,8 +2708,8 @@ contains
                  if ( l_pos_rc_mc_tend ) then
                     ! Changing cloud water to snow heats and increases dry
                     ! static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       + latice * mc_correction_ratio * rc_mc_tend(icol,k)
                     ! Update cloud water mixing ratio microphysics tendency.
                     rc_mc_tend(icol,k) &
@@ -2650,8 +2718,8 @@ contains
                  if ( ixrain > 0 .and. l_pos_rr_mc_tend ) then
                     ! Changing rain water to snow heats and increases dry
                     ! static energy.
-                    ptend%s(icol,k) &
-                    = ptend%s(icol,k) &
+                    stend(icol,k) &
+                    = stend(icol,k) &
                       + latice * mc_correction_ratio * rr_mc_tend(icol,k)
                     ! Update rain water mixing ratio microphysics tendency.
                     rr_mc_tend(icol,k) &
@@ -2697,11 +2765,6 @@ contains
      ! can still cause holes to form.  These holes can be filled conservatively
      ! using the sedimentation hole filler.
      if ( l_sed_hole_fill ) then
-
-        ! Calculate liquid precipitation rate (precl) from the total
-        ! precipitation rate (prect) and the frozen preciptation rate (preci).
-        ! This should never be negative, but just to be safe, threshold at 0.
-        precl = max( prect - preci, 0.0_r8 )
 
         ! Call the sedimentation hole filler for cloud water mixing ratio.
         ! This can update rc_tend and precl.
@@ -2755,6 +2818,11 @@ contains
         rs_hf_tend = rs_tend - ptend%q(:,:,ixsnow)
      endif ! ixsnow > 0
 
+     ! The updated dry static energy tendency after hole filling has not been
+     ! used to update ptend yet, so record the budget term for hole filling
+     ! first.
+     s_hf_tend = stend - ptend%s
+
      ! Pack the current total tendencies for hydrometeor mixing ratio fields.
      ptend%q(:,:,1) = rv_tend
      ptend%q(:,:,ixcldliq) = rc_tend
@@ -2766,7 +2834,11 @@ contains
         ptend%q(:,:,ixsnow) = rs_tend
      endif
 
-     if ( l_check_water_conserv ) then
+     ! Pack the current tendency for dry static energy.
+     ptend%s = stend
+
+     ! Perform total water and total energy conservation checks.
+     if ( l_check_conservation ) then
 
         ! Calculate total water in each grid column.
         ! This calculation is the vertically-integrated grand total water
@@ -2802,32 +2874,88 @@ contains
              + prect(icol) * ( dt / cld_macmic_num_steps ) * 1000.0_r8
         enddo ! icol = 1, ncol
 
+        ! Calculate total energy in each column.
+        ! This calculation is the vertically-integrated total energy in each
+        ! grid column updated for all microphysics and hole filling.  This
+        ! includes the amount that precipitated to the surface.  Since, the
+        ! microphysics code does not directly change kinetic energy,
+        ! 0.5 * ( u^2 + v^2 ), it can be skipped as part of the energy
+        ! conservation check.
+        do icol = 1, ncol
+           total_energy_column_finish(icol) = 0.0_r8
+           do k = top_lev, pver
+              total_energy_column_finish(icol) &
+              = total_energy_column_finish(icol) &
+                + ( state%s(icol,k) + ptend%s(icol,k) * dt &
+                    + ( latvap + latice ) &
+                      * ( state%q(icol,k,1) + ptend%q(icol,k,1) * dt ) &
+                    + latice * ( state%q(icol,k,ixcldliq) &
+                                 + ptend%q(icol,k,ixcldliq) * dt ) ) &
+                  * state%pdel(icol,k) / gravit
+              if ( ixrain > 0 ) then
+                 total_energy_column_finish(icol) &
+                 = total_energy_column_finish(icol) &
+                   + latice * ( state%q(icol,k,ixrain) &
+                                + ptend%q(icol,k,ixrain) * dt ) &
+                     * state%pdel(icol,k) / gravit
+              endif
+              total_energy_column_finish(icol) &
+              = total_energy_column_finish(icol) &
+                + latice * precl(icol) &
+                  * ( dt / cld_macmic_num_steps ) * 1000.0_r8
+           enddo ! k = top_lev, pver
+        enddo ! icol = 1, ncol
+
         ! Calculate the total relative error in each grid column.
         do icol = 1, ncol
-           tot_rel_err(icol) &
+
+           tot_water_rel_err(icol) &
            = abs( ( grand_total_water_column_finish(icol) &
                     - grand_total_water_column_start(icol) ) ) &
              / min( grand_total_water_column_finish(icol), &
                     grand_total_water_column_start(icol) )
+
+           tot_energy_rel_err(icol) &
+           = abs( ( total_energy_column_finish(icol) &
+                    - total_energy_column_start(icol) ) ) &
+             / min( total_energy_column_finish(icol), &
+                    total_energy_column_start(icol) )
+
         enddo ! icol = 1, ncol
 
-        ! Print an error message if any total relative error is found to be
-        ! greater than the threshold.
-        if ( any( tot_rel_err >= err_thresh ) ) then
+        ! Print an error message if any total water relative error is found to
+        ! be greater than the threshold.
+        if ( any( tot_water_rel_err >= err_thresh ) ) then
            print *, "Water conservation error reported in hole filling"
            do icol = 1, ncol
-              if ( tot_rel_err(icol) >= err_thresh ) then
+              if ( tot_water_rel_err(icol) >= err_thresh ) then
                  print *, "Column = ", icol, &
-                          "Relative error = ", tot_rel_err(icol), &
+                          "Relative error = ", tot_water_rel_err(icol), &
                           "Column-integrated grand total water at start = ", &
                           grand_total_water_column_start(icol), &
                           "Column-integrated grand total water at finish = ", &
                           grand_total_water_column_finish(icol)
-              endif ! tot_rel_err(icol) >= err_thresh
+              endif ! tot_water_rel_err(icol) >= err_thresh
            enddo ! icol = 1, ncol
-        endif ! any( tot_rel_err >= err_thresh )
+        endif ! any( tot_water_rel_err >= err_thresh )
 
-     endif ! l_check_water_conserv
+        ! Print an error message if any total energy relative error is found to
+        ! be greater than the threshold.
+        if ( any( tot_energy_rel_err >= err_thresh ) ) then
+           print *, "Energy conservation error reported in hole filling"
+           do icol = 1, ncol
+              if ( tot_energy_rel_err(icol) >= err_thresh ) then
+                 print *, "Column = ", icol, &
+                          "Relative error = ", tot_energy_rel_err(icol), &
+                          "Column-integrated total energy at start = ", &
+                          total_energy_column_start(icol), &
+                          "Column-integrated total energy at finish = ", &
+                          total_energy_column_finish(icol)
+              endif ! tot_energy_rel_err(icol) >= err_thresh
+           enddo ! icol = 1, ncol
+        endif ! any( tot_energy_rel_err >= err_thresh )
+
+     endif ! l_check_conservation
 
 
      return

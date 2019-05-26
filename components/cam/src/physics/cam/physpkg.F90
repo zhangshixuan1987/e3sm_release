@@ -2504,6 +2504,16 @@ end if
              ! Average the sub-column ptend for use in gridded update - will not contain ptend_aero
              call subcol_ptend_avg(ptend_sc, state_sc%ngrdcol, lchnk, ptend)
 #if defined(UWM_MISC) && defined(SILHS)
+
+             if ( .false. ) then
+                ! Call the conservative hole filler.
+                ! Hole filling is only necessary when using subcolumns.
+                ! Note:  this needs to be called after subcol_ptend_avg but
+                !        before physics_ptend_scale.
+                call subcol_SILHS_fill_holes_conserv( state, cld_macmic_ztodt, &
+                                                      ptend, pbuf )
+             endif
+
              ! Destroy massless droplets!
              call subcol_SILHS_massless_droplet_destroyer( cld_macmic_ztodt, state, & ! Intent(in)
                                                            ptend )                    ! Intent(inout)
@@ -2552,16 +2562,6 @@ end if
           call outfld('INEGCLPTEND', icecliptend, pcols, lchnk   )
           call outfld('LNEGCLPTEND', liqcliptend, pcols, lchnk   )
           call outfld('VNEGCLPTEND', vapcliptend, pcols, lchnk   )
-
-          if ( use_subcol_microp .and. .false. ) then
-             ! Call the conservative hole filler.
-             ! Hole filling is only necessary when using subcolumns.
-             ! Note:  this needs to be called after physics_ptend_scale but
-             !        before physics_update.
-             call subcol_SILHS_fill_holes_conserv( state, ztodt, &
-                                                   cld_macmic_num_steps, &
-                                                   ptend, pbuf )
-          endif ! use_subcol_microp
 
           call physics_update (state, ptend, ztodt, tend, chunk_smry, do_hole_fill=.true.)
           call check_energy_chng(state, tend, "microp_tend", nstep, ztodt, &

@@ -1765,9 +1765,7 @@ contains
    end subroutine subcol_SILHS_massless_droplet_destroyer
 
    !============================================================================
-   subroutine subcol_SILHS_fill_holes_conserv( state, dt, &
-                                               cld_macmic_num_steps, &
-                                               ptend, pbuf )
+   subroutine subcol_SILHS_fill_holes_conserv( state, dt, ptend, pbuf )
 
      ! The William F. Buckley Jr. Conservative Hole Filler.
 
@@ -1806,7 +1804,7 @@ contains
      ! by microphysics; pdel is the pressure difference between vertical levels,
      ! g is gravity, and prect * dt * 1000 is the total amount of water (from
      ! all precipitating hydrometeors) that sedimented to the ground during
-     ! microphysics (dt is the microphysics substep time).  The units of
+     ! microphysics (dt is the timestep used for microphysics).  The units of
      ! column-integrated total water are kg (water) / m^2.
      !
      ! All the updated hydrometeor fields are related to the hydrometeor fields
@@ -1930,7 +1928,6 @@ contains
      ! Input Variables
      type(physics_state), intent(in) :: state     ! Physics state variables
      real(r8), intent(in) :: dt                   ! Time step duration
-     integer, intent(in) :: cld_macmic_num_steps  ! Number of substeps 
 
      ! Input/Output Variables
      type(physics_ptend),  intent(inout) :: ptend  ! Parameterization tendencies
@@ -1972,12 +1969,6 @@ contains
        rr_mc_tend, & ! Rain water mixing ratio microphysics tendency   [kg/kg/s]
        ri_mc_tend, & ! Cloud ice mixing ratio microphysics tendency    [kg/kg/s]
        rs_mc_tend    ! Snow mixing ratio microphysics tendency         [kg/kg/s]
-
-     real(r8), dimension(pcols,pver) :: &
-       rc_sed_tend_adj, & ! Adjusted cloud water sedimentation tend.   [kg/kg/s]
-       rr_sed_tend_adj, & ! Adjusted rain water sedimentation tendency [kg/kg/s]
-       ri_sed_tend_adj, & ! Adjusted cloud ice sedimentation tendency  [kg/kg/s]
-       rs_sed_tend_adj    ! Adjusted snow sedimentation tendency       [kg/kg/s]
 
      real(r8) :: &
        rv_curr, & ! Current water vapor mixing ratio    [kg/kg]
@@ -2142,8 +2133,7 @@ contains
               endif
               total_energy_column_start(icol) &
               = total_energy_column_start(icol) &
-                + latice * precl(icol) &
-                  * ( dt / cld_macmic_num_steps ) * 1000.0_r8
+                + latice * precl(icol) * dt * 1000.0_r8
            enddo ! k = top_lev, pver
         enddo ! icol = 1, ncol
 
@@ -2176,35 +2166,17 @@ contains
      stend = ptend%s
 
      ! The total hydrometeor tendencies are the sum of microphysics process
-     ! rates and sedimentation rates.  After microphysics was completed, the
-     ! total hydrometeor tendenices were multiplied by 1 / cld_macmic_num_steps
-     ! in a call to physics_ptend_scale in order to account for macrophysics and
-     ! microphysics sub-stepping.  When the tendencies are added back into the
-     ! state variables in the call to physics_update, the normal model time step
-     ! duration can be used (ztodt).
-     !
-     ! In order to extract the scaled microphysics process rates from the total
-     ! tendencies, the sedimentation rates that are output from microphysics
-     ! must also be scaled in the same manner.
-     rc_sed_tend_adj = ( 1.0_r8 / cld_macmic_num_steps ) * rc_sed_tend
-     if ( ixrain > 0 ) then
-        rr_sed_tend_adj = ( 1.0_r8 / cld_macmic_num_steps ) * rr_sed_tend
-     endif
-     ri_sed_tend_adj = ( 1.0_r8 / cld_macmic_num_steps ) * ri_sed_tend
-     if ( ixsnow > 0 ) then
-        rs_sed_tend_adj = ( 1.0_r8 / cld_macmic_num_steps ) * rs_sed_tend
-     endif
-
-     ! Calculate the microphysics process tendencies by subtracting the
-     ! sedimentation tendencies from the overall tendencies.
+     ! rates and sedimentation rates.  Calculate the microphysics process
+     ! tendencies by subtracting the sedimentation tendencies from the overall
+     ! tendencies.
      rv_mc_tend = rv_tend
-     rc_mc_tend = rc_tend - rc_sed_tend_adj
+     rc_mc_tend = rc_tend - rc_sed_tend
      if ( ixrain > 0 ) then
-        rr_mc_tend = rr_tend - rr_sed_tend_adj
+        rr_mc_tend = rr_tend - rr_sed_tend
      endif
-     ri_mc_tend = ri_tend - ri_sed_tend_adj
+     ri_mc_tend = ri_tend - ri_sed_tend
      if ( ixsnow > 0 ) then
-        rs_mc_tend = rs_tend - rs_sed_tend_adj
+        rs_mc_tend = rs_tend - rs_sed_tend
      endif
 
      ! Loop over all columns, performing any tendency adjustments one column
@@ -2751,13 +2723,13 @@ contains
      ! Calculate the new overall tendencies by adding the sedimentation
      ! tendencies back onto the new microphysics process tendencies.
      rv_tend = rv_mc_tend
-     rc_tend = rc_mc_tend + rc_sed_tend_adj
+     rc_tend = rc_mc_tend + rc_sed_tend
      if ( ixrain > 0 ) then
-        rr_tend = rr_mc_tend + rr_sed_tend_adj
+        rr_tend = rr_mc_tend + rr_sed_tend
      endif
-     ri_tend = ri_mc_tend + ri_sed_tend_adj
+     ri_tend = ri_mc_tend + ri_sed_tend
      if ( ixsnow > 0 ) then
-        rs_tend = rs_mc_tend + rs_sed_tend_adj
+        rs_tend = rs_mc_tend + rs_sed_tend
      endif
 
      ! Now that the original sedimentation tendency has been added to the
@@ -2768,33 +2740,29 @@ contains
 
         ! Call the sedimentation hole filler for cloud water mixing ratio.
         ! This can update rc_tend and precl.
-        call fill_holes_sedimentation( dt, cld_macmic_num_steps, ncol, &
-                                       rc_start, state%pdel, vtrmc, &
-                                       state%zi, qmin(ixcldliq), &
+        call fill_holes_sedimentation( dt, ncol, rc_start, state%pdel, &
+                                       vtrmc, state%zi, qmin(ixcldliq), &
                                        rc_tend, precl )
 
         ! Call the sedimentation hole filler for rain water mixing ratio.
         ! This can update rr_tend and precl.
         if ( ixrain > 0 ) then
-           call fill_holes_sedimentation( dt, cld_macmic_num_steps, ncol, &
-                                          rr_start, state%pdel, umr, &
-                                          state%zi, qmin(ixrain), &
+           call fill_holes_sedimentation( dt, ncol, rr_start, state%pdel, &
+                                          umr, state%zi, qmin(ixrain), &
                                           rr_tend, precl )
         endif ! ixrain > 0
 
         ! Call the sedimentation hole filler for cloud ice mixing ratio.
         ! This can update ri_tend and preci.
-        call fill_holes_sedimentation( dt, cld_macmic_num_steps, ncol, &
-                                       ri_start, state%pdel, vtrmi, &
-                                       state%zi, qmin(ixcldice), &
+        call fill_holes_sedimentation( dt, ncol, ri_start, state%pdel, &
+                                       vtrmi, state%zi, qmin(ixcldice), &
                                        ri_tend, preci )
 
         ! Call the sedimentation hole filler for snow mixing ratio.
         ! This can update rs_tend and preci.
         if ( ixsnow > 0 ) then
-           call fill_holes_sedimentation( dt, cld_macmic_num_steps, ncol, &
-                                          rs_start, state%pdel, ums, &
-                                          state%zi, qmin(ixsnow), &
+           call fill_holes_sedimentation( dt, ncol, rs_start, state%pdel, &
+                                          ums, state%zi, qmin(ixsnow), &
                                           rs_tend, preci )
         endif ! ixsnow > 0
 
@@ -2871,7 +2839,7 @@ contains
            enddo ! k = top_lev, pver
            grand_total_water_column_finish(icol) &
            = grand_total_water_column_finish(icol) &
-             + prect(icol) * ( dt / cld_macmic_num_steps ) * 1000.0_r8
+             + prect(icol) * dt * 1000.0_r8
         enddo ! icol = 1, ncol
 
         ! Calculate total energy in each column.
@@ -2901,8 +2869,7 @@ contains
               endif
               total_energy_column_finish(icol) &
               = total_energy_column_finish(icol) &
-                + latice * precl(icol) &
-                  * ( dt / cld_macmic_num_steps ) * 1000.0_r8
+                + latice * precl(icol) * dt * 1000.0_r8
            enddo ! k = top_lev, pver
         enddo ! icol = 1, ncol
 
@@ -2963,9 +2930,9 @@ contains
    end subroutine subcol_SILHS_fill_holes_conserv
 
    !============================================================================
-   subroutine fill_holes_sedimentation( dt, cld_macmic_num_steps, ncol, &
-                                        hm_start, pdel, fallspeed_m_per_s, &
-                                        zi, qmin_hm, hm_tend, prec )
+   subroutine fill_holes_sedimentation( dt, ncol, hm_start, pdel, &
+                                        fallspeed_m_per_s, zi, qmin_hm, &
+                                        hm_tend, prec )
 
      ! Description:
      ! After hydrometeor tendencies from microphysics processes were adjusted
@@ -2998,7 +2965,7 @@ contains
 
      ! Input Variables
      real(r8), intent(in) :: dt                   ! Time step duration
-     integer, intent(in) :: cld_macmic_num_steps  ! Number of substeps 
+
      integer, intent(in) :: ncol                  ! Number of grid columns
 
      real(r8), dimension(pcols,pver), intent(in) :: &
@@ -3097,8 +3064,7 @@ contains
 
                     ! Calculate the available amount of hydrometeor mass to
                     ! fill the hole.
-                    total_fill_mass &
-                    = prec(icol) * ( dt / cld_macmic_num_steps ) * 1000.0_r8
+                    total_fill_mass = prec(icol) * dt * 1000.0_r8
 
                     ! Calculate the ratio of total hole to total fill mass.
                     ! This should not exceed 1, but use thresholding to be safe.
@@ -3107,9 +3073,9 @@ contains
                            1.0_r8 )
 
                     ! Modify (reduce) the amount of surface precipitation in
-                    ! order to fill the hole.  Since dt, cld_macmic_num_steps,
-                    ! and 1000 are all constants, the only variable that needs
-                    ! to be modified proportionately is prec.
+                    ! order to fill the hole.  Since dt and 1000 are constants,
+                    ! the only variable that needs to be modified
+                    ! proportionately is prec.
                     prec(icol) = prec(icol) * ( 1.0_r8 - hole_fillmass_ratio )
 
                     ! Update the value of the hydrometeor at the level where the
@@ -3141,15 +3107,11 @@ contains
                       * pdel(icol,k) / ( zi(icol,k) - zi(icol,k+1) )
 
                     ! Calculate the fall "distance" in Pa.
-                    ! The time duration used is the macrophysics/microphysics
-                    ! substep time, which is the model timestep duration
-                    ! divided by the number of macmic steps.
-                    total_fall_Pa &
-                    = fallspeed_Pa_per_s * ( dt / cld_macmic_num_steps )
+                    total_fall_Pa = fallspeed_Pa_per_s * dt
 
                     ! Find the index of the vertical level that the hydrometeor
-                    ! sedimented to in one macmic substep.  It must sediment
-                    ! at least one level.
+                    ! sedimented to in one timestep.  It must sediment at least
+                    ! one level.
                     sum_pdel = 0.0_r8
                     idx = k + 1
                     do
@@ -3204,9 +3166,7 @@ contains
                        enddo ! idx = k+1, pver, 1
                        ! Contribution to total fill mass from the surface.
                        total_fill_mass &
-                       = total_fill_mass &
-                         + prec(icol) * ( dt / cld_macmic_num_steps ) &
-                           * 1000.0_r8
+                       = total_fill_mass + prec(icol) * dt * 1000.0_r8
                     else ! .not. l_reached_surface
                        ! The hydrometeor sedimented to lowest_level_idx.
                        idx = k + 1
@@ -3239,9 +3199,7 @@ contains
                                    ! surface.
                                    total_fill_mass &
                                    = total_fill_mass &
-                                     + prec(icol) &
-                                       * ( dt / cld_macmic_num_steps ) &
-                                       * 1000.0_r8
+                                     + prec(icol) * dt * 1000.0_r8
                                    exit
                                 else ! idx < pver
                                    ! Haven't reached pver yet, so increment
@@ -3280,9 +3238,8 @@ contains
                     if ( l_reached_surface ) then
                        ! Modify (reduce) the amount of surface precipitation in
                        ! order to fill the hole.
-                       ! Since dt, cld_macmic_num_steps, and 1000 are all
-                       ! constants, the only variable that needs to be modified
-                       ! proportionately is prec.
+                       ! Since dt and 1000 are constants, the only variable that
+                       ! needs to be modified proportionately is prec.
                        prec(icol) &
                        = prec(icol) * ( 1.0_r8 - hole_fillmass_ratio )
                     endif ! l_reached_surface

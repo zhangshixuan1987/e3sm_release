@@ -327,6 +327,8 @@ contains
       umr_idx = pbuf_get_index('UMR')
       vtrmi_idx = pbuf_get_index('VTRMI')
       ums_idx = pbuf_get_index('UMS')
+      qcsevap_idx = pbuf_get_index('QCSEVAP')
+      qisevap_idx = pbuf_get_index('QISEVAP')
      
       !-------------------------------
       ! Set up SILHS hydrometeors #KTCtodo: move microphys specification to config time,
@@ -2740,11 +2742,11 @@ contains
      ! this is the sum of rc_sed_tend and rc_sed_evap, and for cloud ice, this
      ! is the sum of ri_sed_tend and ri_sed_subl.
      rv_tend = rv_mc_tend
-     rc_tend = rc_mc_tend + rc_sed_tend + rc_sed_evap
+     rc_tend = rc_mc_tend + ( rc_sed_tend + rc_sed_evap )
      if ( ixrain > 0 ) then
         rr_tend = rr_mc_tend + rr_sed_tend
      endif
-     ri_tend = ri_mc_tend + ri_sed_tend + ri_sed_subl
+     ri_tend = ri_mc_tend + ( ri_sed_tend + ri_sed_subl )
      if ( ixsnow > 0 ) then
         rs_tend = rs_mc_tend + rs_sed_tend
      endif
@@ -3225,8 +3227,8 @@ contains
                                 endif ! idx == pver
                              endif ! total_fill_mass >= total_hole
                           else ! idx < lowest_level_idx
-                             ! Haven't reached lowest_level_idx yet, so increment
-                             ! and keep going.
+                             ! Haven't reached lowest_level_idx yet, so
+                             ! increment and keep going.
                              idx = idx + 1
                           endif ! idx >= lowest_level_idx
                        enddo
@@ -3242,7 +3244,7 @@ contains
                     ! that were used to fill the hole.
                     do idx = k+1, lowest_level_idx
                        if ( l_pos_hm(idx) ) then
-                          ! Since pver at a grid level does not change and
+                          ! Since pdel at a grid level does not change and
                           ! gravit is constant, the only variable that needs to
                           ! be modified proportionately is hm_curr.
                           hm_curr(idx) &

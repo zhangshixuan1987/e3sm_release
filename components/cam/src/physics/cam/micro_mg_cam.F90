@@ -224,7 +224,8 @@ integer :: &
      qcsedten_idx=-1, qrsedten_idx=-1, &
      qisedten_idx=-1, qssedten_idx=-1, &
      vtrmc_idx=-1, umr_idx=-1, &
-     vtrmi_idx=-1, ums_idx=-1
+     vtrmi_idx=-1, ums_idx=-1, &
+     qcsevap_idx=-1, qisevap_idx=-1
 
 integer :: &
    naai_idx = -1,           &
@@ -585,6 +586,8 @@ subroutine micro_mg_cam_register
      call pbuf_add_field('UMR', 'global', dtype_r8, (/pcols,pver/), umr_idx)
      call pbuf_add_field('VTRMI', 'global', dtype_r8, (/pcols,pver/), vtrmi_idx)
      call pbuf_add_field('UMS', 'global', dtype_r8, (/pcols,pver/), ums_idx)
+     call pbuf_add_field('QCSEVAP', 'global', dtype_r8, (/pcols,pver/), qcsevap_idx)
+     call pbuf_add_field('QISEVAP', 'global', dtype_r8, (/pcols,pver/), qisevap_idx)
   end if
    
 
@@ -1050,6 +1053,8 @@ subroutine micro_mg_cam_init(pbuf2d)
    umr_idx      = pbuf_get_index('UMR', ierr)
    vtrmi_idx    = pbuf_get_index('VTRMI', ierr)
    ums_idx      = pbuf_get_index('UMS', ierr)
+   qcsevap_idx  = pbuf_get_index('QCSEVAP', ierr)
+   qisevap_idx  = pbuf_get_index('QISEVAP', ierr)
 
   ! fields for heterogeneous freezing
   frzimm_idx = pbuf_get_index('FRZIMM', ierr)
@@ -1088,6 +1093,8 @@ subroutine micro_mg_cam_init(pbuf2d)
       if (umr_idx > 0)        call pbuf_set_field(pbuf2d, umr_idx, 0._r8)
       if (vtrmi_idx > 0)      call pbuf_set_field(pbuf2d, vtrmi_idx, 0._r8)
       if (ums_idx > 0)        call pbuf_set_field(pbuf2d, ums_idx, 0._r8)
+      if (qcsevap_idx > 0)    call pbuf_set_field(pbuf2d, qcsevap_idx, 0._r8)
+      if (qisevap_idx > 0)    call pbuf_set_field(pbuf2d, qisevap_idx, 0._r8)
 
       ! If sub-columns turned on, need to set the sub-column fields as well
       if (use_subcol_microp) then
@@ -1558,6 +1565,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    real(r8) :: umrout_grid(pcols,pver)
    real(r8) :: vtrmiout_grid(pcols,pver)
    real(r8) :: umsout_grid(pcols,pver)
+   real(r8) :: qcsevapout_grid(pcols,pver)
+   real(r8) :: qisevapout_grid(pcols,pver)
 
    real(r8) :: nc_grid(pcols,pver)
    real(r8) :: ni_grid(pcols,pver)
@@ -1610,6 +1619,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    real(r8), pointer :: umrout_grid_ptr(:,:)
    real(r8), pointer :: vtrmiout_grid_ptr(:,:)
    real(r8), pointer :: umsout_grid_ptr(:,:)
+   real(r8), pointer :: qcsevapout_grid_ptr(:,:)
+   real(r8), pointer :: qisevapout_grid_ptr(:,:)
 
    integer :: nlev   ! number of levels where cloud physics is done
    integer :: mgncol ! size of mgcols
@@ -1740,6 +1751,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    if (vtrmi_idx > 0) call pbuf_get_field(pbuf, vtrmi_idx, vtrmiout_grid_ptr)
    if (ums_idx > 0 .and. micro_mg_version > 1) &
       call pbuf_get_field(pbuf, ums_idx, umsout_grid_ptr)
+   if (qcsevap_idx > 0 ) call pbuf_get_field(pbuf, qcsevap_idx, qcsevapout_grid_ptr)
+   if (qisevap_idx > 0 ) call pbuf_get_field(pbuf, qisevap_idx, qisevapout_grid_ptr)
 
    !-----------------------
    ! If subcolumns is turned on, all calculated fields which are on subcolumns
@@ -2590,6 +2603,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
       if (micro_mg_version > 1) then
          call subcol_field_avg(ums,       ngrdcol, lchnk, umsout_grid)
       endif
+      call subcol_field_avg(qcsevap,  ngrdcol, lchnk, qcsevapout_grid)
+      call subcol_field_avg(qisevap,  ngrdcol, lchnk, qisevapout_grid)
 
       if (micro_mg_version > 1) then
          call subcol_field_avg(cldmax,    ngrdcol, lchnk, cldmax_grid)
@@ -2673,6 +2688,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
       if (micro_mg_version > 1) then
          umsout_grid      = ums
       endif
+      qcsevapout_grid = qcsevap
+      qisevapout_grid = qisevap
 
       if (micro_mg_version > 1) then
          cldmax_grid = cldmax
@@ -3055,6 +3072,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    if (vtrmi_idx > 0)     vtrmiout_grid_ptr    = vtrmiout_grid
    if (ums_idx > 0 .and. micro_mg_version > 1) &
       umsout_grid_ptr      = umsout_grid
+   if (qcsevap_idx > 0 ) qcsevapout_grid_ptr = qcsevapout_grid
+   if (qisevap_idx > 0 ) qisevapout_grid_ptr = qisevapout_grid
 
    ! --------------------------------------------- !
    ! General outfield calls for microphysics       !

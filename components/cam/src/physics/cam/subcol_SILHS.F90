@@ -53,7 +53,8 @@ module subcol_SILHS
    integer :: thlm_idx, num_subcols_idx, pdf_params_idx, rcm_idx, rtm_idx, ice_supersat_idx, &
               alst_idx, cld_idx, qrain_idx, qsnow_idx, nrain_idx, nsnow_idx, ztodt_idx, &
               prec_pcw_idx, snow_pcw_idx, qcsedten_idx, qrsedten_idx, qisedten_idx, &
-              qssedten_idx, vtrmc_idx, umr_idx, vtrmi_idx, ums_idx
+              qssedten_idx, vtrmc_idx, umr_idx, vtrmi_idx, ums_idx, &
+              qcsevap_idx, qisevap_idx
 
    logical :: subcol_SILHS_weight  ! if set, sets up weights for averaging subcolumns for SILHS
    integer :: subcol_SILHS_numsubcol ! number of subcolumns for this run
@@ -1954,14 +1955,16 @@ contains
        preci    ! Ice-phase precipitation rate (surface)    [m/s]
 
      real(r8), dimension(:,:), pointer :: &
-       rc_sed_tend, & ! Mean cloud water sedimentation tendency    [kg/kg/s]
-       rr_sed_tend, & ! Mean rain water sedimentation tendency     [kg/kg/s]
-       ri_sed_tend, & ! Mean cloud ice sedimentation tendency      [kg/kg/s]
-       rs_sed_tend, & ! Mean snow sedimentation tendency           [kg/kg/s]
-       vtrmc,       & ! Mean cloud water sedimentation velocity    [m/s]
-       umr,         & ! Mean rain water sedimentation velocity     [m/s]
-       vtrmi,       & ! Mean cloud ice sedimentation velocity      [m/s]
-       ums            ! Mean snow sedimentation velocity           [m/s]
+       rc_sed_tend, & ! Mean cloud water sedimentation tendency        [kg/kg/s]
+       rr_sed_tend, & ! Mean rain water sedimentation tendency         [kg/kg/s]
+       ri_sed_tend, & ! Mean cloud ice sedimentation tendency          [kg/kg/s]
+       rs_sed_tend, & ! Mean snow sedimentation tendency               [kg/kg/s]
+       vtrmc,       & ! Mean cloud water sedimentation velocity        [m/s]
+       umr,         & ! Mean rain water sedimentation velocity         [m/s]
+       vtrmi,       & ! Mean cloud ice sedimentation velocity          [m/s]
+       ums,         & ! Mean snow sedimentation velocity               [m/s]
+       rc_sed_evap, & ! Mean evap of cloud water during sedimentation  [kg/kg/s]
+       ri_sed_subl    ! Mean subl of cloud ice during sedimentation    [kg/kg/s]
 
      real(r8), dimension(pcols,pver) :: &
        rv_mc_tend, & ! Water vapor mixing ratio microphysics tendency  [kg/kg/s]
@@ -2056,6 +2059,8 @@ contains
      call pbuf_get_field(pbuf, umr_idx, umr)
      call pbuf_get_field(pbuf, vtrmi_idx, vtrmi)
      call pbuf_get_field(pbuf, ums_idx, ums)
+     call pbuf_get_field(pbuf, qcsevap_idx, rc_sed_evap)
+     call pbuf_get_field(pbuf, qisevap_idx, ri_sed_subl)
 
      ! Calculate liquid precipitation rate (precl) from the total precipitation
      ! rate (prect) and the frozen preciptation rate (preci).  This should never
@@ -2169,12 +2174,20 @@ contains
      ! rates and sedimentation rates.  Calculate the microphysics process
      ! tendencies by subtracting the sedimentation tendencies from the overall
      ! tendencies.
+     ! The sedimentation tendencies for cloud water (rc_sed_tend) and cloud ice
+     ! (ri_sed_tend) include the evaporation of cloud water during sedimentation
+     ! and the sublimation of cloud ice during sedimentation, respectively.  The
+     ! true sedimentation of cloud water is the sum of rc_sed_tend and
+     ! rc_sed_evap, and the true sedimentation of cloud ice is the sum of
+     ! ri_sed_tend and ri_sed_subl.  Subtract off only the true sedimentation
+     ! rates, as evaporation and sublimation need to be included in the
+     ! microphysics process rates.
      rv_mc_tend = rv_tend
-     rc_mc_tend = rc_tend - rc_sed_tend
+     rc_mc_tend = rc_tend - ( rc_sed_tend + rc_sed_evap )
      if ( ixrain > 0 ) then
         rr_mc_tend = rr_tend - rr_sed_tend
      endif
-     ri_mc_tend = ri_tend - ri_sed_tend
+     ri_mc_tend = ri_tend - ( ri_sed_tend + ri_sed_subl )
      if ( ixsnow > 0 ) then
         rs_mc_tend = rs_tend - rs_sed_tend
      endif
@@ -2722,12 +2735,16 @@ contains
 
      ! Calculate the new overall tendencies by adding the sedimentation
      ! tendencies back onto the new microphysics process tendencies.
+     ! For cloud water and cloud ice, the sedimentation tendencies that are
+     ! added back on are the true sedimentation tendencies.  For cloud water,
+     ! this is the sum of rc_sed_tend and rc_sed_evap, and for cloud ice, this
+     ! is the sum of ri_sed_tend and ri_sed_subl.
      rv_tend = rv_mc_tend
-     rc_tend = rc_mc_tend + rc_sed_tend
+     rc_tend = rc_mc_tend + rc_sed_tend + rc_sed_evap
      if ( ixrain > 0 ) then
         rr_tend = rr_mc_tend + rr_sed_tend
      endif
-     ri_tend = ri_mc_tend + ri_sed_tend
+     ri_tend = ri_mc_tend + ri_sed_tend + ri_sed_subl
      if ( ixsnow > 0 ) then
         rs_tend = rs_mc_tend + rs_sed_tend
      endif

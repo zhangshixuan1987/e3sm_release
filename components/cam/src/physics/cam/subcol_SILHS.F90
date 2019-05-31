@@ -44,6 +44,7 @@ module subcol_SILHS
    private :: meansc
    private :: stdsc
    private :: fill_holes_sedimentation
+   private :: fill_holes_same_phase_vert
 #endif
 
    !-----
@@ -2771,6 +2772,13 @@ contains
                                        vtrmc, state%zi, qmin(ixcldliq), &
                                        rc_tend, precl )
 
+        if ( ixrain > 0 ) then
+           call fill_holes_same_phase_vert( dt, ncol, rc_start, rr_start, &
+                                            state%pdel, qmin(ixcldliq), &
+                                            qmin(ixrain), &
+                                            rc_tend, rr_tend )
+        endif ! ixrain > 0
+
         ! Call the sedimentation hole filler for snow mixing ratio.
         ! This can update rs_tend and preci.
         if ( ixsnow > 0 ) then
@@ -2784,6 +2792,13 @@ contains
         call fill_holes_sedimentation( dt, ncol, ri_start, state%pdel, &
                                        vtrmi, state%zi, qmin(ixcldice), &
                                        ri_tend, preci )
+
+        if ( ixsnow > 0 ) then
+           call fill_holes_same_phase_vert( dt, ncol, ri_start, rs_start, &
+                                            state%pdel, qmin(ixcldice), &
+                                            qmin(ixsnow), &
+                                            ri_tend, rs_tend )
+        endif  ! ixsnow > 0
 
         ! Update the total precipitation rate (prect) from the updated liquid
         ! precipitation rate (precl) and the updated frozen preciptation rate
@@ -3303,6 +3318,174 @@ contains
      return
 
    end subroutine fill_holes_sedimentation
+
+   !============================================================================
+   subroutine fill_holes_same_phase_vert( dt, ncol, hm_start, hm_start_filler, &
+                                          pdel, qmin_hm, qmin_hm_filler, &
+                                          hm_tend, hm_tend_filler )
+
+     ! Description:
+
+     !----------------------------------------------------------------------
+
+     use ppgrid, only: &
+         pcols
+
+     use ref_pres, only: &
+         top_lev => trop_cloud_top_lev
+
+     implicit none
+
+     ! Input Variables
+     real(r8), intent(in) :: dt                   ! Time step duration
+
+     integer, intent(in) :: ncol                  ! Number of grid columns
+
+     real(r8), dimension(pcols,pver), intent(in) :: &
+       hm_start,        & ! Hydrometeor mixing ratio (microphys start)   [kg/kg]
+       hm_start_filler, & ! Filler hydromet mix ratio (microphys start)  [kg/kg]
+       pdel               ! Pressure difference between grid levels      [Pa]
+
+     real(r8), intent(in) :: &
+       qmin_hm,        & ! Minimum threshold hydrometeor mixing ratio  [kg/kg]
+       qmin_hm_filler    ! Min threshold filler hydromet mixing ratio  [kg/kg]
+
+     ! Input/Output Variables
+     real(r8), dimension(pcols,pver), intent(inout) :: &
+       hm_tend,        & ! Hydrometeor mixing ratio tendency         [kg/kg/s]
+       hm_tend_filler    ! Filler hydrometeor mixing ratio tendency  [kg/kg/s]
+
+     ! Local Variables
+     real(r8), dimension(pver) :: &
+       hm_update,        & ! Hydrometeor mixing ratio; start           [kg/kg]
+       hm_update_filler, & ! Filler Hydrometeor mixing ratio; start    [kg/kg]
+       hm_curr,          & ! Current hydrometeor mixing ratio          [kg/kg]
+       hm_curr_filler      ! Current filler hydrometeor mixing ratio   [kg/kg]
+
+     real(r8) :: &
+       total_hole,          & ! Total mass of hole in hydrometeor       [kg/m^2]
+       total_fill_mass,     & ! Total mass available to fill hole       [kg/m^2]
+       hole_fillmass_ratio    ! Ratio: total_hole / total_fill_mass     [-]
+
+     logical, dimension(pver) :: &
+       l_pos_hm,        & ! Flag: hydrometeor has positive (>= qmin_hm) value
+       l_pos_hm_filler    ! Flag: filler hydrometeor has positive value
+
+     integer :: icol  ! Grid column index
+
+     integer :: k, idx  ! Vertical grid level indices
+
+
+     ! Loop over all columns, performing any adjustments one column at a time.
+     do icol = 1, ncol
+
+        ! Calculate the updated value of the hydrometeor field based on the
+        ! updated microphysics tendency.
+        hm_update = hm_start(icol,:) + hm_tend(icol,:) * dt
+        hm_curr = hm_update
+
+        ! Calculate the updated value of the filler hydrometeor field based on
+        ! the updated microphysics tendency.
+        hm_update_filler = hm_start_filler(icol,:) + hm_tend_filler(icol,:) * dt
+        hm_curr_filler = hm_update_filler
+
+        ! Check for any holes in the vertical profile
+        if ( any( hm_curr(top_lev:pver) < qmin_hm ) ) then
+
+           ! At least one hole is found in this hydrometeor species in this
+           ! grid column.  The holes must be filled conservatively.
+
+           ! Check which levels have values of the hydrometeor that are at or
+           ! above the minimum threshold value.
+           do k = top_lev, pver
+              ! Check for the hydrometeor that might need to be filled.
+              if ( hm_curr(k) >= qmin_hm ) then
+                l_pos_hm(k) = .true.
+              else ! hm_curr < qmin_hm
+                l_pos_hm(k) = .false.
+              endif ! hm_curr >= qmin_hm
+              ! Check for the filler hydrometeor, as some levels might have
+              ! numerical round-off level, small negative values.
+              if ( hm_curr_filler(k) >= qmin_hm_filler ) then
+                l_pos_hm_filler(k) = .true.
+              else ! hm_curr_filler < qmin_hm_filler
+                l_pos_hm_filler(k) = .false.
+              endif ! hm_curr_filler >= qmin_hm_filler
+           enddo ! k = top_lev, pver
+
+           do k = top_lev, pver
+
+              if ( .not. l_pos_hm(k) ) then
+
+                 ! A hole is found in the hydrometeor at this grid level.
+
+                 ! Calculate the total hydrometeor mass of the hole that needs
+                 ! to be filled.
+                 ! The value of the hydrometeor mixing ratio is negative, but
+                 ! the value of total_hole is positive.
+                 total_hole = ( qmin_hm - hm_curr(k) ) * pdel(icol,k) / gravit
+
+                 ! Calculate the total hydrometeor mass available from the
+                 ! filler hydrometeor to fill the hole.
+                 total_fill_mass = 0.0_r8
+                 do idx = top_lev, pver, 1
+                    if ( l_pos_hm_filler(idx) ) then
+                        total_fill_mass &
+                        = total_fill_mass &
+                          + ( hm_curr_filler(idx) - qmin_hm_filler ) &
+                            * pdel(icol,idx) / gravit
+                     endif ! l_pos_hm_filler(idx)
+                 enddo ! idx = top_lev, pver, 1
+
+                 ! Calculate the ratio of total hole to total fill mass.  This
+                 ! should not exceed 1 except as a result of numerical round-off
+                 ! errors.  Use thresholding to be safe.
+                 hole_fillmass_ratio &
+                 = min( total_hole / max( total_fill_mass, 1.0e-30 ), &
+                        1.0_r8 )
+
+                 ! Modify (reduce) the amount of the filler hydrometeor.
+                 do idx = top_lev, pver
+                    if ( l_pos_hm_filler(idx) ) then
+                       ! Since pdel at a grid level does not change and gravit
+                       ! is constant, the only variable that needs to be
+                       ! modified proportionately is hm_curr_filler.
+                       hm_curr_filler(idx) &
+                       = qmin_hm_filler &
+                         + ( hm_curr_filler(idx) - qmin_hm_filler ) &
+                           * ( 1.0_r8 - hole_fillmass_ratio )
+                    endif ! l_pos_hm_filler(idx)
+                 enddo ! idx = top_lev, pver
+
+                 ! Update the value of the hydrometeor at the level where the
+                 ! hole was found.  Mathematically, as long as the available
+                 ! mass was able to fill the entire hole, the new value of the
+                 ! hydrometeor mixing ratio (hm_curr) should be qmin_hm.
+                 hm_curr(k) &
+                 = hm_curr(k) &
+                   + hole_fillmass_ratio * total_fill_mass &
+                     * gravit / pdel(icol,k)
+
+              endif ! .not. l_pos_hm(k)
+
+           enddo ! k = top_lev, pver
+
+        endif ! any( hm_curr(top_lev:pver) < qmin_hm )
+
+        ! Update the value of total microphysics tendency after hole filling.
+        hm_tend(icol,:) = hm_tend(icol,:) + ( hm_curr - hm_update ) / dt
+
+        ! Update the value of total microphysics tendency after hole filling for
+        ! the filler hydrometeor.
+        hm_tend_filler(icol,:) &
+        = hm_tend_filler(icol,:) + ( hm_curr_filler - hm_update_filler ) / dt
+
+     enddo ! icol = 1, ncol
+
+
+     return
+
+   end subroutine fill_holes_same_phase_vert
 
    !============================================================================
 #endif

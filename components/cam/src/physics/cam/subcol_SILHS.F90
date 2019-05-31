@@ -2731,7 +2731,7 @@ contains
 
            endif ! ixsnow > 0 .and. ( .not. l_pos_rs_mc_tend )
 
-        enddo ! k = 1, pver
+        enddo ! k = top_lev, pver
 
      enddo ! icol = 1, ncol
 
@@ -2757,12 +2757,6 @@ contains
      ! using the sedimentation hole filler.
      if ( l_sed_hole_fill ) then
 
-        ! Call the sedimentation hole filler for cloud water mixing ratio.
-        ! This can update rc_tend and precl.
-        call fill_holes_sedimentation( dt, ncol, rc_start, state%pdel, &
-                                       vtrmc, state%zi, qmin(ixcldliq), &
-                                       rc_tend, precl )
-
         ! Call the sedimentation hole filler for rain water mixing ratio.
         ! This can update rr_tend and precl.
         if ( ixrain > 0 ) then
@@ -2771,11 +2765,11 @@ contains
                                           rr_tend, precl )
         endif ! ixrain > 0
 
-        ! Call the sedimentation hole filler for cloud ice mixing ratio.
-        ! This can update ri_tend and preci.
-        call fill_holes_sedimentation( dt, ncol, ri_start, state%pdel, &
-                                       vtrmi, state%zi, qmin(ixcldice), &
-                                       ri_tend, preci )
+        ! Call the sedimentation hole filler for cloud water mixing ratio.
+        ! This can update rc_tend and precl.
+        call fill_holes_sedimentation( dt, ncol, rc_start, state%pdel, &
+                                       vtrmc, state%zi, qmin(ixcldliq), &
+                                       rc_tend, precl )
 
         ! Call the sedimentation hole filler for snow mixing ratio.
         ! This can update rs_tend and preci.
@@ -2784,6 +2778,12 @@ contains
                                           ums, state%zi, qmin(ixsnow), &
                                           rs_tend, preci )
         endif ! ixsnow > 0
+
+        ! Call the sedimentation hole filler for cloud ice mixing ratio.
+        ! This can update ri_tend and preci.
+        call fill_holes_sedimentation( dt, ncol, ri_start, state%pdel, &
+                                       vtrmi, state%zi, qmin(ixcldice), &
+                                       ri_tend, preci )
 
         ! Update the total precipitation rate (prect) from the updated liquid
         ! precipitation rate (precl) and the updated frozen preciptation rate
@@ -3027,6 +3027,10 @@ contains
      ! the total_fill_mass for hole filling.
      logical :: l_reached_surface
 
+     ! Flag for whether hydrometeor mass from levels above the hole needs to be
+     ! included in the total_fill_mass for hole filling.
+     logical :: l_fill_from_above
+
      integer :: icol  ! Grid column index
 
      integer :: k, idx  ! Vertical grid level indices
@@ -3068,43 +3072,25 @@ contains
               if ( .not. l_pos_hm(k) ) then
 
                  ! A hole is found in the hydrometeor at this grid level.
+
+                 ! Calculate the total hydrometeor mass of the hole that needs
+                 ! to be filled.
+                 ! The value of the hydrometeor mixing ratio is negative, but
+                 ! the value of total_hole is positive.
+                 total_hole = ( qmin_hm - hm_curr(k) ) * pdel(icol,k) / gravit
+
+                 ! Calculate the total hydrometeor mass available from below
+                 ! to fill the hole.
                  if ( k == pver ) then
 
                     ! A hole is found at the lowermost level.
                     ! The only place the hydrometeor could have sedimented
                     ! to is the surface, so fill from only the surface.
-
-                    ! Calculate the total hydrometeor mass of the hole that
-                    ! needs to be filled.
-                    ! The value of the hydrometeor mixing ratio is negative,
-                    ! but total_hole is positive.
-                    total_hole &
-                    = ( qmin_hm - hm_curr(k) ) * pdel(icol,k) / gravit
+                    l_reached_surface = .true.
 
                     ! Calculate the available amount of hydrometeor mass to
                     ! fill the hole.
                     total_fill_mass = prec(icol) * dt * 1000.0_r8
-
-                    ! Calculate the ratio of total hole to total fill mass.
-                    ! This should not exceed 1, but use thresholding to be safe.
-                    hole_fillmass_ratio &
-                    = min( total_hole / max( total_fill_mass, 1.0e-30 ), &
-                           1.0_r8 )
-
-                    ! Modify (reduce) the amount of surface precipitation in
-                    ! order to fill the hole.  Since dt and 1000 are constants,
-                    ! the only variable that needs to be modified
-                    ! proportionately is prec.
-                    prec(icol) = prec(icol) * ( 1.0_r8 - hole_fillmass_ratio )
-
-                    ! Update the value of the hydrometeor at the level where the
-                    ! hole was found.  Mathematically, as long as the available
-                    ! mass was able to fill the entire hole, the new value of
-                    ! the hydrometeor mixing ratio (hm_curr) should be 0.
-                    hm_curr(k) &
-                    = hm_curr(k) &
-                      + hole_fillmass_ratio * total_fill_mass &
-                        * gravit / pdel(icol,k)
 
                  else ! top_lev <= k < pver
 
@@ -3160,13 +3146,6 @@ contains
                           endif ! idx == pver
                        endif ! sum_pdel >= total_fall_Pa
                     enddo
-
-                    ! Calculate the total hydrometeor mass of the hole that
-                    ! needs to be filled.
-                    ! The value of the hydrometeor mixing ratio is negative,
-                    ! but total_hole is positive.
-                    total_hole &
-                    = ( qmin_hm - hm_curr(k) ) * pdel(icol,k) / gravit
 
                     ! Calculate the available amount of hydrometeor mass to
                     ! fill the hole.
@@ -3234,12 +3213,33 @@ contains
                        enddo
                     endif ! l_reached_surface
 
-                    ! Calculate the ratio of total hole to total fill mass.
-                    ! This should not exceed 1, but use thresholding to be safe.
-                    hole_fillmass_ratio &
-                    = min( total_hole / max( total_fill_mass, 1.0e-30 ), &
-                           1.0_r8 )
+                 endif ! k == pver
 
+                 ! If mass has been added all the way down to the surface and
+                 ! there's still not enough mass to fill the hole, then fill the
+                 ! hole pulling mass from above.
+                 if ( total_fill_mass >= total_hole ) then
+                    l_fill_from_above = .false.
+                 else ! total_fill_mass < total_hole
+                    l_fill_from_above = .true.
+                    do idx = top_lev, k-1, 1
+                       if ( l_pos_hm(idx) ) then
+                          total_fill_mass &
+                          = total_fill_mass &
+                            + ( hm_curr(idx) - qmin_hm ) &
+                              * pdel(icol,idx) / gravit
+                       endif ! l_pos_hm(idx)
+                    enddo ! idx = top_lev, k-1, 1
+                 endif ! total_fill_mass >= total_hole
+
+                 ! Calculate the ratio of total hole to total fill mass.  This
+                 ! should not exceed 1 except as a result of numerical round-off
+                 ! errors.  Use thresholding to be safe.
+                 hole_fillmass_ratio &
+                 = min( total_hole / max( total_fill_mass, 1.0e-30 ), &
+                        1.0_r8 )
+
+                 if ( k < pver ) then
                     ! Modify (reduce) the amount of the hydrometeor at levels
                     ! that were used to fill the hole.
                     do idx = k+1, lowest_level_idx
@@ -3253,26 +3253,40 @@ contains
                               * ( 1.0_r8 - hole_fillmass_ratio )
                        endif ! l_pos_hm(idx)
                     enddo ! idx = k+1, lowest_level_idx
+                 endif ! k < pver
 
-                    if ( l_reached_surface ) then
-                       ! Modify (reduce) the amount of surface precipitation in
-                       ! order to fill the hole.
-                       ! Since dt and 1000 are constants, the only variable that
-                       ! needs to be modified proportionately is prec.
-                       prec(icol) &
-                       = prec(icol) * ( 1.0_r8 - hole_fillmass_ratio )
-                    endif ! l_reached_surface
+                 if ( l_reached_surface ) then
+                    ! Modify (reduce) the amount of surface precipitation in
+                    ! order to fill the hole.  Since dt and 1000 are constants,
+                    ! the only variable that needs to be modified
+                    ! proportionately is prec.
+                    prec(icol) = prec(icol) * ( 1.0_r8 - hole_fillmass_ratio )
+                 endif ! l_reached_surface
 
-                    ! Update the value of the hydrometeor at the level where the
-                    ! hole was found.  Mathematically, as long as the available
-                    ! mass was able to fill the entire hole, the new value of
-                    ! the hydrometeor mixing ratio (hm_curr) should be 0.
-                    hm_curr(k) &
-                    = hm_curr(k) &
-                      + hole_fillmass_ratio * total_fill_mass &
-                        * gravit / pdel(icol,k)
+                 if ( l_fill_from_above ) then
+                    ! Modify (reduce) the amount of the hydrometeor at levels
+                    ! that were used to fill the hole.
+                    do idx = top_lev, k-1
+                       if ( l_pos_hm(idx) ) then
+                          ! Since pdel at a grid level does not change and
+                          ! gravit is constant, the only variable that needs to
+                          ! be modified proportionately is hm_curr.
+                          hm_curr(idx) &
+                          = qmin_hm &
+                            + ( hm_curr(idx) - qmin_hm ) &
+                              * ( 1.0_r8 - hole_fillmass_ratio )
+                       endif ! l_pos_hm(idx)
+                    enddo ! idx = top_lev, k-1
+                 endif ! l_fill_from_above
 
-                 endif ! k == pver
+                 ! Update the value of the hydrometeor at the level where the
+                 ! hole was found.  Mathematically, as long as the available
+                 ! mass was able to fill the entire hole, the new value of the
+                 ! hydrometeor mixing ratio (hm_curr) should be qmin_hm.
+                 hm_curr(k) &
+                 = hm_curr(k) &
+                   + hole_fillmass_ratio * total_fill_mass &
+                     * gravit / pdel(icol,k)
 
               endif ! .not. l_pos_hm(k)
 

@@ -1911,6 +1911,37 @@ contains
      !    SUM(k=top_lev:pver) ( ri_sed_tend(k) + rs_sed_tend(k) )
      !                        * dt * pdel(k) / g
      !    + preci * dt * 1000 = 0.
+     !
+     ! The conservative hole filler works as follows.  The total microphysics
+     ! tendency for each hydrometeor is provided in ptend.  This is the sum of
+     ! the microphysics process rate tendency and sedimentation tendency for
+     ! each hydrometeor.  The sedimentation tendency is provided in pbuf.  The
+     ! sedimentation tendency is subtracted off the total microphysics tendency
+     ! to produce the microphysics process rate tendency for each hydrometeor.
+     ! The microphysics process rate tendency is adjusted when necessary so that
+     ! holes in the hydrometeor are not produced by microphysics process rates.
+     ! When a hydrometeor's negative microphysics process rate tendency needs to
+     ! be made smaller in magnitude to avoid a hole, all hydrometeor tendencies
+     ! that are positive at that grid level are also decreased proportionately
+     ! to maintain a balance.  Dry static energy tendency is also adjusted
+     ! appropriately when necessary.  After this, the vertical integral of each
+     ! hydrometeor species is greater than or equal to 0.
+     !
+     ! The sedimentation tendency is then added back onto the new microphysics
+     ! process rate tendency to produce a new total microphysics tendency for
+     ! each hydrometeor.  Since the sedimentation tendency was based on the old
+     ! value of hydrometeor, before the hole-filling adjustment, it is possible
+     ! that the new total microphysics tendency may produce holes.  When this
+     ! happens, sedimentation hole filling fills holes in the vertical profile
+     ! of each hydrometeor.  Holes are filled using mass from other vertical
+     ! levels for the same hydrometeor (or from a same-phase hydrometeor when
+     ! necessary).  Since the vertical integral of sedimentation tendency
+     ! (including surface precipitation rate) is 0, the vertical integral of the
+     ! hydrometeor must be greater than or equal to 0, which means that all
+     ! holes can be filled.  The result is that all holes in any hydrometeor
+     ! mixing ratio are filled completely and conservatively.  The value of
+     ! ptend is updated appropriately so that it can be applied later in
+     ! physics_update.
 
      !----------------------------------------------------------------------
 
@@ -2195,6 +2226,27 @@ contains
         rs_mc_tend = rs_tend - rs_sed_tend
      endif
 
+     ! This section adjusts microphysics process rate tendencies so that the
+     ! resulting values of all hydrometeor mixing ratios are greater than or
+     ! equal to qmin after this section is complete.  Once sedimentation is
+     ! added back on after this section, some of the hydrometeor mixing ratios
+     ! may become less than qmin again.
+     !
+     ! This section, which again is concerned only with adjusting microphysics
+     ! process rates, makes use of the following two principles:
+     !
+     ! 1) When adjusting the tendencies from microphysics process rates,
+     !    conserve:
+     !
+     !    rv_mc_tend(k) + rc_mc_tend(k) + rr_mc_tend(k)
+     !    + ri_mc_tend(k) + rs_mc_tend(k) = 0; for all k from top_lev to pver.
+     !
+     ! 2) When adjusting the tendencies from microphysics process rates, adjust
+     !    dry static energy appropriately.  The change in dry static energy
+     !    is necessary because of phase changes.  This "puts back" the extra dry
+     !    static energy that was "taken out" when an excessive phase-changing
+     !    process rate was produced by microphysics.
+
      ! Loop over all columns, performing any tendency adjustments one column
      ! at a time.
      do icol = 1, ncol
@@ -2273,8 +2325,8 @@ contains
                  endif
 
                  ! Calculate the correction ratio.
-                 ! In principal, this should never be greater than 1, but this
-                 ! is limited at 1 to be safe.
+                 ! In principle, this should never be greater than 1 outside of
+                 ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &
                  = min( mc_tend_correction &
                         / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
@@ -2376,8 +2428,8 @@ contains
                  endif
 
                  ! Calculate the correction ratio.
-                 ! In principal, this should never be greater than 1, but this
-                 ! is limited at 1 to be safe.
+                 ! In principle, this should never be greater than 1 outside of
+                 ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &
                  = min( mc_tend_correction &
                         / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
@@ -2474,8 +2526,8 @@ contains
                  endif
 
                  ! Calculate the correction ratio.
-                 ! In principal, this should never be greater than 1, but this
-                 ! is limited at 1 to be safe.
+                 ! In principle, this should never be greater than 1 outside of
+                 ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &
                  = min( mc_tend_correction &
                         / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
@@ -2572,8 +2624,8 @@ contains
                  endif
 
                  ! Calculate the correction ratio.
-                 ! In principal, this should never be greater than 1, but this
-                 ! is limited at 1 to be safe.
+                 ! In principle, this should never be greater than 1 outside of
+                 ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &
                  = min( mc_tend_correction &
                         / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
@@ -2671,8 +2723,8 @@ contains
                  endif
 
                  ! Calculate the correction ratio.
-                 ! In principal, this should never be greater than 1, but this
-                 ! is limited at 1 to be safe.
+                 ! In principle, this should never be greater than 1 outside of
+                 ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &
                  = min( mc_tend_correction &
                         / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
@@ -2754,9 +2806,27 @@ contains
 
      ! Now that the original sedimentation tendency has been added to the
      ! new microphysics process tendency, the new total microphysics tendency
-     ! can still cause holes to form.  These holes can be filled conservatively
-     ! using the sedimentation hole filler.
+     ! can still cause holes to form.  After the microphysics process rates were
+     ! adjusted, the values of the hydrometeor fields were greater than or equal
+     ! to 0 at all grid levels, which means their vertical integrals were also
+     ! greater than or equal to 0.  Sedimentation by itself has a vertical
+     ! integral of 0 (including the amount that sedimented to the surface).
+     ! This means that after the microphysics process rates have been adjusted
+     ! and sedimentation has been added back on, the resulting hydrometeor
+     ! fields all still have vertical integrals that are greater than or equal
+     ! to 0.  Holes that develop at any particular grid level can be filled.
+     ! These holes can be filled conservatively using the sedimentation hole
+     ! filler.
      if ( l_sed_hole_fill ) then
+
+        ! This section makes use of the following principle:
+        !
+        ! 3) When adjusting the hydrometeor tendency from sedimentation of a
+        !    liquid hydrometeor (cloud water or rain water), conserve:
+        !
+        !    SUM(k=top_lev:pver) ( rc_sed_tend(k) + rr_sed_tend(k) )
+        !                        * dt * pdel(k) / g
+        !    + precl * dt * 1000 = 0.
 
         ! Call the sedimentation hole filler for rain water mixing ratio.
         ! This can update rr_tend and precl.
@@ -2772,12 +2842,27 @@ contains
                                        vtrmc, state%zi, qmin(ixcldliq), &
                                        rc_tend, precl )
 
+        ! Occasionally, a situation can occur where filling a hole in rain can
+        ! deplete all the surface liquid-phase precipitation (precl), resulting
+        ! in not enough water mass in the vertical profile of cloud water to
+        ! fill a hole in cloud water.  When this happens, there must be liquid
+        ! water found in the vertical profile of rain, so pull the water from
+        ! rain to fill any remaining holes in cloud water.
         if ( ixrain > 0 ) then
            call fill_holes_same_phase_vert( dt, ncol, rc_start, rr_start, &
                                             state%pdel, qmin(ixcldliq), &
                                             qmin(ixrain), &
                                             rc_tend, rr_tend )
         endif ! ixrain > 0
+
+        ! This section makes use of the following principle:
+        !
+        ! 4) When adjusting the hydrometeor tendency from sedimentation of a
+        !    frozen hydrometeor (cloud ice or snow), conserve:
+        !
+        !    SUM(k=top_lev:pver) ( ri_sed_tend(k) + rs_sed_tend(k) )
+        !                        * dt * pdel(k) / g
+        !    + preci * dt * 1000 = 0.
 
         ! Call the sedimentation hole filler for snow mixing ratio.
         ! This can update rs_tend and preci.
@@ -2793,6 +2878,12 @@ contains
                                        vtrmi, state%zi, qmin(ixcldice), &
                                        ri_tend, preci )
 
+        ! Occasionally, a situation can occur where filling a hole in snow can
+        ! deplete all the surface ice-phase precipitation (preci), resulting
+        ! in not enough water mass in the vertical profile of cloud ice to
+        ! fill a hole in cloud ice.  When this happens, there must be ice-phase
+        ! water found in the vertical profile of snow, so pull the water from
+        ! snow to fill any remaining holes in cloud ice.
         if ( ixsnow > 0 ) then
            call fill_holes_same_phase_vert( dt, ncol, ri_start, rs_start, &
                                             state%pdel, qmin(ixcldice), &
@@ -2986,6 +3077,17 @@ contains
      ! based on fallspeed of the hydrometeor.  If the level that contains the
      ! hole is within proximity to the surface, then the water that sedimented
      ! to the surface can be used to fill the hole, as well.
+     !
+     ! If there isn't enough total hydrometeor mass within the fall range to
+     ! fill the hole, then positive hydrometeor mass from levels below the fall
+     ! range is to be added to the total available mass to fill the hole.  Mass
+     ! is added one level at a time until enough mass is found to fill the hole
+     ! or until the surface is reached and the surface precipitation is added to
+     ! the total available fill mass.
+     !
+     ! After this, if there still isn't enough available mass to fill the hole,
+     ! then positive hydrometeor mass is added from all levels above the hole to
+     ! the total mass that is available to fill the hole.
 
      !----------------------------------------------------------------------
 
@@ -3325,6 +3427,68 @@ contains
                                           hm_tend, hm_tend_filler )
 
      ! Description:
+     ! Fills remaining holes in a hydrometeor with mass from the the vertical
+     ! profile of another hydrometeor of the same phase.  Remaining holes in
+     ! cloud water are filled with rain water and remaining holes in snow are
+     ! filled with cloud ice.
+     !
+     ! This subroutine, combined with subroutine fill_holes_sedimentation, fill
+     ! holes making use of the following principles:
+     !
+     ! 3) When adjusting the hydrometeor tendency from sedimentation of a
+     !    liquid hydrometeor (cloud water or rain water), conserve:
+     !
+     !    SUM(k=top_lev:pver) ( rc_sed_tend(k) + rr_sed_tend(k) )
+     !                        * dt * pdel(k) / g
+     !    + precl * dt * 1000 = 0.
+     !
+     ! 4) When adjusting the hydrometeor tendency from sedimentation of a
+     !    frozen hydrometeor (cloud ice or snow), conserve:
+     !
+     !    SUM(k=top_lev:pver) ( ri_sed_tend(k) + rs_sed_tend(k) )
+     !                        * dt * pdel(k) / g
+     !    + preci * dt * 1000 = 0.
+     !
+     ! These two equations (one for liquid-phase hydrometeors and one for
+     ! ice-phase hydrometeors) could be further split into one equation for
+     ! each hydrometeor if there was prec output for each hydrometeor.  However,
+     ! there's only prec output for ice-phase precipitation rate and total
+     ! precipitation rate (liquid preciptation rate is total rate minus
+     ! ice-phase rate).
+     !
+     ! Since only liquid-phase precipitation rate (precl) and ice-phase
+     ! precipitation rate (preci) are available, and there are two hydrometeors
+     ! in each category, one hydrometeor from each category must fill before
+     ! the other hydrometeor from its category and get priority access to precl
+     ! or preci.  Since a vast majority of liquid precipitation comes from rain
+     ! rather than sedimenting cloud water, rain is filled before cloud water
+     ! and gets priority access to precl.  Likewise, since a vast majority of
+     ! frozen precipitation comes from snow rather than sedimenting cloud ice,
+     ! snow is filled before cloud ice and gets priority access to preci.
+     !
+     ! The order of sedimentation hole filling is as follows.  First, a level
+     ! with a hole in it is identified.  The fall distance for the hydrometeor
+     ! that originated at a level is calculated.  Total mass to fill the hole is
+     ! calculated from all levels within the fall range that have positive
+     ! values of the hydrometeor.  The amount that precipitated to the surface
+     ! is also included if the hydrometeor fell that far.  If that isn't enough
+     ! mass to fill the hole, then levels that are lower in the profile are
+     ! included (if the hydrometeor has a positive value) until enough mass is
+     ! found to fill the hole or until the surface is reached.  If there isn't
+     ! enough mass found in all levels below the hole, including the amount that
+     ! precipitated to the ground, to fill the hole, then the hydrometeor mass
+     ! from all levels above the hole (again, where a positive value of the
+     ! hydrometeor is found) are included in the total available mass to fill
+     ! the hole.
+     !
+     ! Occasionally, a situation can occur where both hydrometeors in a category
+     ! contributed to surface precipitation rate, and filling a hole in rain
+     ! (or snow) can deplete all the surface precl (or preci), resulting in not
+     ! enough water mass in the vertical profile (including the surface) of
+     ! cloud water (or cloud ice) to fill a hole in cloud water (or cloud ice).
+     ! When this happens, there must still be liquid water (or frozen water)
+     ! found in the vertical profile of rain (or snow), so pull the water from
+     ! rain (or snow) to fill any remaining holes in cloud water (or cloud ice).
 
      !----------------------------------------------------------------------
 

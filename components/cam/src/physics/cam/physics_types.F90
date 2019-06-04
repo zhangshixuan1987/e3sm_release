@@ -269,14 +269,7 @@ contains
 
 #ifdef CLUBB_SGS
     ! Whether to do hole filling rather than hard clipping (default false)
-    logical :: clubb_hole_fill = .false.
-
-    ! Flag for filling holes in liquid hydrometeors with other liquid
-    ! hydrometeors from the same level and filling holes in frozen hydrometeors
-    ! with other frozen hydrometeors from the same level as a first step in
-    ! hole filling.  This code is only used when both clubb_hole_fill and
-    ! clubb_fill_holes_hydromet are enabled.
-    logical, parameter :: clubb_fill_holes_hydromet = .false.
+    logical :: clubb_hole_fill = .false.  
 
     !--- Needed for CLUBB's hole filling code <janhft 09/17/2014> ------
     real( r8 ), parameter :: & 
@@ -421,101 +414,6 @@ contains
           end do
 
 #ifdef CLUBB_SGS
-       endif ! ptend%lq(m)
-    enddo  ! m=1,pcnst
-
-    if ( clubb_hole_fill .and. clubb_fill_holes_hydromet ) then
-
-       ! Fill any holes at a level in a liquid hydrometeor with another liquid hydrometeor.
-       if ( ptend%lq(ixcldliq) .and. ptend%lq(ixrain) ) then
-          if ( ixcldliq > 0 .and. ixrain > 0 ) then
-             do icol = 1, ncol
-                do k = top_lev, pver
-                   if ( state%q(icol,k,ixcldliq) < qmin(ixcldliq) &
-                        .and. state%q(icol,k,ixrain) > qmin(ixrain) ) then
-                      ! Fill the hole in cloud water mixing ratio with rain water mixing ratio.
-                      if ( ( state%q(icol,k,ixrain) - qmin(ixrain) ) &
-                           >= ( qmin(ixcldliq) - state%q(icol,k,ixcldliq) ) ) then
-                         ! The hole in cloud water mixing ratio can be completely filled.
-                         state%q(icol,k,ixrain) &
-                         = state%q(icol,k,ixrain) + ( state%q(icol,k,ixcldliq) - qmin(ixcldliq) )
-                         state%q(icol,k,ixcldliq) = qmin(ixcldliq)
-                      else
-                         ! The hole in cloud water mixing ratio can only be partially filled by
-                         ! depleting all the rain water.
-                         state%q(icol,k,ixcldliq) &
-                         = state%q(icol,k,ixcldliq) + ( state%q(icol,k,ixrain) - qmin(ixrain) )
-                         state%q(icol,k,ixrain) = qmin(ixrain)
-                      endif
-                   elseif ( state%q(icol,k,ixcldliq) > qmin(ixcldliq) &
-                            .and. state%q(icol,k,ixrain) < qmin(ixrain) ) then
-                      ! Fill the hole in rain water mixing ratio with cloud water mixing ratio.
-                      if ( ( state%q(icol,k,ixcldliq) - qmin(ixcldliq) ) &
-                           >= ( qmin(ixrain) - state%q(icol,k,ixrain) ) ) then
-                         ! The hole in rain water mixing ratio can be completely filled.
-                         state%q(icol,k,ixcldliq) &
-                         = state%q(icol,k,ixcldliq) + ( state%q(icol,k,ixrain) - qmin(ixrain) )
-                         state%q(icol,k,ixrain) = qmin(ixrain)
-                      else
-                         ! The hole in rain water mixing ratio can only be partially filled by
-                         ! depleting all the cloud water.
-                         state%q(icol,k,ixrain) &
-                         = state%q(icol,k,ixrain) + ( state%q(icol,k,ixcldliq) - qmin(ixcldliq) )
-                         state%q(icol,k,ixcldliq) = qmin(ixcldliq)
-                      endif
-                   endif
-                enddo ! k = top_lev, pver
-             enddo ! icol = 1, ncol
-          endif ! ixcldliq > 0 .and. ixrain > 0
-       endif ! ptend%lq(ixcldliq) .and. ptend%lq(ixrain)
-
-       ! Fill any holes at a level in a frozen hydrometeor with another frozen hydrometeor.
-       if ( ptend%lq(ixcldice) .and. ptend%lq(ixsnow) ) then
-          if ( ixcldice > 0 .and. ixsnow > 0 ) then
-             do icol = 1, ncol
-                do k = top_lev, pver
-                   if ( state%q(icol,k,ixcldice) < qmin(ixcldice) &
-                        .and. state%q(icol,k,ixsnow) > qmin(ixsnow) ) then
-                      ! Fill the hole in cloud ice mixing ratio with snow mixing ratio.
-                      if ( ( state%q(icol,k,ixsnow) - qmin(ixsnow) ) &
-                           >= ( qmin(ixcldice) - state%q(icol,k,ixcldice) ) ) then
-                         ! The hole in cloud ice mixing ratio can be completely filled.
-                         state%q(icol,k,ixsnow) &
-                         = state%q(icol,k,ixsnow) + ( state%q(icol,k,ixcldice) - qmin(ixcldice) )
-                         state%q(icol,k,ixcldice) = qmin(ixcldice)
-                      else
-                         ! The hole in cloud ice mixing ratio can only be partially filled by
-                         ! depleting all the snow.
-                         state%q(icol,k,ixcldice) &
-                         = state%q(icol,k,ixcldice) + ( state%q(icol,k,ixsnow) - qmin(ixsnow) )
-                         state%q(icol,k,ixsnow) = qmin(ixsnow)
-                      endif
-                   elseif ( state%q(icol,k,ixcldice) > qmin(ixcldice) &
-                            .and. state%q(icol,k,ixsnow) < qmin(ixsnow) ) then
-                      ! Fill the hole in snow mixing ratio with cloud ice mixing ratio.
-                      if ( ( state%q(icol,k,ixcldice) - qmin(ixcldice) ) &
-                           >= ( qmin(ixsnow) - state%q(icol,k,ixsnow) ) ) then
-                         ! The hole in snow mixing ratio can be completely filled.
-                         state%q(icol,k,ixcldice) &
-                         = state%q(icol,k,ixcldice) + ( state%q(icol,k,ixsnow) - qmin(ixsnow) )
-                         state%q(icol,k,ixsnow) = qmin(ixsnow)
-                      else
-                         ! The hole in snow mixing ratio can only be partially filled by
-                         ! depleting all the cloud ice.
-                         state%q(icol,k,ixsnow) &
-                         = state%q(icol,k,ixsnow) + ( state%q(icol,k,ixcldice) - qmin(ixcldice) )
-                         state%q(icol,k,ixcldice) = qmin(ixcldice)
-                      endif
-                   endif
-                enddo ! k = top_lev, pver
-             enddo ! icol = 1, ncol
-          endif ! ixcldice > 0 .and. ixsnow > 0
-       endif ! ptend%lq(ixcldice) .and. ptend%lq(ixsnow)
-
-    endif ! clubb_hole_fill .and. clubb_fill_holes_hydromet
-
-    do m = 1, pcnst
-       if(ptend%lq(m)) then
 
           rtdt = 1._r8/dt
 

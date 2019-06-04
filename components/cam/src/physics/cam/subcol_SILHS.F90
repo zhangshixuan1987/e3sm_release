@@ -2176,10 +2176,10 @@ contains
                                 + ptend%q(icol,k,ixrain) * dt ) &
                      * state%pdel(icol,k) / gravit
               endif
-              total_energy_column_start(icol) &
-              = total_energy_column_start(icol) &
-                + latice * precl(icol) * dt * 1000.0_r8
            enddo ! k = top_lev, pver
+           total_energy_column_start(icol) &
+           = total_energy_column_start(icol) &
+             + latice * precl(icol) * dt * 1000.0_r8
         enddo ! icol = 1, ncol
 
      endif ! l_check_conservation
@@ -3006,10 +3006,10 @@ contains
                                 + ptend%q(icol,k,ixrain) * dt ) &
                      * state%pdel(icol,k) / gravit
               endif
-              total_energy_column_finish(icol) &
-              = total_energy_column_finish(icol) &
-                + latice * precl(icol) * dt * 1000.0_r8
            enddo ! k = top_lev, pver
+           total_energy_column_finish(icol) &
+           = total_energy_column_finish(icol) &
+             + latice * precl(icol) * dt * 1000.0_r8
         enddo ! icol = 1, ncol
 
         ! Calculate the total relative error in each grid column.

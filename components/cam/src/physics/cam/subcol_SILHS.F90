@@ -53,9 +53,9 @@ module subcol_SILHS
    ! Pbuf indicies
    integer :: thlm_idx, num_subcols_idx, pdf_params_idx, rcm_idx, rtm_idx, ice_supersat_idx, &
               alst_idx, cld_idx, qrain_idx, qsnow_idx, nrain_idx, nsnow_idx, ztodt_idx, &
-              prec_pcw_idx, snow_pcw_idx, qcsedten_idx, qrsedten_idx, qisedten_idx, &
-              qssedten_idx, vtrmc_idx, umr_idx, vtrmi_idx, ums_idx, &
-              qcsevap_idx, qisevap_idx
+              prec_pcw_idx, snow_pcw_idx, prec_str_idx, snow_str_idx, &
+              qcsedten_idx, qrsedten_idx, qisedten_idx, qssedten_idx, &
+              vtrmc_idx, umr_idx, vtrmi_idx, ums_idx, qcsevap_idx, qisevap_idx
 
    logical :: subcol_SILHS_weight  ! if set, sets up weights for averaging subcolumns for SILHS
    integer :: subcol_SILHS_numsubcol ! number of subcolumns for this run
@@ -320,6 +320,8 @@ contains
       ice_supersat_idx = pbuf_get_index('ISS_FRAC')
       prec_pcw_idx = pbuf_get_index('PREC_PCW')
       snow_pcw_idx = pbuf_get_index('SNOW_PCW')
+      prec_str_idx = pbuf_get_index('PREC_STR')
+      snow_str_idx = pbuf_get_index('SNOW_STR')
       qcsedten_idx = pbuf_get_index('QCSEDTEN')
       qrsedten_idx = pbuf_get_index('QRSEDTEN')
       qisedten_idx = pbuf_get_index('QISEDTEN')
@@ -1985,8 +1987,10 @@ contains
        stend      ! Dry static energy tendency         [J/kg/s]
 
      real(r8), dimension(:), pointer :: &
-       prect, & ! Total precipitation rate (surface)        [m/s]
-       preci    ! Ice-phase precipitation rate (surface)    [m/s]
+       prect,    & ! Total microphysics precipitation rate (surface)      [m/s]
+       preci,    & ! Ice-phase microphysics precipitation rate (surface)  [m/s]
+       prec_str, & ! Total surface precipitation rate from stratoform     [m/s]
+       snow_str    ! Snow surface precipitation rate from stratoform      [m/s]
 
      real(r8), dimension(:,:), pointer :: &
        rc_sed_tend, & ! Mean cloud water sedimentation tendency        [kg/kg/s]
@@ -2085,6 +2089,8 @@ contains
      ! Get fields from the pbuf.
      call pbuf_get_field(pbuf, prec_pcw_idx, prect)
      call pbuf_get_field(pbuf, snow_pcw_idx, preci)
+     call pbuf_get_field(pbuf, prec_str_idx, prec_str)
+     call pbuf_get_field(pbuf, snow_str_idx, snow_str)
      call pbuf_get_field(pbuf, qcsedten_idx, rc_sed_tend)
      call pbuf_get_field(pbuf, qrsedten_idx, rr_sed_tend)
      call pbuf_get_field(pbuf, qisedten_idx, ri_sed_tend)
@@ -2895,6 +2901,14 @@ contains
         ! precipitation rate (precl) and the updated frozen preciptation rate
         ! (preci).
         prect = precl + preci
+
+        ! The MG code sets prec_str equal to prect (prec_pcw) and snow_str equal
+        ! to preci (snow_pcw).  The prec_str and snow_str variables are used
+        ! in the calculations for energy and water conservation.  Since prect
+        ! and preci are adjusted here, when necessary, prec_str and snow_str
+        ! also need to be adjusted.
+        prec_str = prect
+        snow_str = preci
 
      endif ! l_sed_hole_fill
 

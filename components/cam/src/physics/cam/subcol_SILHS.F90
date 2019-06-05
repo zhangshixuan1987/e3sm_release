@@ -2111,53 +2111,46 @@ contains
      if ( l_check_conservation ) then
 
         ! Calculate total water in each column.
-        ! This calculation is the vertically-integrated grand total water
-        ! in each grid column before microphysics began.
+        ! This calculation is the vertically-integrated grand total water (where
+        ! grand total water is the sum of water vapor, cloud water, rain water,
+        ! cloud ice, and snow, as well as the amount of water that precipitated
+        ! to the surface) in each grid column after microphysics, but at the
+        ! start of hole filling.
         do icol = 1, ncol
            grand_total_water_column_start(icol) = 0.0_r8
            do k = top_lev, pver
               grand_total_water_column_start(icol) &
               = grand_total_water_column_start(icol) &
-                + ( state%q(icol,k,1) + state%q(icol,k,ixcldliq) &
-                    + state%q(icol,k,ixcldice) ) &
+                + ( state%q(icol,k,1) + ptend%q(icol,k,1) * dt &
+                    + state%q(icol,k,ixcldliq) &
+                    + ptend%q(icol,k,ixcldliq) * dt &
+                    + state%q(icol,k,ixcldice) &
+                    + ptend%q(icol,k,ixcldice) * dt ) &
                   * state%pdel(icol,k) / gravit
               if ( ixrain > 0 ) then
                  grand_total_water_column_start(icol) &
                  = grand_total_water_column_start(icol) &
-                   + state%q(icol,k,ixrain) * state%pdel(icol,k) / gravit
+                   + ( state%q(icol,k,ixrain) + ptend%q(icol,k,ixrain) * dt ) &
+                     * state%pdel(icol,k) / gravit
               endif
               if ( ixsnow > 0 ) then
                  grand_total_water_column_start(icol) &
                  = grand_total_water_column_start(icol) &
-                   + state%q(icol,k,ixsnow) * state%pdel(icol,k) / gravit
+                   + ( state%q(icol,k,ixsnow) + ptend%q(icol,k,ixsnow) * dt ) &
+                     * state%pdel(icol,k) / gravit
               endif
            enddo ! k = top_lev, pver
+           grand_total_water_column_start(icol) &
+           = grand_total_water_column_start(icol) &
+             + prect(icol) * dt * 1000.0_r8
         enddo ! icol = 1, ncol
 
         ! Calculate total energy in each column.
         ! This calculation is the vertically-integrated total energy in each
-        ! grid column before microphysics began.  Since, the microphysics code
-        ! does not directly change kinetic energy, 0.5 * ( u^2 + v^2 ), it can
-        ! be skipped as part of the energy conservation check.
-        !do icol = 1, ncol
-        !   total_energy_column_start(icol) = 0.0_r8
-        !   do k = top_lev, pver
-        !      total_energy_column_start(icol) &
-        !      = total_energy_column_start(icol) &
-        !        + ( state%s(icol,k) &
-        !            + ( latvap + latice ) * state%q(icol,k,1) &
-        !            + latice * state%q(icol,k,ixcldliq) ) &
-        !          * state%pdel(icol,k) / gravit
-        !      if ( ixrain > 0 ) then
-        !         total_energy_column_start(icol) &
-        !         = total_energy_column_start(icol) &
-        !           + latice * state%q(icol,k,ixrain) &
-        !             * state%pdel(icol,k) / gravit
-        !      endif
-        !   enddo ! k = top_lev, pver
-        !enddo ! icol = 1, ncol
-        ! This calculation is the vertically-integrated total energy in each
-        ! grid column after microphysics, but at the start of hole-filling.
+        ! grid column after microphysics, but at the start of hole filling.
+        ! Since the microphysics and hole filling code does not directly change
+        ! kinetic energy, 0.5 * ( u^2 + v^2 ), it can be skipped as part of the
+        ! energy conservation check.
         do icol = 1, ncol
            total_energy_column_start(icol) = 0.0_r8
            do k = top_lev, pver

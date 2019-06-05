@@ -2505,14 +2505,12 @@ end if
              call subcol_ptend_avg(ptend_sc, state_sc%ngrdcol, lchnk, ptend)
 #if defined(UWM_MISC) && defined(SILHS)
 
-             if ( .false. ) then
-                ! Call the conservative hole filler.
-                ! Hole filling is only necessary when using subcolumns.
-                ! Note:  this needs to be called after subcol_ptend_avg but
-                !        before physics_ptend_scale.
-                call subcol_SILHS_fill_holes_conserv( state, cld_macmic_ztodt, &
-                                                      ptend, pbuf )
-             endif
+             ! Call the conservative hole filler.
+             ! Hole filling is only necessary when using subcolumns.
+             ! Note:  this needs to be called after subcol_ptend_avg but before
+             ! physics_ptend_scale.
+             call subcol_SILHS_fill_holes_conserv( state, cld_macmic_ztodt, &
+                                                   ptend, pbuf )
 
              ! Destroy massless droplets!
              call subcol_SILHS_massless_droplet_destroyer( cld_macmic_ztodt, state, & ! Intent(in)

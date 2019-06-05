@@ -444,107 +444,9 @@ contains
 
           end if
 
-             ! The number of vertical grid levels used in CLUBB is pverp, which
-             ! is originally set in the call to setup_clubb_core_api from
-             ! subroutine clubb_ini_cam.  This is stored in CLUBB in the object
-             ! gr%nz.  This isn't changed in CLUBB.  However, when SILHS is
-             ! used, SILHS only uses pverp - top_lev + 1 vertical grid levels
-             ! and also uses the gr%nz object.  This corresponds to the number
-             ! of grid levels used in MG microphysics.  The hole filling for
-             ! hydrometeors here should use the same number of vertical grid
-             ! levels as SILHS.  The value of gr%nz needs to be reset for
-             ! hole-filling here and then set again for CLUBB in subroutine
-             ! clubb_tend_cam.
-             gr%nz = pverp - top_lev + 1
-
-             do icol= 1, ncol
-
-             ! Create a Clubb grid object. This must be done for each
-             ! column as the z-distance between hybrid pressure levels can 
-             ! change easily.
-             sfc_elevation = state%zi(icol,pverp)
-             ! Define the CLUBB momentum grid (in height, units of m)
-             do k = 1, pverp-top_lev+1
-                zi_g(k) = state%zi(icol,pverp-k+1)-sfc_elevation
-             enddo
-             ! Define the CLUBB thermodynamic grid (in units of m)
-             do k = 1, pver-top_lev+1
-                zt_g(k+1) = state%zm(icol,pver-k+1)-state%zi(icol,pverp)
-             enddo
-             ! Thermodynamic ghost point is below surface
-             zt_g(1) = -1._r8*zt_g(2)
-             ! Calculate the distance between grid levels on the host model grid,
-             ! using host model grid indices.
-             do k = top_lev, pver
-                dz_g(k) = state%zi(icol,k)-state%zi(icol,k+1)
-             enddo
-             ! allocate grid object
-             call setup_grid_heights_api( l_implemented, grid_type, &
-                                          zi_g(2), zi_g(1), zi_g(1:pverp-top_lev+1), &
-                                          zt_g(1:pverp-top_lev+1) )
-
-             ! Calculate rho for each column once to be used for liq & ice
-
-             do k = 1, pver-top_lev+1
-                rho_ds_zt(k+1) = (1._r8/gravit)*(state%pdel(icol,pver-k+1)/dz_g(pver-k+1))
-             enddo
-             rho_ds_zt(1) = rho_ds_zt(2) ! Set the ghost point to avoid Nan's
-             rho_ds_zm = zt2zm_api(rho_ds_zt)
-
-             ! Call CLUBB hole filling code for rain & ice mixing ratios 
+          do icol= 1, ncol
 
              if( m.eq.ixcldliq .or. m.eq.ixcldice .or. m.eq.ixrain .or. m.eq.ixsnow ) then
-
-                ! We need to flip the cloud ice/cloud liquid mixing ratio arrays in order to use 
-                ! the hole filling algorithm on those
-                do k = 1, pver-top_lev+1
-                   constituent_flipped(k+1) = state%q(icol,pver-k+1,m)
-                enddo ! k = 1, pver-top_lev+1
-
-                constituent_flipped(1) = constituent_flipped(2)
-                
-                call fill_holes_vertical_api( 6, qmin(m), "zt", &
-                                              rho_ds_zt, rho_ds_zm, &
-                                              constituent_flipped )
-
-                ! Flip the cloud ice/cloud liquid mixing ratios back to CAM's grid
-                do k = top_lev, pver
-                   state%q(icol,k,m) = constituent_flipped(pver-k+2)
-                enddo ! k = top_lev, pver 
-
-                ! Water vaper hole filling (fills holes in ice or liquid mixing ratios)
-                if (any(state%q(icol,top_lev:pver,m) < qmin(m))) then
-
-                   do k = top_lev, pver
-
-                      if ( ( state%q(icol,k,m) < qmin(m) ) .and. &
-                           ( state%q(icol,k,ixwatervapor) - qmin(ixwatervapor) >= qmin(m) - state%q(icol,k,m) ) ) &
-                      then
-
-                         ! Adjust the vapor mixing ratio rvm accordingly
-                         state%q(icol,k,ixwatervapor) = state%q(icol,k,ixwatervapor) - ( qmin(m) - state%q(icol,k,m) )
-
-                         ! Adjust the temperature according to whether the effect is evaporation
-                         ! or sublimation.
-                         if ( m.eq.ixcldliq .or. m.eq.ixrain ) then
-                            latheat = latvap
-                         elseif ( m.eq.ixcldice .or. m.eq.ixsnow ) then
-                            latheat = latvap+latice
-                         else
-                            stop "Shouldn't be here in physics_update"
-                         endif
-
-!                        V. Larson updated ptend%s here so that tend%dtdt is updated later
-                         ptend%s(icol,k) = ptend%s(icol,k) + &
-                           (latheat) * (qmin(m)-state%q(icol,k,m)) / dt
-
-                         ! Set the mixing ratio to 0
-                         state%q(icol,k,m) = qmin(m)
-
-                      endif ! state%q(icol,k,m) < qmin(m)
-
-                   enddo ! k = top_lev, pver
-                endif ! any(state%q(icol,top_lev:pver,m) < qmin(m)   
 
                 ! If the hole filling was not able to fill all the holes, we use the hard clipping
                 if (any(state%q(icol,1:pver,m) < qmin(m))) then
@@ -653,7 +555,7 @@ contains
 
              end if    
 
-             enddo ! icol=1,ncol
+          enddo ! icol=1,ncol
 
           if (m /= ixnumice  .and.  m /= ixnumliq .and. &
               m /= ixnumrain .and.  m /= ixnumsnow ) then

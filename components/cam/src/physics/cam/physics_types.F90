@@ -200,7 +200,7 @@ contains
 
   end subroutine physics_type_alloc
 !===============================================================================
-  subroutine physics_update(state, ptend, dt, tend, chunk_smry, do_hole_fill)
+  subroutine physics_update(state, ptend, dt, tend, chunk_smry)
 !-----------------------------------------------------------------------
 ! Update the state and or tendency structure with the parameterization tendencies
 !-----------------------------------------------------------------------
@@ -212,22 +212,6 @@ contains
     use ppgrid,       only: begchunk, endchunk
     use glb_verif_smry,only: tp_stat_smry, get_chunk_smry
 
-#ifdef CLUBB_SGS
-    !--- Needed for CLUBB's hole filling code <janhft 09/17/2014> ------
-    use shr_const_mod, only: &
-        shr_const_pi, &
-        shr_const_rhofw
-
-    use physconst, only: rair, cpair, latvap, latice
-
-    use ref_pres, only : top_lev => trop_cloud_top_lev
-
-    use clubb_api_module, only: setup_grid_heights_api, &
-                                fill_holes_vertical_api, &
-                                zt2zm_api, gr
-    !-------------------------------------------------------------------
-#endif
-
 !------------------------------Arguments--------------------------------
     type(physics_ptend), intent(inout)  :: ptend   ! Parameterization tendencies
 
@@ -238,14 +222,13 @@ contains
     type(physics_tend ), intent(inout), optional  :: tend  ! Physics tendencies over timestep
                     ! This is usually only needed by calls from physpkg.
 
-    logical, optional, intent(in) :: do_hole_fill
     type(tp_stat_smry),intent(inout), optional :: chunk_smry(:)
 !
 !---------------------------Local storage-------------------------------
     integer :: i,k,m                               ! column,level,constituent indices
     integer :: ixcldice, ixcldliq                  ! indices for CLDICE and CLDLIQ
     integer :: ixnumice, ixnumliq
-    integer :: ixsnow, ixnumsnow, ixrain, ixnumrain, ixrelevant_mixing_ratio
+    integer :: ixnumsnow, ixnumrain
     integer :: ncol                                ! number of columns
     character*40 :: name    ! param and tracer name for qneg3
 
@@ -267,49 +250,7 @@ contains
     ! Whether to do validation of state on each call.
     logical :: state_debug_checks
 
-#ifdef CLUBB_SGS
-    ! Whether to do hole filling rather than hard clipping (default false)
-    logical :: clubb_hole_fill = .false.  
-
-    !--- Needed for CLUBB's hole filling code <janhft 09/17/2014> ------
-    real( r8 ), parameter :: & 
-      four_third   = 4/3_r8,           &
-      rho_ice      = 917.0_r8,         & ! Accepted value is 0.40 (+/-) 0.01      [-]
-      rho_lw       = shr_const_rhofw,  & ! Density of liquid water    
-      pi           = shr_const_pi,     &
-      mvr_rain_max = 5.0E-3_r8, & ! Max. avg. mean vol. rad. rain    [m]
-      mvr_ice_max  = 1.3E-4_r8    ! Max. avg. mean vol. rad. ice     [m]
-
-    logical, parameter :: l_implemented = .true.
-
-    integer, parameter :: grid_type = 3
-
-    real(r8), parameter :: p0_clubb = 100000._r8
-
-    integer :: ixwatervapor
-
-    real( r8 ) :: sfc_elevation  ! Input to CLUBB setup_grid call
-
-    integer :: begin_height, end_height  ! Output from setup_grid call
-
-    real( r8 ), dimension( pver ) :: dz_g
-
-    real( r8 ), dimension( pverp-top_lev+1 ) :: &
-      constituent_flipped, &
-      rho_ds_zm, &
-      rho_ds_zt, &
-      zt_g, zi_g  
-      
-    real( r8 ) :: Nxm_min_coef, latheat
-
-    real( r8 ) :: rtdt
-
-   ! CHARACTER(LEN=80) :: FMT
-
-    integer :: icol
-
     !-----------------------------------------------------------------------
-#endif
 
     ! The column radiation model does not update the state
     if(single_column.and.scm_crm_mode) return
@@ -364,14 +305,6 @@ contains
     !-----------------------------------------------------------------------
     call phys_getopts(state_debug_checks_out=state_debug_checks)
 
-#ifdef CLUBB_SGS
-    if(present(do_hole_fill)) then
-      clubb_hole_fill = do_hole_fill
-    else
-      clubb_hole_fill = .false.
-    endif
-#endif
-
     ncol = state%ncol
 
     ! Update u,v fields
@@ -398,14 +331,8 @@ contains
     ! the indices will be set to -1)
     call cnst_get_ind('NUMICE', ixnumice, abort=.false.)
     call cnst_get_ind('NUMLIQ', ixnumliq, abort=.false.)
-    call cnst_get_ind('RAINQM', ixrain, abort=.false.)
     call cnst_get_ind('NUMRAI', ixnumrain, abort=.false.)
-    call cnst_get_ind('SNOWQM', ixsnow, abort=.false.)
     call cnst_get_ind('NUMSNO', ixnumsnow, abort=.false.)
-  
-#ifdef CLUBB_SGS
-    call cnst_get_ind('Q', ixwatervapor, abort=.false.)
-#endif
 
     do m = 1, pcnst
        if(ptend%lq(m)) then
@@ -413,211 +340,6 @@ contains
              state%q(:ncol,k,m) = state%q(:ncol,k,m) + ptend%q(:ncol,k,m) * dt
           end do
 
-#ifdef CLUBB_SGS
-
-          rtdt = 1._r8/dt
-
-
-          ! now test for mixing ratios which are too small
-          if ( clubb_hole_fill ) then
-             !<janhft 09/17/2014>
-             
-          ! don't track number concentrations summary 
-          if ( m /= ixnumice  .and.  m /= ixnumliq .and. &
-               m /= ixnumrain .and.  m /= ixnumsnow ) then
-               name = trim(ptend%name) // '/' // trim(cnst_name(m))
-
-             !HuiWan 2017-07: Use module glb_verif_smry to provide consise summary for negative values +++
-             !HuiWan 2017-07: For now this module is used only for diagnostics. Later we will consider
-             !                replacing qneg3.
-             if (present(chunk_smry)) then
-                call t_startf('get_chunk_smry')
-                call get_chunk_smry( trim(cnst_name(m))//' @'//trim(ptend%name), ncol, pver, state%q(:ncol,:,m), &
-                                     state%lat(:ncol), state%lon(:ncol), chunk_smry(:) )
-                call t_stopf('get_chunk_smry')
-             end if
-             !HuiWan:2017-07 ===
-
-             if (present(chunk_smry)) then
-             call t_startf('hole_filling_in_physics_update')
-             end if
-
-          end if
-
-          do icol= 1, ncol
-
-             if( m.eq.ixcldliq .or. m.eq.ixcldice .or. m.eq.ixrain .or. m.eq.ixsnow ) then
-
-                ! If the hole filling was not able to fill all the holes, we use the hard clipping
-                if (any(state%q(icol,1:pver,m) < qmin(m))) then
-                   ! The hard clipping is done within qneg3.  The hard clipping
-                   ! should be done over the entire vertical domain, not just
-                   ! from top_lev to pver.
-                   if(use_mass_borrower) then 
-                      call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.False.)
-                      call massborrow(trim(name), state%lchnk, ncol, state%psetcols, m, m, qmin(m), state%q(1,1,m), state%pdel)
-                   else
-                      call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.True.)
-                   end if 
-                endif ! any(state%q(icol,1:pver,m) < qmin(m)      
-
-             ! Clipping on the ice number concentration to ensure a reasonable droplet size
-             elseif ( (m.eq.ixnumice) .or. (m.eq.ixnumsnow) ) then
-
-                Nxm_min_coef = 1._r8 / ( four_third * pi * rho_ice * mvr_ice_max**3 )
-                   ! The hard clipping should be done over the entire vertical
-                   ! domain, not just from top_lev to pver.
-                   do k = 1, pver, 1
-                      if (m .eq. ixnumice) then
-                        ixrelevant_mixing_ratio = ixcldice
-                      else if (m .eq. ixnumsnow) then
-                        ixrelevant_mixing_ratio = ixsnow
-                      else
-                        stop "Error: shouldn't be here"
-                      end if
-                      if ( state%q(icol,k,ixrelevant_mixing_ratio) > 0._r8 ) then
-
-                         ! Hydrometeor mixing ratio, <rx>, is found at the grid level.
-                         state%q(icol,k,m) = &
-                            max( state%q(icol,k,m), Nxm_min_coef * state%q(icol,k,ixrelevant_mixing_ratio) )
-
-                      else ! <rx> = 0
-  
-                         state%q(icol,k,m) = 0._r8
-
-                      endif ! state%q(icol,k,ixrelevant_mixing_ratio) > 0._r8
- 
-                   enddo ! k = 1, pver, 1
-
-                   ! Additionally, clip with the same hard clipping for number
-                   ! concentrations that is used when hole-filling is not used.
-                   ! The hard clipping should be done over the entire vertical
-                   ! domain, not just from top_lev to pver.
-                   ! Note:  The value of ptend%top_level is not the same as
-                   !        top_lev.  The value of ptend%top_level is 1.  The
-                   !        value of ptend%bot_level is pver.
-                   do k = ptend%top_level, ptend%bot_level
-                      ! checks for number concentration
-                      state%q(icol,k,m) = max(1.e-12_r8,state%q(icol,k,m))
-                      state%q(icol,k,m) = min(1.e10_r8,state%q(icol,k,m))
-                   enddo
-
-             ! Clipping on the cloud liquid number concentration to ensure a reasonable droplet size
-             elseif ( (m.eq.ixnumliq) .or. (m.eq.ixnumrain) ) then
-
-                Nxm_min_coef = 1._r8 / ( four_third * pi * rho_lw * mvr_rain_max**3 )
-                   ! The hard clipping should be done over the entire vertical
-                   ! domain, not just from top_lev to pver.
-                   do k = 1, pver, 1
-                      if (m .eq. ixnumliq) then
-                        ixrelevant_mixing_ratio = ixcldliq
-                      else if (m .eq. ixnumrain) then
-                        ixrelevant_mixing_ratio = ixrain
-                      else
-                        stop "Error: shouldn't be here"
-                      end if
-                      if ( state%q(icol,k,ixrelevant_mixing_ratio) > 0._r8 ) then
-
-                         ! Hydrometeor mixing ratio, <rx>, is found at the grid level.
-                         state%q(icol,k,m) = &
-                            max( state%q(icol,k,m), Nxm_min_coef * state%q(icol,k,ixrelevant_mixing_ratio) )
-
-                      else ! <rx> = 0
-  
-                         state%q(icol,k,m) = 0._r8
-
-                      endif ! state%q(icol,k,ixrelevant_mixing_ratio) > 0._r8
- 
-                   enddo ! k = 1, pver, 1
-
-                   ! Additionally, clip with the same hard clipping for number
-                   ! concentrations that is used when hole-filling is not used.
-                   ! The hard clipping should be done over the entire vertical
-                   ! domain, not just from top_lev to pver.
-                   ! Note:  The value of ptend%top_level is not the same as
-                   !        top_lev.  The value of ptend%top_level is 1.  The
-                   !        value of ptend%bot_level is pver.
-                   do k = ptend%top_level, ptend%bot_level
-                      ! checks for number concentration
-                      state%q(:ncol,k,m) = max(1.e-12_r8,state%q(:ncol,k,m))
-                      state%q(:ncol,k,m) = min(1.e10_r8,state%q(:ncol,k,m))
-                   enddo
-
-             else ! For all other advected consituents do the old hard clipping
-
-                name = trim(ptend%name) // '/' // trim(cnst_name(m))
-                if(use_mass_borrower) then 
-                   call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.False.)
-                   call massborrow(trim(name), state%lchnk, ncol, state%psetcols, m, m, qmin(m), state%q(1,1,m), state%pdel)
-                else
-                   call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.True.)
-                end if 
-
-             end if    
-
-          enddo ! icol=1,ncol
-
-          if (m /= ixnumice  .and.  m /= ixnumliq .and. &
-              m /= ixnumrain .and.  m /= ixnumsnow ) then
-             name = trim(ptend%name) // '/' // trim(cnst_name(m))
-
-             if (present(chunk_smry)) then
-             call t_stopf('hole_filling_in_physics_update')
-             end if
-
-          end if 
-
-
-          else  ! ~clubb_hole_fill
-
-            ! Original code for hard clipping negative values is unchanged
-            !     don't call qneg3 for number concentration variables
-
-            ! don't call qneg3 for number concentration variables
-            if (m /= ixnumice  .and.  m /= ixnumliq .and. &
-                m /= ixnumrain .and.  m /= ixnumsnow ) then
-                name = trim(ptend%name) // '/' // trim(cnst_name(m))
-
-
-             !HuiWan 2017-07: Use module glb_verif_smry to provide consise summary for negative values +++
-             !HuiWan 2017-07: For now this module is used only for diagnostics. Later we will consider
-             !                replacing qneg3.
-             if (present(chunk_smry)) then
-                call t_startf('get_chunk_smry')
-                call get_chunk_smry( trim(cnst_name(m))//' @'//trim(ptend%name), ncol, pver, state%q(:ncol,:,m), &
-                                     state%lat(:ncol), state%lon(:ncol), chunk_smry(:) )
-                call t_stopf('get_chunk_smry')
-             end if
-             !HuiWan:2017-07 ===
-
-             if (present(chunk_smry)) then
-             call t_startf('qneg3_in_physics_update')
-             end if
-
-
-
-                if(use_mass_borrower) then 
-                   call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.False.)
-                   call massborrow(trim(name), state%lchnk, ncol, state%psetcols, m, m, qmin(m), state%q(1,1,m), state%pdel)
-                else
-                   call qneg3(trim(name), state%lchnk, ncol, state%psetcols, pver, m, m, qmin(m), state%q(1,1,m),.True.)
-                end if 
-
-             if (present(chunk_smry)) then
-             call t_stopf('qneg3_in_physics_update')
-             end if
-
-            else
-                do k = ptend%top_level, ptend%bot_level
-                   ! checks for number concentration
-                   state%q(:ncol,k,m) = max(1.e-12_r8,state%q(:ncol,k,m))
-                   state%q(:ncol,k,m) = min(1.e10_r8,state%q(:ncol,k,m))
-                end do
-            end if
-
-
-          end if ! clubb_hole_fill
-#else
           ! now test for mixing ratios which are too small
           ! don't call qneg3 for number concentration variables
           if (m /= ixnumice  .and.  m /= ixnumliq .and. &
@@ -659,10 +381,9 @@ contains
              end do
           end if
 
-#endif
-       end if ! ptend%lq(m)
+       end if
 
-    end do  ! m=1,pcnst
+    end do
 
     !------------------------------------------------------------------------
     ! This is a temporary fix for the large H, H2 in WACCM-X

@@ -37,7 +37,8 @@ module subcol_SILHS
 #ifdef SILHS
    public :: subcol_SILHS_var_covar_driver, &
              subcol_SILHS_massless_droplet_destroyer, &
-             subcol_SILHS_fill_holes_conserv
+             subcol_SILHS_fill_holes_conserv, &
+             hydromet_conc_tend_lim
    private :: Abs_Temp_profile
    private :: StaticEng_profile
    ! Calc subcol mean ! Calc subcol variance
@@ -3657,6 +3658,202 @@ contains
      return
 
    end subroutine fill_holes_same_phase_vert
+
+   !============================================================================
+   subroutine hydromet_conc_tend_lim( state, dt, ptend )
+
+     ! Description:
+     ! Limits the values of mean hydrometeor concentrations so that the mean
+     ! drop size for the hydrometeor type remains reasonable and does not become
+     ! too large.
+
+     !----------------------------------------------------------------------
+
+     use shr_const_mod, only: &
+         shr_const_pi, &
+         shr_const_rhofw
+
+     use constituents, only: &
+         qmin
+
+     use ref_pres, only: &
+         top_lev => trop_cloud_top_lev
+
+     implicit none
+
+     ! Input Variables
+     type(physics_state), intent(in) :: state     ! Physics state variables
+     real(r8), intent(in) :: dt                   ! Time step duration
+
+     ! Input/Output Variable
+     type(physics_ptend),  intent(inout) :: ptend  ! Parameterization tendencies
+
+     ! Local Variables
+     real( r8 ) :: &
+       rcm_update, & ! New value of mean cloud water mixing ratio    [kg/kg]
+       rrm_update, & ! New value of mean rain water mixing ratio     [kg/kg]
+       rim_update, & ! New value of mean ice mixing ratio            [kg/kg]
+       rsm_update    ! New value of mean snow mixing ratio           [kg/kg]
+
+     real( r8 ) :: &
+       Nc_tend_min, & ! Minimum value of cloud droplet conc. tendency [num/kg/s]
+       Nr_tend_min, & ! Minimum value of rain drop conc. tendency     [num/kg/s]
+       Ni_tend_min, & ! Minimum value of ice conc. tendency           [num/kg/s]
+       Ns_tend_min    ! Minimum value of snow conc. tendency          [num/kg/s]
+
+     real( r8 ), parameter :: &
+       four_thirds = 4.0_r8/3.0_r8,    & ! 4/3
+       rho_ice     = 917.0_r8,         & ! Density of ice            [kg/m^3]
+       rho_lw      = shr_const_rhofw,  & ! Density of liquid water   [kg/m^3]
+       pi          = shr_const_pi        ! Pi
+
+     real( r8 ), parameter :: &
+       mvr_cloud_max = 1.6E-5_r8, & ! Max. avg. mean vol. rad. cloud   [m]
+       mvr_rain_max  = 5.0E-3_r8, & ! Max. avg. mean vol. rad. rain    [m]
+       mvr_ice_max   = 1.3E-4_r8, & ! Max. avg. mean vol. rad. ice     [m]
+       mvr_snow_max  = 1.0E-2_r8    ! Max. avg. mean vol. rad. snow    [m]
+
+     ! Calculate the coefficient for the minimum mean cloud droplet
+     ! concentration, where <Nc>|_min = Ncm_min_coef * <rc> and has units of
+     ! 1/kg.
+     real( r8 ), parameter :: &
+       Ncm_min_coef = 1.0_r8 / ( four_thirds * pi * rho_lw * mvr_cloud_max**3 )
+
+     ! Calculate the coefficient for the minimum mean rain drop concentration,
+     ! where <Nr>|_min = Nrm_min_coef * <rr> and has units of 1/kg.
+     real( r8 ), parameter :: &
+       Nrm_min_coef = 1.0_r8 / ( four_thirds * pi * rho_lw * mvr_rain_max**3 )
+
+     ! Calculate the coefficient for the minimum mean ice crystal concentration,
+     ! where <Ni>|_min = Nim_min_coef * <ri> and has units of 1/kg.
+     real( r8 ), parameter :: &
+       Nim_min_coef = 1.0_r8 / ( four_thirds * pi * rho_ice * mvr_ice_max**3 )
+
+     ! Calculate the coefficient for the minimum mean snow flake concentration,
+     ! where <Ns>|_min = Nsm_min_coef * <rs> and has units of 1/kg.
+     real( r8 ), parameter :: &
+       Nsm_min_coef = 1.0_r8 / ( four_thirds * pi * rho_ice * mvr_snow_max**3 )
+
+     integer :: ixcldliq, ixnumliq, ixrain, ixnumrain, &
+                ixcldice, ixnumice, ixsnow, ixnumsnow  ! Hydrometeor indices
+
+     integer :: ncol  ! Number of grid columns
+
+     integer :: icol    ! Column loop index
+
+     integer :: k    ! Vertical level loop index
+
+
+     ! Get indices for hydrometeor fields.
+     call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
+     call cnst_get_ind('NUMLIQ', ixnumliq, abort=.false.)
+     call cnst_get_ind('RAINQM', ixrain, abort=.false.)
+     call cnst_get_ind('NUMRAI', ixnumrain, abort=.false.)
+     call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
+     call cnst_get_ind('NUMICE', ixnumice, abort=.false.)
+     call cnst_get_ind('SNOWQM', ixsnow, abort=.false.)
+     call cnst_get_ind('NUMSNO', ixnumsnow, abort=.false.)
+
+     ! Get the number of grid columns.
+     ncol = state%ncol
+
+     ! Loop over all grid columns.
+     do icol = 1, ncol
+
+        ! Loop over all vertical levels from top_lev to pver.
+        do k = top_lev, pver
+
+           ! Cloud droplet concentration
+           if ( ixcldliq > 0 .and. ixnumliq > 0 ) then
+
+              ! Calculate the value of cloud water mixing ratio after the
+              ! update.
+              rcm_update &
+              = max( state%q(icol,k,ixcldliq) + ptend%q(icol,k,ixcldliq) * dt, &
+                     qmin(ixcldliq) )
+
+              ! Calculate the limiting cloud droplet concentration tendency so
+              ! that cloud maintains a reasonable (not too big) mean volume
+              ! radius.
+              Nc_tend_min &
+              = ( Ncm_min_coef * rcm_update - state%q(icol,k,ixnumliq) ) / dt
+
+              ! The cloud droplet concentration tendency needs to be the greater
+              ! of the current Nc_tend and Nc_tend_min.
+              ptend%q(icol,k,ixnumliq) &
+              = max( ptend%q(icol,k,ixnumliq), Nc_tend_min )
+
+           endif ! ixcldliq > 0 .and. ixnumliq > 0
+
+           ! Rain drop concentration
+           if ( ixrain > 0 .and. ixnumrain > 0 ) then
+
+              ! Calculate the value of rain water mixing ratio after the update.
+              rrm_update &
+              = max( state%q(icol,k,ixrain) + ptend%q(icol,k,ixrain) * dt, &
+                     qmin(ixrain) )
+
+              ! Calculate the limiting rain drop concentration tendency so that
+              ! rain maintains a reasonable (not too big) mean volume radius.
+              Nr_tend_min &
+              = ( Nrm_min_coef * rrm_update - state%q(icol,k,ixnumrain) ) / dt
+
+              ! The rain drop concentration tendency needs to be the greater of
+              ! the current Nr_tend and Nr_tend_min.
+              ptend%q(icol,k,ixnumrain) &
+              = max( ptend%q(icol,k,ixnumrain), Nr_tend_min )
+
+           endif ! ixrain > 0 .and. ixnumrain > 0
+
+           ! Ice crystal concentration
+           if ( ixcldice > 0 .and. ixnumice > 0 ) then
+
+              ! Calculate the value of ice mixing ratio after the update.
+              rim_update &
+              = max( state%q(icol,k,ixcldice) + ptend%q(icol,k,ixcldice) * dt, &
+                     qmin(ixcldice) )
+
+              ! Calculate the limiting ice crystal concentration tendency so
+              ! that ice maintains a reasonable (not too big) mean volume
+              ! radius.
+              Ni_tend_min &
+              = ( Nim_min_coef * rim_update - state%q(icol,k,ixnumice) ) / dt
+
+              ! The ice crystal concentration tendency needs to be the greater
+              ! of the current Ni_tend and Ni_tend_min.
+              ptend%q(icol,k,ixnumice) &
+              = max( ptend%q(icol,k,ixnumice), Ni_tend_min )
+
+           endif ! ixcldice > 0 .and. ixnumice > 0
+
+           ! Snow flake concentration
+           if ( ixsnow > 0 .and. ixnumsnow > 0 ) then
+
+              ! Calculate the value of snow mixing ratio after the update.
+              rsm_update &
+              = max( state%q(icol,k,ixsnow) + ptend%q(icol,k,ixsnow) * dt, &
+                     qmin(ixsnow) )
+
+              ! Calculate the limiting snow flake concentration tendency so that
+              ! snow maintains a reasonable (not too big) mean volume radius.
+              Ns_tend_min &
+              = ( Nsm_min_coef * rsm_update - state%q(icol,k,ixnumsnow) ) / dt
+
+              ! The snow flake concentration tendency needs to be the greater of
+              ! the current Ns_tend and Ns_tend_min.
+              ptend%q(icol,k,ixnumsnow) &
+              = max( ptend%q(icol,k,ixnumsnow), Ns_tend_min )
+
+           endif ! ixsnow > 0 .and. ixnumsnow > 0
+
+        enddo ! k = top_lev, pver
+
+     enddo ! icol = 1, ncol
+
+
+     return
+
+   end subroutine hydromet_conc_tend_lim
 
    !============================================================================
 #endif

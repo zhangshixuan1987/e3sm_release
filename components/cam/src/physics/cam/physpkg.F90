@@ -1837,7 +1837,8 @@ subroutine tphysbc (ztodt,               &
 #if defined(UWM_MISC) && defined(SILHS)
     use subcol_SILHS,    only: subcol_SILHS_var_covar_driver, &
                                subcol_SILHS_massless_droplet_destroyer, &
-                               subcol_SILHS_fill_holes_conserv
+                               subcol_SILHS_fill_holes_conserv, &
+                               hydromet_conc_tend_lim
 #endif
 
     implicit none
@@ -2508,9 +2509,17 @@ end if
              ! Call the conservative hole filler.
              ! Hole filling is only necessary when using subcolumns.
              ! Note:  this needs to be called after subcol_ptend_avg but before
-             ! physics_ptend_scale.
+             !        physics_ptend_scale.
              call subcol_SILHS_fill_holes_conserv( state, cld_macmic_ztodt, &
                                                    ptend, pbuf )
+
+             ! Limit the value of hydrometeor concentrations in order to place
+             ! reasonable limits on hydrometeor drop size and keep them from
+             ! becoming too large.
+             ! Note:  this needs to be called after hydrometeor mixing ratio
+             !        tendencies are adjusted by subcol_SILHS_fill_holes_conserv
+             !        but before physics_ptend_scale.
+             call hydromet_conc_tend_lim( state, cld_macmic_ztodt, ptend )
 
              ! Destroy massless droplets!
              call subcol_SILHS_massless_droplet_destroyer( cld_macmic_ztodt, state, & ! Intent(in)
@@ -2561,7 +2570,7 @@ end if
           call outfld('LNEGCLPTEND', liqcliptend, pcols, lchnk   )
           call outfld('VNEGCLPTEND', vapcliptend, pcols, lchnk   )
 
-          call physics_update (state, ptend, ztodt, tend, chunk_smry, do_hole_fill=.true.)
+          call physics_update (state, ptend, ztodt, tend, chunk_smry)
           call check_energy_chng(state, tend, "microp_tend", nstep, ztodt, &
                zero, prec_str(:ncol)/cld_macmic_num_steps, &
                snow_str(:ncol)/cld_macmic_num_steps, zero, &

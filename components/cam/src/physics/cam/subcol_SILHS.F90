@@ -1719,13 +1719,23 @@ contains
    !                                                                                 !
    ! =============================================================================== !
 
-   subroutine subcol_SILHS_massless_droplet_destroyer &
-              ( ztodt, state, &
-                ptend )
+   subroutine subcol_SILHS_massless_droplet_destroyer( ztodt, state, &
+                                                       ptend )
 
      ! This subroutine eradicates cloud droplets in grid boxes with no cloud
      ! mass. This code is actually not at all related to SILHS. It should be
      ! moved out of this cage they call "subcol_SILHS.F90" someday.
+     !
+     ! This code is now expanded to remove massless rain drops, ice crystals,
+     ! and snow flakes.
+     !
+     ! Note: qsmall, which is a small, positive number, is used as the
+     !       threshold here instead of qmin, which is 0.  Some numbers that are
+     !       supposed to have a value of 0, but don't because of numerical
+     !       roundoff (especially after hole filling) will have small, positive
+     !       values.  Using qsmall as the threshold here instead of qmin allows
+     !       for unreasonable massless drop concentrations to be removed in
+     !       those scenarios.
      !
      ! This code is experimental!!
 
@@ -1744,7 +1754,8 @@ contains
      ! Local Variables
      integer :: icol, k
 
-     integer :: ixcldliq, ixnumliq
+     integer :: ixcldliq, ixnumliq, ixrain, ixnumrain, &
+                ixcldice, ixnumice, ixsnow, ixnumsnow
 
      !----- Begin Code -----
 
@@ -1752,18 +1763,42 @@ contains
      if ( .not. subcol_SILHS_destroy_massless_droplets ) return
 
      ! Indices!
-     call cnst_get_ind('CLDLIQ', ixcldliq)
-     call cnst_get_ind('NUMLIQ', ixnumliq)
+     call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
+     call cnst_get_ind('NUMLIQ', ixnumliq, abort=.false.)
+     call cnst_get_ind('RAINQM', ixrain, abort=.false.)
+     call cnst_get_ind('NUMRAI', ixnumrain, abort=.false.)
+     call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
+     call cnst_get_ind('NUMICE', ixnumice, abort=.false.)
+     call cnst_get_ind('SNOWQM', ixsnow, abort=.false.)
+     call cnst_get_ind('NUMSNO', ixnumsnow, abort=.false.)
 
      ! These "labels" in loops are really cool. We should start doing this in
      ! CLUBB.
      col_loop: do icol=1, state%ncol
-       ! If updated qc (after microphysics) is zero, then ensure updated nc is also zero!!
        vert_loop: do k = top_lev, pver
-         if ( state%q(icol,k,ixcldliq) + (ztodt*ptend%q(icol,k,ixcldliq)) < qsmall ) then
+         ! If updated qc (after microphysics) is zero, then ensure updated nc is also zero!!
+         if ( state%q(icol,k,ixcldliq) + ztodt * ptend%q(icol,k,ixcldliq) < qsmall ) then
            ptend%lq(ixnumliq) = .true. ! This is probably already true, but it doesn't
                                        ! hurt to set it.
            ptend%q(icol,k,ixnumliq) = -(state%q(icol,k,ixnumliq) / ztodt)
+         end if
+         ! If updated qr (after microphysics) is zero, then ensure updated nr is also zero!!
+         if ( state%q(icol,k,ixrain) + ztodt * ptend%q(icol,k,ixrain) < qsmall ) then
+           ptend%lq(ixnumrain) = .true. ! This is probably already true, but it doesn't
+                                        ! hurt to set it.
+           ptend%q(icol,k,ixnumrain) = -(state%q(icol,k,ixnumrain) / ztodt)
+         end if
+         ! If updated qi (after microphysics) is zero, then ensure updated ni is also zero!!
+         if ( state%q(icol,k,ixcldice) + ztodt * ptend%q(icol,k,ixcldice) < qsmall ) then
+           ptend%lq(ixnumice) = .true. ! This is probably already true, but it doesn't
+                                       ! hurt to set it.
+           ptend%q(icol,k,ixnumice) = -(state%q(icol,k,ixnumice) / ztodt)
+         end if
+         ! If updated qs (after microphysics) is zero, then ensure updated ns is also zero!!
+         if ( state%q(icol,k,ixsnow) + ztodt * ptend%q(icol,k,ixsnow) < qsmall ) then
+           ptend%lq(ixnumsnow) = .true. ! This is probably already true, but it doesn't
+                                        ! hurt to set it.
+           ptend%q(icol,k,ixnumsnow) = -(state%q(icol,k,ixnumsnow) / ztodt)
          end if
        end do vert_loop
      end do col_loop

@@ -2513,17 +2513,19 @@ end if
              call subcol_SILHS_fill_holes_conserv( state, cld_macmic_ztodt, &
                                                    ptend, pbuf )
 
+             ! Destroy massless droplets!
+             call subcol_SILHS_massless_droplet_destroyer( cld_macmic_ztodt, state, & ! Intent(in)
+                                                           ptend )                    ! Intent(inout)
+
              ! Limit the value of hydrometeor concentrations in order to place
              ! reasonable limits on hydrometeor drop size and keep them from
              ! becoming too large.
              ! Note:  this needs to be called after hydrometeor mixing ratio
              !        tendencies are adjusted by subcol_SILHS_fill_holes_conserv
-             !        but before physics_ptend_scale.
+             !        and after massless drop concentrations are removed by the
+             !        subcol_SILHS_massless_droplet_destroyer, but before the
+             !        call to physics_ptend_scale.
              call hydromet_conc_tend_lim( state, cld_macmic_ztodt, ptend )
-
-             ! Destroy massless droplets!
-             call subcol_SILHS_massless_droplet_destroyer( cld_macmic_ztodt, state, & ! Intent(in)
-                                                           ptend )                    ! Intent(inout)
 #endif
 
              ! Copy ptend_aero field to one dimensioned by sub-columns before summing with ptend

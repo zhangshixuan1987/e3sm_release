@@ -445,6 +445,13 @@ contains
      call addfld('SILHS_CLUBB_ICE_SS_FRAC', (/ 'lev' /), 'A', 'frac', &
                   'Ice supersaturation fraction from CLUBB')
 
+     call addfld ('QVHFTEN', (/ 'lev' /), 'A', 'kg/kg/s', 'Water vapor mixing ratio tendency from hole filling')
+     call addfld ('QCHFTEN', (/ 'lev' /), 'A', 'kg/kg/s', 'Cloud water mixing ratio tendency from hole filling')
+     call addfld ('QRHFTEN', (/ 'lev' /), 'A', 'kg/kg/s', 'Rain water mixing ratio tendency from hole filling')
+     call addfld ('QIHFTEN', (/ 'lev' /), 'A', 'kg/kg/s', 'Cloud ice mixing ratio tendency from hole filling')
+     call addfld ('QSHFTEN', (/ 'lev' /), 'A', 'kg/kg/s', 'Snow mixing ratio tendency from hole filling')
+     call addfld ('THFTEN', (/ 'lev' /), 'A', 'K/s', 'Temperature tendency from hole filling')
+
       !call add_default('SILHS_NCLD_SCOL', 1, ' ')
       !call add_default('SILHS_NRAIN_SCOL', 1, ' ')
       !call add_default('SILHS_OMEGA_SCOL', 1, ' ')
@@ -2972,6 +2979,14 @@ contains
 
      ! Pack the current tendency for dry static energy.
      ptend%s = stend
+
+     ! Output stats for hole filling tendencies.
+     call outfld( 'QVHFTEN', rv_hf_tend, pcols, state%lchnk )
+     call outfld( 'QCHFTEN', rc_hf_tend, pcols, state%lchnk )
+     call outfld( 'QRHFTEN', rr_hf_tend, pcols, state%lchnk )
+     call outfld( 'QIHFTEN', ri_hf_tend, pcols, state%lchnk )
+     call outfld( 'QSHFTEN', rs_hf_tend, pcols, state%lchnk )
+     call outfld( 'THFTEN', s_hf_tend / cpair, pcols, state%lchnk )
 
      ! Perform total water and total energy conservation checks.
      if ( l_check_conservation ) then

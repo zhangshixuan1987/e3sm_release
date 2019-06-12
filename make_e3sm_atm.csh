@@ -23,7 +23,7 @@ setenv CCSMROOT $PWD
 #setenv COMPSET FC5AV1C-04P2
 setenv COMPSET FAMIPC5
 setenv RESOLUTION ne30_ne30
-setenv MACH      edison
+setenv MACH      cori-haswell
 setenv PTMP      /global/cscratch1/sd/$user/bld
 #setenv ntasks 960
 setenv ntasks 864
@@ -211,7 +211,7 @@ fincl1 = 'U:A','PS:A','T:A','V:A','OMEGA:A','Z3:A','PRECT:A',
 'PE:A','APRL:A','PEFRAC:A','VPRCO:A','VPRAO:A','RACAU:A',
 'QIRESO:A','QCRESO:A','PRACSO:A','MPDT:A','MPDQ:A','MPDLIQ:A',
 'MPDICE:A','INEGCLPTEND', 'LNEGCLPTEND', 'VNEGCLPTEND',
-'QCRAT:A',
+'QCRAT:A', 'QVHFTEN', 'QCHFTEN', 'QRHFTEN', 'QIHFTEN', 'QSHFTEN', 'THFTEN',
 'SL', 'Q', 'RHW', 'QRS', 'QRL', 'HR', 'FDL', 'SILHS_CLUBB_PRECIP_FRAC',
 'SILHS_CLUBB_ICE_SS_FRAC'
 fincl2 = 'CLDTOT', 'CLDST','CDNUMC','CLDLIQ','CLDICE','FLUT',

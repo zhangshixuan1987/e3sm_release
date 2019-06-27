@@ -1853,7 +1853,9 @@ contains
      ! by microphysics; pdel is the pressure difference between vertical levels,
      ! g is gravity, and prect * dt * 1000 is the total amount of water (from
      ! all precipitating hydrometeors) that sedimented to the ground during
-     ! microphysics (dt is the timestep used for microphysics).  The units of
+     ! microphysics (dt is the timestep used for microphysics). (1000 is presumably 
+     ! the density of liquid water substance, even though prect includes ice hydrometeors.
+     ! This is how prect is treated throughout MG2.  The units of
      ! column-integrated total water are kg (water) / m^2.
      !
      ! All the updated hydrometeor fields are related to the hydrometeor fields
@@ -1889,8 +1891,8 @@ contains
      ! snow from microphysics process rates, and rc_sed_tend, rr_sed_tend,
      ! ri_sed_tend, and rs_sed_tend are the tendencies of cloud water,
      ! rain water, cloud ice, and snow from sedimentation.  When these equations
-     ! are applied to the equation for column-integrated total water, that
-     ! equation becomes:
+     ! are applied to the equation for column-integrated total water, the
+     ! local and sedimentation tendencies can be separated:
      !
      ! SUM(k=top_lev:pver) ( rv_mc_tend(k) + rc_mc_tend(k) + rr_mc_tend(k)
      !                       + ri_mc_tend(k) + rs_mc_tend(k) )
@@ -1900,13 +1902,13 @@ contains
      ! + prect * dt * 1000 = 0.
      !
      ! At any vertical level, the tendencies from microphysics process rates
-     ! (mc_tend variables) must balance:
+     ! (mc_tend variables) must balance each other, by conservation:
      !
      ! rv_mc_tend(k) + rc_mc_tend(k) + rr_mc_tend(k)
      ! + ri_mc_tend(k) + rs_mc_tend(k) = 0; for all k from top_lev to pver.
      !
-     ! The column-integrated total water equation can be applied to
-     ! sedimentation:
+     ! The sedimentation of each hydrometeor species must be conserved; therefore,
+     ! the sum is conserved also:
      !
      ! SUM(k=top_lev:pver) ( rc_sed_tend(k) + rr_sed_tend(k) + ri_sed_tend(k)
      !                       + rs_sed_tend(k) ) * dt * pdel(k) / g
@@ -1932,7 +1934,7 @@ contains
      ! Overall, the conservation methods used in this subroutine are:
      !
      ! 1) When adjusting the tendencies from microphysics process rates,
-     !    conserve:
+     !    conserve the sum of local rates:
      !
      !    rv_mc_tend(k) + rc_mc_tend(k) + rr_mc_tend(k)
      !    + ri_mc_tend(k) + rs_mc_tend(k) = 0; for all k from top_lev to pver.
@@ -1944,14 +1946,14 @@ contains
      !    process rate was produced by microphysics.
      !
      ! 3) When adjusting the hydrometeor tendency from sedimentation of a
-     !    liquid hydrometeor (cloud water or rain water), conserve:
+     !    liquid hydrometeor (cloud water or rain water), conserve liq sed:
      !
      !    SUM(k=top_lev:pver) ( rc_sed_tend(k) + rr_sed_tend(k) )
      !                        * dt * pdel(k) / g
      !    + precl * dt * 1000 = 0.
      !
      ! 4) When adjusting the hydrometeor tendency from sedimentation of a
-     !    frozen hydrometeor (cloud ice or snow), conserve:
+     !    frozen hydrometeor (cloud ice or snow), conserve ice sed:
      !
      !    SUM(k=top_lev:pver) ( ri_sed_tend(k) + rs_sed_tend(k) )
      !                        * dt * pdel(k) / g
@@ -1959,13 +1961,14 @@ contains
      !
      ! The conservative hole filler works as follows.  The total microphysics
      ! tendency for each hydrometeor is provided in ptend.  This is the sum of
-     ! the microphysics process rate tendency and sedimentation tendency for
+     ! the local microphysics process rate tendency and sedimentation tendency for
      ! each hydrometeor.  The sedimentation tendency is provided in pbuf.  The
      ! sedimentation tendency is subtracted off the total microphysics tendency
-     ! to produce the microphysics process rate tendency for each hydrometeor.
+     ! to produce the local microphysics process rate tendency for each hydrometeor.
      ! The microphysics process rate tendency is adjusted when necessary so that
-     ! holes in the hydrometeor are not produced by microphysics process rates.
-     ! When a hydrometeor's negative microphysics process rate tendency needs to
+     ! holes in the hydrometeor are not produced by local microphysics process rates.
+     ! Then we proceed analogously to MG2.  When a hydrometeor's negative 
+     ! microphysics process rate tendency needs to
      ! be made smaller in magnitude to avoid a hole, all hydrometeor tendencies
      ! that are positive at that grid level are also decreased proportionately
      ! to maintain a balance.  Dry static energy tendency is also adjusted
@@ -2189,6 +2192,7 @@ contains
         enddo ! icol = 1, ncol
 
         ! Calculate total energy in each column.
+        ! This calculation "freezes" all species, as in CAM's check_energy_chnge.
         ! This calculation is the vertically-integrated total energy in each
         ! grid column after microphysics, but at the start of hole filling.
         ! Since the microphysics and hole filling code does not directly change
@@ -2257,7 +2261,7 @@ contains
      ! rc_sed_evap, and the true sedimentation of cloud ice is the sum of
      ! ri_sed_tend and ri_sed_subl.  Subtract off only the true sedimentation
      ! rates, as evaporation and sublimation need to be included in the
-     ! microphysics process rates.
+     ! local microphysics process rates.
      rv_mc_tend = rv_tend
      rc_mc_tend = rc_tend - ( rc_sed_tend + rc_sed_evap )
      if ( ixrain > 0 ) then
@@ -2350,6 +2354,7 @@ contains
                  ! tendency.  This number is positive.
                  mc_tend_correction = mc_tend_max_mag - rv_mc_tend(icol,k)
 
+                 ! Determine how much water mass is available for filling holes.
                  ! Calculate the total amount of positive microphysics process
                  ! tendencies for all hydrometeor mixing ratios.
                  total_mc_positive = 0.0_r8
@@ -2366,7 +2371,8 @@ contains
                     total_mc_positive = total_mc_positive + rs_mc_tend(icol,k)
                  endif
 
-                 ! Calculate the correction ratio.
+                 ! Calculate the correction ratio, i.e. the fraction of positive mass
+                 ! that is needed to completely fill the hole.
                  ! In principle, this should never be greater than 1 outside of
                  ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &

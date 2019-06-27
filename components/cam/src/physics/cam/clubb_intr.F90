@@ -1322,7 +1322,7 @@ end subroutine clubb_init_cnst
    real(r8) :: wv_a(pcols), wv_b(pcols), wl_b(pcols), wl_a(pcols)
    real(r8) :: se_dis, se_a(pcols), se_b(pcols), clubb_s(pver)
 
-   real(r8) :: exner_clubb(pcols,pverp)         ! Exner function consistent with CLUBB          [-]
+   real(r8) :: inv_exner_clubb(pcols,pverp)     ! Inverse exner function consistent with CLUBB  [-]
    real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
    real(r8) :: wprtp_output(pcols,pverp)        ! Total water flux output variable              [W/m2]
    real(r8) :: wp3_output(pcols,pverp)          ! wp3 output                                    [m^3/s^3]
@@ -1762,11 +1762,11 @@ end subroutine clubb_init_cnst
    !  Compute inverse exner function consistent with CLUBB's definition, which uses a constant
    !  surface pressure.  CAM's exner (in state does not).  Therefore, for consistent 
    !  treatment with CLUBB code, anytime exner is needed to treat CLUBB variables 
-   !  (such as thlm), use "exner_clubb" other wise use the exner in state
+   !  (such as thlm), use "inv_exner_clubb" other wise use the exner in state
 
    do k=1,pver
      do i=1,ncol
-       exner_clubb(i,k) = 1._r8/((state1%pmid(i,k)/p0_clubb)**(rair/cpair))
+       inv_exner_clubb(i,k) = 1._r8/((state1%pmid(i,k)/p0_clubb)**(rair/cpair))
      enddo
    enddo
    
@@ -1776,11 +1776,12 @@ end subroutine clubb_init_cnst
    do k=1,pver   ! loop over levels
      do i=1,ncol ! loop over columns
 
-       rtm(i,k)     = state1%q(i,k,ixq)+state1%q(i,k,ixcldliq)
-       rvm(i,k)     = state1%q(i,k,ixq)
-       um(i,k)      = state1%u(i,k)
-       vm(i,k)      = state1%v(i,k)
-       thlm(i,k)    = state1%t(i,k)*exner_clubb(i,k)-(latvap/cpair)*state1%q(i,k,ixcldliq)
+       rtm(i,k)  = state1%q(i,k,ixq)+state1%q(i,k,ixcldliq)
+       rvm(i,k)  = state1%q(i,k,ixq)
+       um(i,k)   = state1%u(i,k)
+       vm(i,k)   = state1%v(i,k)
+       thlm(i,k) = ( state1%t(i,k) - (latvap/cpair)*state1%q(i,k,ixcldliq) ) &
+                   * inv_exner_clubb(i,k)
 
        if (clubb_do_adv) then
           if (macmic_it .eq. 1) then 
@@ -1895,8 +1896,8 @@ end subroutine clubb_init_cnst
    !  Compute virtual potential temperature, which is needed for CLUBB  
    do k=1,pver
      do i=1,ncol
-       thv(i,k) = state1%t(i,k)*exner_clubb(i,k)*(1._r8+zvir*state1%q(i,k,ixq)&
-                  -state1%q(i,k,ixcldliq))
+       thv(i,k) = state1%t(i,k) * inv_exner_clubb(i,k) &
+                  * ( 1.0_r8 + zvir*state1%q(i,k,ixq) - state1%q(i,k,ixcldliq) )
      enddo
    enddo
    call t_stopf('clubb_tend_cam_init')
@@ -1951,7 +1952,7 @@ end subroutine clubb_init_cnst
       !  Inputs for the momentum levels are set below setup_clubb core
       do k=1,pver
          p_in_Pa(k+1)         = state1%pmid(i,pver-k+1)                              ! Pressure profile
-         exner(k+1)           = 1._r8/exner_clubb(i,pver-k+1)
+         exner(k+1)           = 1.0_r8/inv_exner_clubb(i,pver-k+1)
          rho_ds_zt(k+1)       = (1._r8/gravit)*(state1%pdel(i,pver-k+1)/dz_g(pver-k+1))
          invrs_rho_ds_zt(k+1) = 1._r8/(rho_ds_zt(k+1))                               ! Inverse ds rho at thermo
          rho(i,k+1)           = rho_ds_zt(k+1)                                       ! rho on thermo 
@@ -2515,8 +2516,9 @@ end subroutine clubb_init_cnst
       wv_a = 0._r8
       wl_a = 0._r8
       do k=1,pver
-         clubb_s(k) = cpair*((thlm(i,k)+(latvap/cpair)*rcm(i,k))/exner_clubb(i,k))+ &
-                      gravit*state1%zm(i,k)+state1%phis(i)
+         clubb_s(k) = cpair * thlm(i,k) / inv_exner_clubb(i,k) &
+                      + latvap * rcm(i,k) &
+                      + gravit * state1%zm(i,k) + state1%phis(i)
          se_a(i) = se_a(i) + clubb_s(k)*state1%pdel(i,k)/gravit
          ke_a(i) = ke_a(i) + 0.5_r8*(um(i,k)**2+vm(i,k)**2)*state1%pdel(i,k)/gravit
          wv_a(i) = wv_a(i) + (rtm(i,k)-rcm(i,k))*state1%pdel(i,k)/gravit

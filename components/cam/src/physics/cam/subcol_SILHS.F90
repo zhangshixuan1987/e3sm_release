@@ -496,7 +496,9 @@ contains
 
 #ifdef CLUBB_SGS
 #ifdef SILHS
-      use clubb_api_module,       only : pdf_parameter, unpack_pdf_params_api, &
+      use clubb_api_module,       only : pdf_parameter, &
+                                         unpack_pdf_params_api, &
+                                         init_pdf_params_api, &
                                          num_pdf_params, &
                                          hydromet_dim, &
 
@@ -588,7 +590,7 @@ contains
       integer :: num_subcols                     ! Number of subcolumns
       integer, dimension(pcols) :: numsubcol_arr ! To set up the state struct
       integer, parameter :: sequence_length = 1  ! Number of timesteps btn subcol calls
-      type(pdf_parameter), dimension(pverp-top_lev+1) :: pdf_params     ! PDF parameters
+      type(pdf_parameter) :: pdf_params     ! PDF parameters
       real(r8), dimension(pverp, num_pdf_params) :: pdf_params_packed
       real(r8), dimension(pverp-top_lev+1) :: rho_ds_zt    ! Dry static density (kg/m^3) on thermo levs
       real(r8), dimension(pver)  :: dz_g         ! thickness of layer
@@ -717,6 +719,9 @@ contains
       real(r8), pointer, dimension(:,:) :: nrain     ! micro_mg rain num conc 
       real(r8), pointer, dimension(:,:) :: nsnow
 
+
+      ! Initialize CLUBB's PDF parameter type variable
+      call init_pdf_params_api( pverp-top_lev+1, pdf_params )
 
       if (.not. allocated(state_sc%lat)) then
          call endrun('subcol_gen error: state_sc must be allocated before calling subcol_gen')
@@ -1497,7 +1502,10 @@ contains
      use physics_buffer,          only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
      use ref_pres,                only: top_lev => trop_cloud_top_lev
      use subcol_utils,            only: subcol_unpack, subcol_get_nsubcol, subcol_get_weight
-     use clubb_api_module,        only: T_in_K2thlm_api, pdf_parameter, unpack_pdf_params_api
+     use clubb_api_module,        only: T_in_K2thlm_api, &
+                                        pdf_parameter, &
+                                        unpack_pdf_params_api, &
+                                        init_pdf_params_api
      use silhs_api_module,        only: lh_microphys_var_covar_driver_api
 
      implicit none
@@ -1529,7 +1537,7 @@ contains
      real(r8), dimension(pcols,psubcols,pverp) :: zi_all
  
      real(r8), pointer, dimension(:,:,:) :: pdf_params_ptr  ! Packed PDF_Params
-     type(pdf_parameter), dimension(pverp-top_lev+1) :: pdf_params  ! PDF parameters [units vary]
+     type(pdf_parameter) :: pdf_params  ! PDF parameters [units vary]
 
      integer :: ixcldliq, ixq
 
@@ -1557,6 +1565,9 @@ contains
 
      ! Don't do anything if this option isn't enabled.
      if ( .not. subcol_SILHS_var_covar_src ) return
+
+     ! Initialize CLUBB's PDF parameter type variable
+     call init_pdf_params_api( pverp-top_lev+1, pdf_params )
 
      lchnk = state_sc%lchnk
      ngrdcol  = state_sc%ngrdcol

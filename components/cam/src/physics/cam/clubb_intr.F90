@@ -1135,6 +1135,7 @@ end subroutine clubb_init_cnst
                                         pdf_parameter, num_pdf_params, &  ! Type, dimension
                                         unpack_pdf_params_api, & ! convert array to type
                                         pack_pdf_params_api, & ! convert type to 2d real array
+                                        init_pdf_params_api, & ! convert type to 2d real array
                                         stats_begin_timestep_api, &
                                         hydromet_dim, calculate_thlp2_rad_api, mu, update_xp2_mc_api, &
                                         sat_mixrat_liq_api
@@ -1396,8 +1397,8 @@ end subroutine clubb_init_cnst
    real(kind=time_precision)             :: time_elapsed            ! time keep track of stats          [s]
    real(r8), dimension(nparams)          :: clubb_params                ! These adjustable CLUBB parameters (C1, C2 ...)
    real(r8), dimension(sclr_dim)         :: sclr_tol                    ! Tolerance on passive scalar       [units vary]
-   type(pdf_parameter), dimension(pverp) :: pdf_params                  ! PDF parameters                    [units vary]
-   type(pdf_parameter), dimension(pverp) :: pdf_params_zm               ! PDF parameters on momentum levels [units vary]
+   type(pdf_parameter) :: pdf_params                                    ! PDF parameters                    [units vary]
+   type(pdf_parameter) :: pdf_params_zm                                 ! PDF parameters on momentum levels [units vary]
    real(r8), dimension(pverp,num_pdf_params) :: pdf_params_packed       ! Packed for storage in pbuf
    real(r8), dimension(pverp,num_pdf_params) :: pdf_params_zm_packed    ! Packed for storage in pbuf
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
@@ -1542,7 +1543,11 @@ end subroutine clubb_init_cnst
 
    !  Determine time step of physics buffer
    
-   itim_old = pbuf_old_tim_idx() 
+   itim_old = pbuf_old_tim_idx()
+
+   ! Initialize CLUBB's PDF parameter type variables
+   call init_pdf_params_api( pverp, pdf_params )
+   call init_pdf_params_api( pverp, pdf_params_zm )
 
    !  Establish associations between pointers and physics buffer fields   
 
@@ -2485,13 +2490,13 @@ end subroutine clubb_init_cnst
              vp2t_laststep(i,k) = vp2t(pverp-k+1) 
           endif
 
-          mean_rt           = pdf_params(pverp-k+1)%mixt_frac*pdf_params(pverp-k+1)%rt_1 &
-             + (1.0_r8-pdf_params(pverp-k+1)%mixt_frac)*pdf_params(pverp-k+1)%rt_2
+          mean_rt           = pdf_params%mixt_frac(pverp-k+1)*pdf_params%rt_1(pverp-k+1) &
+             + (1.0_r8-pdf_params%mixt_frac(pverp-k+1))*pdf_params%rt_2(pverp-k+1)
 
-          pdfp_rtp2(i,k)    = pdf_params(pverp-k+1)%mixt_frac &
-             *((pdf_params(pverp-k+1)%rt_1 - mean_rt)**2 + pdf_params(pverp-k+1)%varnce_rt_1) &
-             + (1.0_r8-pdf_params(pverp-k+1)%mixt_frac) &
-             *((pdf_params(pverp-k+1)%rt_2 - mean_rt)**2 + pdf_params(pverp-k+1)%varnce_rt_2)
+          pdfp_rtp2(i,k)    = pdf_params%mixt_frac(pverp-k+1) &
+             *((pdf_params%rt_1(pverp-k+1) - mean_rt)**2 + pdf_params%varnce_rt_1(pverp-k+1)) &
+             + (1.0_r8-pdf_params%mixt_frac(pverp-k+1)) &
+             *((pdf_params%rt_2(pverp-k+1) - mean_rt)**2 + pdf_params%varnce_rt_2(pverp-k+1))
 
           ice_supersat_frac(i,k) = ice_supersat_frac_out(pverp-k+1)
 

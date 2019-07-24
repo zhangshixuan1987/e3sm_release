@@ -1320,8 +1320,8 @@ end subroutine clubb_init_cnst
    real(r8) :: rtp3_dummy_in(pverp)             ! 3rd moment of rt. Used only in CLUBB-SCM      [(kg/kg)^3]
 
    ! Variables below are needed for energy conservation
-   integer :: clubb_top_lev    ! Highest level index that CLUBB goes up to
-   real(r8) :: T_out(pver)     ! Absolute temperature        [K]
+   integer :: clubb_top_lev        ! Highest level index that CLUBB goes up to
+   real(r8) :: T_after_CLUBB(pver) ! Absolute temperature after CLUBB        [K]
    real(r8) :: delta_T_adj  ! Amount of temperature adjustment (all levels)  [K]
 
    real(r8) :: inv_exner_clubb(pcols,pverp)     ! Inverse exner function consistent with CLUBB  [-]
@@ -2496,11 +2496,21 @@ end subroutine clubb_init_cnst
      
       zi_out(i,1) = 0._r8
      
-      ! Calculate the amount of temperature adjustment or energy conservation purposes.
+      ! Calculate the amount of temperature adjustment for energy conservation
+      ! purposes.
+
+      ! CLUBB's domain extends up to level 1 (top of model) for E3SM.
       clubb_top_lev = 1
-      T_out = thlm(i,:) / inv_exner_clubb(i,:) + ( latvap / cpair ) * rcm(i,:)
-      delta_T_adj = energy_fixer( i, clubb_top_lev, T_out, rtm(i,:), rcm(i,:), &
-                                  hdtime, state1, cam_in )
+
+      ! Calculate the updated absolute temperature.
+      T_after_CLUBB &
+      = thlm(i,:) / inv_exner_clubb(i,:) + ( latvap / cpair ) * rcm(i,:)
+
+      ! Calculate the amount of adjustment needed to T (which is uniform at all
+      ! vertical levels) in order to achieve energy conservation.
+      delta_T_adj &
+      = energy_fixer( i, clubb_top_lev, T_after_CLUBB, rtm(i,:), rcm(i,:), &
+                      hdtime, state1, cam_in )
 
       !  Now compute the tendencies of CLUBB to CAM, note that pverp is the ghost point
       !  for all variables and therefore is never called in this loop
@@ -2514,7 +2524,8 @@ end subroutine clubb_init_cnst
          ptend_loc%v(i,k)   = (vm(i,k)-state1%v(i,k))/hdtime             ! north-south wind
          ptend_loc%q(i,k,ixq) = (rtm(i,k)-rcm(i,k)-state1%q(i,k,ixq))/hdtime ! water vapor
          ptend_loc%q(i,k,ixcldliq) = (rcm(i,k)-state1%q(i,k,ixcldliq))/hdtime   ! Tendency of liquid water
-         ptend_loc%s(i,k)   = cpair*(T_out(k)+delta_T_adj-state1%t(i,k))/hdtime ! Tendency of static energy
+         ptend_loc%s(i,k) &
+         = cpair*(T_after_CLUBB(k)+delta_T_adj-state1%t(i,k))/hdtime ! Tendency of static energy
 
          rtm_integral_ltend = rtm_integral_ltend + ptend_loc%q(i,k,ixcldliq)*state1%pdel(i,k)/gravit
          rtm_integral_vtend = rtm_integral_vtend + ptend_loc%q(i,k,ixq)*state1%pdel(i,k)/gravit
@@ -3038,7 +3049,7 @@ end subroutine clubb_init_cnst
   ! ========================================================================== !
   !                                                                            !
   ! ========================================================================== !
-  function energy_fixer( icol, clubb_top_lev, T_CLUBB, rtm, rcm, &
+  function energy_fixer( icol, clubb_top_lev, T_after_CLUBB, rtm, rcm, &
                          hdtime, state, cam_in ) &
   result( delta_T_adj )
 
@@ -3161,13 +3172,13 @@ end subroutine clubb_init_cnst
     !                       ( delta_T_CLUBB(j) * ( 1 + ( Rv/Rd-1 ) * rv|_a(j) )
     !                         + T|_b(j) * ( Rv/Rd - 1 ) * delta_rv(j) )
     !                       * pdel(j) / p(j) ) )
-    ! / ( ( Cp / g ) * SUM(k=top_lev:pver) pdel(k)
-    !     + ( Rd / g ) * SUM(k=top_lev:pver)
-    !                    pdel(k) * ( ( 1 + ( Rv/Rd - 1 ) * rv|_a(k) )
-    !                                * 0.5 * pdel(k) / p(k)
-    !                                + SUM(j=pver:k+1,-1)
-    !                                  ( 1 + ( Rv/Rd - 1 ) * rv|_a(j) )
-    !                                  * pdel(j) / p(j) ) )
+    !   / ( ( Cp / g ) * SUM(k=top_lev:pver) pdel(k)
+    !       + ( Rd / g ) * SUM(k=top_lev:pver)
+    !                      pdel(k) * ( ( 1 + ( Rv/Rd - 1 ) * rv|_a(k) )
+    !                                  * 0.5 * pdel(k) / p(k)
+    !                                  + SUM(j=pver:k+1,-1)
+    !                                    ( 1 + ( Rv/Rd - 1 ) * rv|_a(j) )
+    !                                    * pdel(j) / p(j) ) )
 
     ! Author: Brian Griffin; July 2019
 
@@ -3185,9 +3196,9 @@ end subroutine clubb_init_cnst
       clubb_top_lev    ! Highest level index that CLUBB goes up to
 
     real(r8), dimension(pver), intent(in) :: &
-      T_CLUBB, & ! Absolute temperature        [K]
-      rtm,     & ! Total water mixing ratio    [kg/kg]
-      rcm        ! Cloud water mixing ratio    [kg/kg]
+      T_after_CLUBB, & ! Absolute temperature (after CLUBB)        [K]
+      rtm,           & ! Total water mixing ratio (after CLUBB)    [kg/kg]
+      rcm              ! Cloud water mixing ratio (after CLUBB)    [kg/kg]
 
     real(r8), intent(in) :: &
       hdtime    ! CLUBB parameterization timestep duration    [s]
@@ -3208,8 +3219,8 @@ end subroutine clubb_init_cnst
       rvm              ! Water vapor mixing ratio                     [kg/kg]
 
     real(r8) :: &
-      numerator_delta_t_term,   & ! Numerator term from delta T    [K Pa]
-      denominator_delta_t_term, & ! Denominator term from delta T  [Pa]
+      numerator_delta_T_term,   & ! Numerator term from delta T    [K Pa]
+      denominator_delta_T_term, & ! Denominator term from delta T  [Pa]
       numerator_delta_rv_term,  & ! Numerator term from delta rv   [kg/kg Pa]
       numerator_delta_z_term,   & ! Numerator term from delta z    [K Pa]
       denominator_delta_z_term    ! Denominator term from delta z  [Pa]
@@ -3229,7 +3240,7 @@ end subroutine clubb_init_cnst
 
     ! Calculate the changes in absolute temperature (T) and water vapor mixing
     ! ratio (rv) at every level from CLUBB.
-    delta_T_CLUBB = T_CLUBB - state%t(icol,:)
+    delta_T_CLUBB = T_after_CLUBB - state%t(icol,:)
     rvm = rtm - rcm
     delta_rv = rvm - state%q(icol,:,1)
 
@@ -3245,8 +3256,8 @@ end subroutine clubb_init_cnst
     Rv_ov_Rd = rh2O / rair     ! Rv / Rd
 
     ! Initialize each term in the delta_T_adj equation.
-    numerator_delta_t_term = 0.0_r8
-    denominator_delta_t_term = 0.0_r8
+    numerator_delta_T_term = 0.0_r8
+    denominator_delta_T_term = 0.0_r8
     numerator_delta_rv_term = 0.0_r8
     numerator_delta_z_term = 0.0_r8
     denominator_delta_z_term = 0.0_r8
@@ -3255,10 +3266,10 @@ end subroutine clubb_init_cnst
     do k = clubb_top_lev, pver, 1
 
        ! Calculate the terms associated with the original Cp * delta t term.
-       numerator_delta_t_term &
-       = numerator_delta_t_term + delta_T_CLUBB(k) * state%pdel(icol,k)
+       numerator_delta_T_term &
+       = numerator_delta_T_term + delta_T_CLUBB(k) * state%pdel(icol,k)
 
-       denominator_delta_t_term = denominator_delta_t_term + state%pdel(icol,k)
+       denominator_delta_T_term = denominator_delta_T_term + state%pdel(icol,k)
 
        ! Calculate the delta rv term.
        numerator_delta_rv_term &
@@ -3307,10 +3318,10 @@ end subroutine clubb_init_cnst
     ! conservation.
     delta_T_adj &
     = ( ( cam_in%shf(icol) + latvap * cam_in%cflx(icol,1) ) * hdtime &
-        - Cp_ov_g * numerator_delta_t_term &
+        - Cp_ov_g * numerator_delta_T_term &
         - Lv_ov_g * numerator_delta_rv_term &
         - Rd_ov_g * numerator_delta_z_term ) &
-      / ( Cp_ov_g * denominator_delta_t_term &
+      / ( Cp_ov_g * denominator_delta_T_term &
           + Rd_ov_g * denominator_delta_z_term )
 
 

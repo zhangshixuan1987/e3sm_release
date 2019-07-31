@@ -28,9 +28,11 @@ setenv CCSMROOT $PWD
 #setenv COMPSET FC5AV1C-04P2
 setenv COMPSET FAMIPC5
 setenv RESOLUTION ne30_ne30
-setenv MACH      cori-haswell
+#setenv MACH       cori-haswell
+setenv MACH       cori-knl
+
 setenv PTMP      /global/cscratch1/sd/$user/bld
-setenv ntasks 960
+setenv ntasks 240
 setenv nthrds 1
 
 # Configuration parameters

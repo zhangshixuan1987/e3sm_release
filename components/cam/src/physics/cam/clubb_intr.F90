@@ -649,7 +649,9 @@ end subroutine clubb_init_cnst
 
 
     !----- Begin Code -----
+    !$OMP PARALLEL
     l_do_expldiff_rtm_thlm = do_expldiff
+    !$OMP END PARALLEL
 
     ! ----------------------------------------------------------------- !
     ! Determine how many constituents CLUBB will transport.  Note that  

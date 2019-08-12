@@ -31,7 +31,7 @@ setenv COMPSET FAMIPC5
 setenv RESOLUTION ne30_ne30
 setenv MACH      anvil
 setenv PTMP      /lcrc/group/acme/$USER/bld
-setenv ntasks 240
+setenv ntasks 864
 setenv nthrds 1
 
 # Configuration parameters
@@ -161,8 +161,8 @@ cat >> user_nl_cam << EOF
 use_gw_convect = .false.
 
 dtime = 1800
-nhtfrq = 0,1,0
-mfilt = 1,1,1
+nhtfrq = 0,-24,0
+mfilt = 1,5000,5000
 ndens = 1,1,1,1,1,1
 history_budget = .true.
 microp_scheme = 'MG'

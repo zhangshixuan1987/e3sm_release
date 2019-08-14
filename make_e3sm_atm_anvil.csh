@@ -138,8 +138,8 @@ if ($run_model > 0) then
 
 cd $CASEROOT
 
-./xmlchange  -file env_batch.xml  -id  JOB_WALLCLOCK_TIME   -val '18:00:00'
-#./xmlchange  -file env_batch.xml  -id  JOB_WALLCLOCK_TIME   -val '01:30:00'
+./xmlchange  -file env_batch.xml  -id  JOB_WALLCLOCK_TIME   -val '20:00:00'
+#./xmlchange  -file env_batch.xml  -id  JOB_WALLCLOCK_TIME   -val '00:30:00'
 ./xmlchange  -file env_batch.xml  -id  JOB_QUEUE   -val 'acme-centos6'
 ./xmlchange PROJECT="condo",CHARGE_ACCOUNT="condo"
 

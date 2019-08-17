@@ -3318,13 +3318,18 @@ end subroutine clubb_init_cnst
 
     ! Calculate the amount of Temperature adjustment required for energy
     ! conservation.
+!    delta_T_adj &
+!    = ( ( cam_in%shf(icol) + latvap * cam_in%cflx(icol,1) ) * hdtime &
+!        - Cp_ov_g * numerator_delta_T_term &
+!        - Lv_ov_g * numerator_delta_rv_term &
+!        - Rd_ov_g * numerator_delta_z_term ) &
+!      / ( Cp_ov_g * denominator_delta_T_term &
+!          + Rd_ov_g * denominator_delta_z_term )
     delta_T_adj &
     = ( ( cam_in%shf(icol) + latvap * cam_in%cflx(icol,1) ) * hdtime &
         - Cp_ov_g * numerator_delta_T_term &
-        - Lv_ov_g * numerator_delta_rv_term &
-        - Rd_ov_g * numerator_delta_z_term ) &
-      / ( Cp_ov_g * denominator_delta_T_term &
-          + Rd_ov_g * denominator_delta_z_term )
+        - Lv_ov_g * numerator_delta_rv_term ) &
+      / ( Cp_ov_g * denominator_delta_T_term )
 
 
     return

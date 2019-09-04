@@ -1322,9 +1322,10 @@ end subroutine clubb_init_cnst
    real(r8) :: rtp3_dummy_in(pverp)             ! 3rd moment of rt. Used only in CLUBB-SCM      [(kg/kg)^3]
 
    ! Variables below are needed for energy conservation
-   integer :: clubb_top_lev        ! Highest level index that CLUBB goes up to
+   integer :: clubb_top_lev        ! Highest level index where CLUBB is active
+   integer :: clubbtop_before, clubbtop_after
    real(r8) :: T_after_CLUBB(pver) ! Absolute temperature after CLUBB        [K]
-   real(r8) :: delta_T_adj  ! Amount of temperature adjustment (all levels)  [K]
+   real(r8) :: delta_T_adj(pver)   ! Amount of temperature adjustment        [K]
 
    real(r8) :: inv_exner_clubb(pcols,pverp)     ! Inverse exner function consistent with CLUBB  [-]
    real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
@@ -2262,7 +2263,15 @@ end subroutine clubb_init_cnst
       endif    
 
       rho_in(:) = rho(i,:)
-     
+
+      ! Limit the energy fixer to find highest layer where CLUBB is active
+      ! Find first level where wp2 is higher than lowest threshold
+      clubbtop_before = 1
+      do while ( wp2(i,clubbtop_before) .eq. w_tol_sqd &
+                 .and. clubbtop_before .lt. pver-1 )
+         clubbtop_before = clubbtop_before + 1
+      enddo
+
       ! --------------------------------------------------------- !
       ! Compute cloud-top radiative cooling contribution to CLUBB !
       ! --------------------------------------------------------- !       
@@ -2501,8 +2510,16 @@ end subroutine clubb_init_cnst
       ! Calculate the amount of temperature adjustment for energy conservation
       ! purposes.
 
+      ! Limit the energy fixer to find highest layer where CLUBB is active
+      ! Find first level where wp2 is higher than lowest threshold
+      clubbtop_after = 1
+      do while ( wp2(i,clubbtop_after) .eq. w_tol_sqd &
+                 .and. clubbtop_after .lt. pver-1 )
+         clubbtop_after = clubbtop_after + 1
+      enddo
+
       ! CLUBB's domain extends up to level 1 (top of model) for E3SM.
-      clubb_top_lev = 1
+      clubb_top_lev = min( clubbtop_before, clubbtop_after )
 
       ! Calculate the updated absolute temperature.
       T_after_CLUBB &
@@ -2527,7 +2544,7 @@ end subroutine clubb_init_cnst
          ptend_loc%q(i,k,ixq) = (rtm(i,k)-rcm(i,k)-state1%q(i,k,ixq))/hdtime ! water vapor
          ptend_loc%q(i,k,ixcldliq) = (rcm(i,k)-state1%q(i,k,ixcldliq))/hdtime   ! Tendency of liquid water
          ptend_loc%s(i,k) &
-         = cpair*(T_after_CLUBB(k)+delta_T_adj-state1%t(i,k))/hdtime ! Tendency of static energy
+         = cpair*(T_after_CLUBB(k)+delta_T_adj(k)-state1%t(i,k))/hdtime ! Tendency of static energy
 
          rtm_integral_ltend = rtm_integral_ltend + ptend_loc%q(i,k,ixcldliq)*state1%pdel(i,k)/gravit
          rtm_integral_vtend = rtm_integral_vtend + ptend_loc%q(i,k,ixq)*state1%pdel(i,k)/gravit
@@ -3067,82 +3084,31 @@ end subroutine clubb_init_cnst
     !
     ! The equation for moist static energy is:
     !
-    ! s_m = Cp * T + g * z + ( Lv + Lf ) * rv + Lf * rc;
+    ! s_m = Cp * T + phi + ( Lv + Lf ) * rv + Lf * rc;
     !
-    ! where Cp is the specific heat of dry air, T is absolute temperature, g is
-    ! gravity, z is height, Lv is latent heat of vaporization, Lf is latent heat
-    ! of fusion, rv is water vapor mixing ratio, and rc is cloud water mixing
-    ! ratio.  The conservation equation is:
+    ! where Cp is the specific heat of dry air, T is absolute temperature, phi
+    ! is geopotential, Lv is latent heat of vaporization, Lf is latent heat of
+    ! fusion, rv is water vapor mixing ratio, and rc is cloud water mixing
+    ! ratio.  The CAM6 conservation of energy equation only considers
+    ! geopotential at the surface, which is not affected by CLUBB.  The
+    ! conservation equation necessary for CLUBB is:
     !
-    ! SUM(k=top_lev:pver) ( Cp * delta_T(k) + g * delta_z(k)
+    ! SUM(k=top_lev:pver) ( Cp * delta_T(k)
     !                       + ( Lv + Lf ) * delta_rv(k) + Lf * delta_rc(k) )
     !                     * pdel(k) / g
     ! - F_s|_sfc - ( Lv + Lf ) * F_v|_sfc = 0;
     !
-    ! where delta_T is the change in T, delta_z is the change in z, delta_rv is
-    ! the change in rv, and delta_rc is the change in rc, all over one timestep.
-    ! Additionally, pdel is the difference in pressure between two adjacent
-    ! vertical levels, F_s|_sfc is the surface flux of moist static energy, and
-    ! F_v|_sfc is the surface flux of water vapor.
+    ! where delta_T is the change in T, delta_rv is the change in rv, and
+    ! delta_rc is the change in rc, all over one timestep.  Additionally, pdel
+    ! is the difference in pressure between two adjacent vertical levels,
+    ! F_s|_sfc is the surface flux of moist static energy, and F_v|_sfc is the
+    ! surface flux of water vapor.
     !
     ! In addition to liquid water potential temperature, CLUBB conserves total
     ! water mixing ratio, rt = rv + rc.  Given that conservation, the above
     ! equation can be reduced to:
     !
-    ! SUM(k=top_lev:pver) ( Cp * delta_T(k) + g * delta_z(k)
-    !                       + Lv * delta_rv(k) ) * pdel(k) / g
-    ! - F_s|_sfc - Lv * F_v|_sfc = 0.
-    !
-    ! The height of a grid level, z, depends on pressure, which does not change
-    ! over time, as E3SM grid levels are defined in pressure coordinates, and
-    ! on temperature and water vapor mixing ratio, both which change over time.
-    ! The equation for z in terms of T, rv, and pressure (p) is found in
-    ! subroutine geopotential_t in geopotential.F90.  The height at momentum
-    ! (interface) levels is given by:
-    !
-    !         | 0;   k = pverp
-    !         |
-    ! zi(k) = | SUM(j=pver:k,-1) ( Rd / g )
-    !         |                  * T(j) * ( 1 + ( Rv/Rd - 1 ) * rv(j) )
-    !         |                  * pdel(j) / p(j);    k < pverp.
-    !
-    ! The moist static energy equation uses the height of thermodynamic
-    ! (midpoint) levels, which is calculated by:
-    !
-    ! z(k) = ( Rd / g ) * T(k) * ( 1 + ( Rv/Rd - 1 ) * rv(k) )
-    !        * 0.5 * pdel(k) / p(k)
-    !        + SUM(j=pver:k+1,-1) ( Rd / g )
-    !                             * T(j) * ( 1 + ( Rv/Rd - 1 ) * rv(j) )
-    !                             * pdel(j) / p(j).
-    !
-    ! Note:  For z(pver), SUM(j=pver:k+1,-1) = 0, as k+1 is pverp, which is
-    !        greater than pver.
-    !
-    ! The change in z(k) over one timestep depends on the changes in T and rv
-    ! (at level k as well as every level below level k):
-    !
-    ! T|_a(k) * ( 1 + ( Rv/Rd - 1 ) * rv|_a(k) )
-    ! - T|_b(k) * ( 1 + ( Rv/Rd - 1 ) * rv|_b(k) )
-    ! = delta_T(k) * ( 1 + ( Rv/Rd - 1 ) * rv|_a(k) )
-    !   + T|_b(k) * ( Rv/Rd - 1 ) * delta_rv(k);
-    !
-    ! where T|_a(k) and rv|_a(k) are T and rv after the CLUBB timestep is
-    ! complete, and where T|_b(k) and rv|_b(k) are T and rv at the beginning of
-    ! the CLUBB timestep.
-    !
-    ! The conservation equation can be rewritten as:
-    !
-    ! ( Cp / g ) * SUM(k=top_lev:pver) delta_T(k) * pdel(k)
-    ! + ( Lv / g ) * SUM(k=top_lev:pver) delta_rv(k) * pdel(k)
-    ! + ( Rd / g )
-    !   * SUM(k=top_lev:pver)
-    !     pdel(k) * ( ( delta_T(k) * ( 1 + ( Rv/Rd - 1 ) * rv|_a(k) )
-    !                   + T|_b(k) * ( Rv/Rd - 1 ) * delta_rv(k) )
-    !                 * 0.5 * pdel(k) / p(k)
-    !                 + SUM(j=pver:k+1,-1)
-    !                   ( delta_T(j) * ( 1 + ( Rv/Rd - 1 ) * rv|_a(j) )
-    !                     + T|_b(j) * ( Rv/Rd - 1 ) * delta_rv(j) )
-    !                   * pdel(j) / p(j) )
+    ! SUM(k=top_lev:pver) ( Cp * delta_T(k) + Lv * delta_rv(k) ) * pdel(k) / g
     ! - F_s|_sfc - Lv * F_v|_sfc = 0.
     !
     ! The value of delta_rv is not adjusted, as CLUBB already conserves total
@@ -3153,34 +3119,27 @@ end subroutine clubb_init_cnst
     ! The value of delta_T is the total amount of change in T that results in
     ! energy conservation.  This is subdivided into:
     !
-    ! delta_T(k) = delta_T_CLUBB(k) + delta_T_adj;
+    ! delta_T(k) = delta_T_CLUBB(k) + delta_T_adj(k);
     !
-    ! where delta_T_CLUBB is the change in T after CLUBB, and delta_T_adj is the
-    ! adjustment amount that is the same at all vertical levels.
+    ! where:
+    !
+    !                  | delta_T_adj_star; k >= clubb_top_lev
+    ! delta_T_adj(k) = |
+    !                  | 0; k < clubb_top_lev;
+    !
+    ! where delta_T_CLUBB is the change in T after CLUBB, delta_T_adj_star is
+    ! the adjustment amount that is the same at all vertical levels from the
+    ! surface to clubb_top_lev, and clubb_top_lev is highest level at which
+    ! CLUBB is considered to be active.
     !
     ! Once this equation is entered into the conservation equation, the value of
-    ! delta_T_adj can be solved.  The equation for delta_T_adj is:
+    ! delta_T_adj_star can be solved.  The equation for delta_T_adj_star is:
     !
-    ! delta_T_adj
+    ! delta_T_adj_star
     ! = ( F_s|_sfc + Lv * F_v|_sfc
     !     - ( Cp / g ) * SUM(k=top_lev:pver) delta_T_CLUBB(k) * pdel(k)
-    !     - ( Lv / g ) * SUM(k=top_lev:pver) delta_rv(k) * pdel(k)
-    !     - ( Rd / g )
-    !       * SUM(k=top_lev:pver)
-    !         pdel(k) * ( ( delta_T_CLUBB(k) * ( 1 + ( Rv/Rd - 1 ) * rv|_a(k) )
-    !                       + T|_b(k) * ( Rv/Rd - 1 ) * delta_rv(k) )
-    !                     * 0.5 * pdel(k) / p(k)
-    !                     + SUM(j=pver:k+1,-1)
-    !                       ( delta_T_CLUBB(j) * ( 1 + ( Rv/Rd-1 ) * rv|_a(j) )
-    !                         + T|_b(j) * ( Rv/Rd - 1 ) * delta_rv(j) )
-    !                       * pdel(j) / p(j) ) )
-    !   / ( ( Cp / g ) * SUM(k=top_lev:pver) pdel(k)
-    !       + ( Rd / g ) * SUM(k=top_lev:pver)
-    !                      pdel(k) * ( ( 1 + ( Rv/Rd - 1 ) * rv|_a(k) )
-    !                                  * 0.5 * pdel(k) / p(k)
-    !                                  + SUM(j=pver:k+1,-1)
-    !                                    ( 1 + ( Rv/Rd - 1 ) * rv|_a(j) )
-    !                                    * pdel(j) / p(j) ) )
+    !     - ( Lv / g ) * SUM(k=top_lev:pver) delta_rv(k) * pdel(k) )
+    !   / ( ( Cp / g ) * SUM(k=clubb_top_lev:pver) pdel(k) )
 
     ! Author: Brian Griffin; July 2019
 
@@ -3195,7 +3154,7 @@ end subroutine clubb_init_cnst
     ! Input Variables
     integer, intent(in) :: &
       icol,          & ! Column index
-      clubb_top_lev    ! Highest level index that CLUBB goes up to
+      clubb_top_lev    ! Highest level index for which CLUBB is active
 
     real(r8), dimension(pver), intent(in) :: &
       T_after_CLUBB, & ! Absolute temperature (after CLUBB)        [K]
@@ -3210,34 +3169,28 @@ end subroutine clubb_init_cnst
     type(cam_in_t), intent(in) :: cam_in  ! Stores needed surface fluxes
 
     ! Return Variable
-    real(r8) :: &
-      delta_T_adj    ! Amount of temperature adjustment (all levels)  [K]
+    real(r8), dimension(pver) :: &
+      delta_T_adj    ! Amount of temperature adjustment    [K]
 
     ! Local Variables
+    real(r8) :: &
+      delta_T_adj_star    ! Amount of constant temperature adjustment    [K]
+
     real(r8), dimension(pver) :: &
       delta_T_CLUBB, & ! Change in Temperature from CLUBB             [K]
       delta_rv,      & ! Change in water vapor mixing ratio (CLUBB)   [kg/kg]
-      pdel_ov_p,     & ! delta p (between levels) divided by p        [-]
       rvm              ! Water vapor mixing ratio                     [kg/kg]
 
     real(r8) :: &
       numerator_delta_T_term,   & ! Numerator term from delta T    [K Pa]
       denominator_delta_T_term, & ! Denominator term from delta T  [Pa]
-      numerator_delta_rv_term,  & ! Numerator term from delta rv   [kg/kg Pa]
-      numerator_delta_z_term,   & ! Numerator term from delta z    [K Pa]
-      denominator_delta_z_term    ! Denominator term from delta z  [Pa]
+      numerator_delta_rv_term     ! Numerator term from delta rv   [kg/kg Pa]
 
     real(r8) :: &
-      numerator_delta_z_term_lev_k,   & ! Num. term from delta z (lev k)    [K]
-      denominator_delta_z_term_lev_k    ! Denom. term from delta z (lev k)  [-]
+      Cp_ov_g, & ! Cp / g    [m/K]
+      Lv_ov_g    ! Lv / g    [m kg(air)/kg(vapor)]
 
-    real(r8) :: &
-      Cp_ov_g,  & ! Cp / g    [m/K]
-      Lv_ov_g,  & ! Lv / g    [m kg(air)/kg(vapor)]
-      Rd_ov_g,  & ! Rd / g    [m/K]
-      Rv_ov_Rd    ! Rv / Rd   [kg(air)/kg(vapor)]
-
-    integer :: k, j  ! Vertical level indices
+    integer :: k  ! Vertical level index
 
 
     ! Calculate the changes in absolute temperature (T) and water vapor mixing
@@ -3246,90 +3199,53 @@ end subroutine clubb_init_cnst
     rvm = rtm - rcm
     delta_rv = rvm - state%q(icol,:,1)
 
-    ! Calculate the value of the vertical pressure difference between two
-    ! adjacent grid levels (pdel) divided by the pressure at the grid level
-    ! (pmid).
-    pdel_ov_p = state%pdel(icol,:) / state%pmid(icol,:)
-
     ! Calculate the values of ratios of some constants
     Cp_ov_g  = cpair / gravit  ! Cp / g
     Lv_ov_g  = latvap / gravit ! Lv / g
-    Rd_ov_g  = rair / gravit   ! Rd / g
-    Rv_ov_Rd = rh2O / rair     ! Rv / Rd
 
     ! Initialize each term in the delta_T_adj equation.
     numerator_delta_T_term = 0.0_r8
     denominator_delta_T_term = 0.0_r8
     numerator_delta_rv_term = 0.0_r8
-    numerator_delta_z_term = 0.0_r8
-    denominator_delta_z_term = 0.0_r8
 
     ! Loop over all vertical grid levels in the CLUBB vertical domain.
-    do k = clubb_top_lev, pver, 1
+    do k = 1, pver, 1
 
-       ! Calculate the terms associated with the original Cp * delta t term.
+       ! Calculate the delta T term for the numerator.
        numerator_delta_T_term &
        = numerator_delta_T_term + delta_T_CLUBB(k) * state%pdel(icol,k)
-
-       denominator_delta_T_term = denominator_delta_T_term + state%pdel(icol,k)
 
        ! Calculate the delta rv term.
        numerator_delta_rv_term &
        = numerator_delta_rv_term + delta_rv(k) * state%pdel(icol,k)
 
-       ! Calculate the terms associated with the original delta z (change in
-       ! height over time) term.
-       numerator_delta_z_term_lev_k &
-       = ( delta_T_CLUBB(k) * ( 1.0_r8 + ( Rv_ov_Rd - 1.0_r8 ) * rvm(k) ) &
-           + state%t(icol,k) * ( Rv_ov_Rd - 1.0_r8 ) * delta_rv(k) ) &
-         * 0.5_r8 * pdel_ov_p(k)
+    enddo ! k = 1, pver, 1
 
-       denominator_delta_z_term_lev_k &
-       = ( 1.0_r8 + ( Rv_ov_Rd - 1.0_r8 ) * rvm(k) ) * 0.5_r8 * pdel_ov_p(k)
+    ! Loop over all vertical grid levels to clubb_top_lev, which is the highest
+    ! level where CLUBB is considered to be active.
+    do k = clubb_top_lev, pver, 1
 
-       if ( k < pver ) then
-
-          do j = pver, k+1, -1
-
-             numerator_delta_z_term_lev_k &
-             = numerator_delta_z_term_lev_k &
-               + ( delta_T_CLUBB(j) &
-                   * ( 1.0_r8 + ( Rv_ov_Rd - 1.0_r8 ) * rvm(j) ) &
-                   + state%t(icol,j) * ( Rv_ov_Rd - 1.0_r8 ) * delta_rv(j) ) &
-                 * pdel_ov_p(j)
-
-             denominator_delta_z_term_lev_k &
-             = denominator_delta_z_term_lev_k &
-               + ( 1.0_r8 + ( Rv_ov_Rd - 1.0_r8 ) * rvm(j) ) * pdel_ov_p(j)
-
-          enddo ! j = pver, k+1, -1
-
-       endif ! k < pver
-
-       numerator_delta_z_term &
-       = numerator_delta_z_term &
-         + numerator_delta_z_term_lev_k * state%pdel(icol,k)
-
-       denominator_delta_z_term &
-       = denominator_delta_z_term &
-         + denominator_delta_z_term_lev_k * state%pdel(icol,k)
+       ! Calculate the term associated with the delta T for the denominator.
+       denominator_delta_T_term = denominator_delta_T_term + state%pdel(icol,k)
 
     enddo ! k = clubb_top_lev, pver, 1
 
-    ! Calculate the amount of Temperature adjustment required for energy
-    ! conservation.
-!    delta_T_adj &
-!    = ( ( cam_in%shf(icol) + latvap * cam_in%cflx(icol,1) ) * hdtime &
-!        - Cp_ov_g * numerator_delta_T_term &
-!        - Lv_ov_g * numerator_delta_rv_term &
-!        - Rd_ov_g * numerator_delta_z_term ) &
-!      / ( Cp_ov_g * denominator_delta_T_term &
-!          + Rd_ov_g * denominator_delta_z_term )
-    delta_T_adj &
+    ! Calculate the amount of constant Temperature adjustment required for
+    ! energy conservation (applied from the surface to clubb_top_lev)
+    delta_T_adj_star &
     = ( ( cam_in%shf(icol) + latvap * cam_in%cflx(icol,1) ) * hdtime &
         - Cp_ov_g * numerator_delta_T_term &
         - Lv_ov_g * numerator_delta_rv_term ) &
       / ( Cp_ov_g * denominator_delta_T_term )
+
+    ! Return the amount of the temperature adjustment at every grid level.
+    do k = 1, pver, 1
+       if ( k >= clubb_top_lev ) then
+          delta_T_adj(k) = delta_T_adj_star
+       else ! k < clubb_top_lev
+          delta_T_adj(k) = 0.0_r8
+       endif ! k >= clubb_top_lev
+    enddo ! k = 1, pver, 1
 
 
     return

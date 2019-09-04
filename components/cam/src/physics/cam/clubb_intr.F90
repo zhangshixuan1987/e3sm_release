@@ -930,6 +930,7 @@ end subroutine clubb_init_cnst
     call addfld ('QT',    (/ 'lev' /),  'A',               'kg/kg', 'Total water mixing ratio')
     call addfld ('SL',     (/ 'lev' /),  'A',               'J/kg', 'Liquid water static energy')
     call addfld ('CLDST', (/ 'lev' /),  'A',            'fraction', 'Stratus cloud fraction')
+    call addfld ('T_ADJ_CLUBB', (/ 'lev' /), 'A',              'K', 'Temperature adjustment from the CLUBB energy fixer')
     call addfld ('ZMDLF',  (/ 'lev' /),  'A',            'kg/kg/s', 'Detrained liquid water from ZM convection')
     call addfld ('TTENDICE',     (/ 'lev' /),  'A',         'K/s', 'T tendency from Ice Saturation Adjustment')
     call addfld ('QVTENDICE', (/ 'lev' /),  'A',        'kg/kg/s', 'Q tendency from Ice Saturation Adjustment')
@@ -1325,7 +1326,7 @@ end subroutine clubb_init_cnst
    integer :: clubb_top_lev        ! Highest level index where CLUBB is active
    integer :: clubbtop_before, clubbtop_after
    real(r8) :: T_after_CLUBB(pver) ! Absolute temperature after CLUBB        [K]
-   real(r8) :: delta_T_adj(pver)   ! Amount of temperature adjustment        [K]
+   real(r8) :: delta_T_adj(pcols,pver)   ! Amount of temperature adjustment        [K]
 
    real(r8) :: inv_exner_clubb(pcols,pverp)     ! Inverse exner function consistent with CLUBB  [-]
    real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
@@ -2527,7 +2528,7 @@ end subroutine clubb_init_cnst
 
       ! Calculate the amount of adjustment needed to T (which is uniform at all
       ! vertical levels) in order to achieve energy conservation.
-      delta_T_adj &
+      delta_T_adj(i,:) &
       = energy_fixer( i, clubb_top_lev, T_after_CLUBB, rtm(i,:), rcm(i,:), &
                       hdtime, state1, cam_in )
 
@@ -2544,7 +2545,7 @@ end subroutine clubb_init_cnst
          ptend_loc%q(i,k,ixq) = (rtm(i,k)-rcm(i,k)-state1%q(i,k,ixq))/hdtime ! water vapor
          ptend_loc%q(i,k,ixcldliq) = (rcm(i,k)-state1%q(i,k,ixcldliq))/hdtime   ! Tendency of liquid water
          ptend_loc%s(i,k) &
-         = cpair*(T_after_CLUBB(k)+delta_T_adj(k)-state1%t(i,k))/hdtime ! Tendency of static energy
+         = cpair*(T_after_CLUBB(k)+delta_T_adj(i,k)-state1%t(i,k))/hdtime ! Tendency of static energy
 
          rtm_integral_ltend = rtm_integral_ltend + ptend_loc%q(i,k,ixcldliq)*state1%pdel(i,k)/gravit
          rtm_integral_vtend = rtm_integral_vtend + ptend_loc%q(i,k,ixq)*state1%pdel(i,k)/gravit
@@ -3016,6 +3017,7 @@ end subroutine clubb_init_cnst
    call outfld( 'QT',               qt_output,               pcols, lchnk )
    call outfld( 'SL',               sl_output,               pcols, lchnk )
    call outfld( 'CONCLD',           concld,                  pcols, lchnk )
+   call outfld( 'T_ADJ_CLUBB',      delta_T_adj,             pcols, lchnk )
    call outfld( 'ZMDLF',            dlf_liq_out,             pcols, lchnk )
    call outfld( 'ZMDLFI',           dlf_ice_out,             pcols, lchnk )
 

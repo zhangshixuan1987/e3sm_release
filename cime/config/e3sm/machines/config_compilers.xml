@@ -4,61 +4,43 @@
 ===========================
 This file defines compiler flags for building CIME.  General flags are listed first
 followed by flags specific to particular operating systems, followed by particular machines.
-
 More general flags are replaced by more specific flags.
 Flags of the sort ADD_FLAG indicate that the field should be appended to an already existing FLAG definition.
-
 Attributes indicate that an if clause should be added to the Macros so that these flags are added
 only under the conditions described by the attribute(s).
-
 The env_mach_specific file may set environment variables or load modules which set environment variables
 which are then  used in the Makefile.   For example the NETCDF_PATH on many machines is set by a module.
-
 Do not use variables CPPDEFS and SLIBS here, instead use ADD_CPPDEFS and ADD_SLIBS
-
 ========================================================================
  Serial/MPI compiler specification
 ========================================================================
-
 SCC   and  SFC specifies the serial compiler
 MPICC and  MPICC specifies the mpi compiler
-
 if $MPILIB is set to mpi-serial then
    CC = $SCC
    FC = $SFC
    MPICC = $SCC
    MPIFC = $SFC
    INC_MPI = $(CIMEROOT)/src/externals/mct/mpi-serial
-
 ========================================================================
  Options for including C++ code in the build
 ========================================================================
-
 SUPPORTS_CXX (TRUE/FALSE): Whether we have defined all the necessary
 settings for including C++ code in the build for this compiler (or
 this compiler/machine combination). See below for a description of the
 necessary settings.
-
 The following are required for a compiler to support the inclusion of
 C++ code:
-
 SCXX: serial C++ compiler
-
 MPICXX: mpi C++ compiler
-
 CXX_LINKER (CXX/FORTRAN): When C++ code is included in the build, do
 we use a C++ or Fortran linker?
-
 In addition, some compilers require additional libraries or link-time
 flags, specified via CXX_LIBS or CXX_LDFLAGS, as in the following
 examples:
-
 <CXX_LIBS> -L/path/to/directory -lfoo </CXX_LIBS>
-
 or
-
 <CXX_LDFLAGS> -cxxlib </CXX_LDFLAGS>
-
 Note that these libraries or LDFLAGS will be added on the link line,
 regardless of whether we are using a C++ or Fortran linker. For
 example, if CXX_LINKER=CXX, then the above CXX_LIBS line should
@@ -66,12 +48,9 @@ specify extra libraries needed when linking C++ and fortran code using
 a C++ linker. If CXX_LINKER=FORTRAN, then the above CXX_LDFLAGS line
 should specify extra LDFLAGS needed when linking C++ and fortran code
 using a fortran linker.
-
 These should NOT be specified via <ADD_SLIBS USE_CXX="true"> or
 <ADD_LDFLAGS USE_CXX="true">, because those mess up the configure step
 for mct, etc.
-
-
 ===========================
 -->
 <!-- Define default values that can be overridden by specific

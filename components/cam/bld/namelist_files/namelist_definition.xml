@@ -3102,16 +3102,23 @@ High skewness of Newtonian damping of water flux
 Default: 1.0
 </entry>
 
+<entry id="clubb_C6thl" type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Low skewness of Newtonian damping of water flux
+Default: 4.0
+</entry>
+
+
 <entry id="clubb_C6thlb" type="real" category="pblrad"
        group="clubb_param_nl" valid_values="" >
 Low skewness of Newtonian damping of water flux
-Default: 1.0
+Default: 6.0
 </entry>
 
 <entry id="clubb_C6thlc" type="real" category="pblrad"
        group="clubb_param_nl" valid_values="" >
 Low skewness of Newtonian damping of water flux
-Default: 6.0
+Default: 1.0
 </entry>
 
 
@@ -3172,13 +3179,13 @@ Default: 0.32
 <entry id="clubb_gamma_coefb" type="real" category="pblrad"
        group="clubb_param_nl" valid_values="" >
 High Skw. gamma coef. Skw. Fnct.
-Default: 0.32 or clubb_gamma_coef if it is specified
+Default: 0.32 
 </entry>
 
 <entry id="clubb_gamma_coefc" type="real" category="pblrad"
        group="clubb_param_nl" valid_values="" >
 High Skw. gamma coef. Skw. Fnct.
-Default: 5.0or clubb_gamma_coef if it is specified
+Default: 5.0
 </entry>
 
 <entry id="clubb_mu" type="real" category="pblrad"
@@ -3192,6 +3199,18 @@ Default: 0.001
 Background coefficient of eddy diffusion
 Default: 20.0
 
+<entry id="clubb_nu2" type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Background coefficient of eddy diffusion
+Default: 5.0
+
+<entry id="clubb_c_K2" type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Coefficient of Kh_zm
+Default: 0.125
+</entry>
+
+
 <entry id="clubb_c_K10" type="real" category="pblrad"
        group="clubb_param_nl" valid_values="" >
 Coefficient of Kh_zm
@@ -3202,6 +3221,54 @@ Default: 0.60
        group="clubb_param_nl" valid_values="" >
 Lscale threshold: damp C6 & C7  [m]
 Default: 60.0D0
+</entry>
+
+<entry id="clubb_C_invrs_tau_bkgnd"  type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Coefficient of inverse tau term contributed by background constant value [-]
+Default: 1.1D0
+</entry>
+
+<entry id="clubb_C_invrs_tau_sfc"  type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Coefficient of inverse tau term contributed by surface log law [-]
+Default: 0.1D0
+</entry>
+
+<entry id="clubb_C_invrs_tau_shear"  type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Coefficient of inverse tau term contributed by vertical wind shear [-]
+Default: 0.02D0
+</entry>
+
+<entry id="clubb_C_invrs_tau_N2"  type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Coefficient of inverse tau term contributed by Brunt Vaisala frequency [-]
+Default: 0.1D0
+</entry>
+
+<entry id="clubb_C_invrs_tau_N2_wp2"  type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Coefficient of inverse tau term contributed by Brunt Vaisala frequency [-]
+Default: 0.1D0
+</entry>
+
+<entry id="clubb_C_invrs_tau_N2_xp2"  type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Coefficient of inverse tau term contributed by Brunt Vaisala frequency [-]
+Default: 0.1D0
+</entry>
+
+<entry id="clubb_C_invrs_tau_N2_wpxp"  type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Coefficient of inverse tau term contributed by Brunt Vaisala frequency [-]
+Default: 0.0D0
+</entry>
+
+<entry id="clubb_C_invrs_tau_N2_clear_wp3"  type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Coefficient of inverse tau term contributed by Brunt Vaisala frequency [-]
+Default: 0.0D0
 </entry>
 
 <!-- CARMA Sectional Microphysics -->

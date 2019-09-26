@@ -585,8 +585,8 @@ end subroutine clubb_init_cnst
 
     do i = begchunk, endchunk
         do j = 1, pcols
-            call init_pdf_params_api( pverp, pdf_params_chnk(i,j) )
-            call init_pdf_params_api( pverp, pdf_params_zm_chnk(i,j) )
+            call init_pdf_params_api( pverp, pdf_params_chnk(j,i) )
+            call init_pdf_params_api( pverp, pdf_params_zm_chnk(j,i) )
         end do
     end do
 

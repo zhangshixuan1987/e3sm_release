@@ -59,6 +59,7 @@ module advance_xm_wpxp_module
                               mixt_frac_zm, l_implemented, em, wp2sclrp, &
                               sclrpthvp, sclrm_forcing, sclrp2, exner, rcm, &
                               p_in_Pa, thvm, Cx_fnc_Richardson, &
+                              ice_supersat_frac, &
                               pdf_implicit_coefs_terms, &
                               um_forcing, vm_forcing, ug, vg, wpthvp, &
                               fcor, um_ref, vm_ref, up2, vp2, &
@@ -274,11 +275,12 @@ module advance_xm_wpxp_module
       sclrp2           ! For clipping Vince Larson             [Units vary]
 
     real( kind = core_rknd ), intent(in), dimension(gr%nz) ::  &
-      exner,           & ! Exner function                            [-]
-      rcm,             & ! cloud water mixing ratio, r_c             [kg/kg]
-      p_in_Pa,         & ! Air pressure                              [Pa]
-      thvm,            & ! Virutal potential temperature             [K]
-      Cx_fnc_Richardson  ! Cx_fnc computed from Richardson_num       [-]
+      exner,            & ! Exner function                            [-]
+      rcm,              & ! cloud water mixing ratio, r_c             [kg/kg]
+      p_in_Pa,          & ! Air pressure                              [Pa]
+      thvm,             & ! Virutal potential temperature             [K]
+      Cx_fnc_Richardson,& ! Cx_fnc computed from Richardson_num       [-]
+      ice_supersat_frac
 
     type(implicit_coefs_terms), dimension(gr%nz), intent(in) :: &
       pdf_implicit_coefs_terms    ! Implicit coefs / explicit terms [units vary]
@@ -878,7 +880,7 @@ module advance_xm_wpxp_module
                         invrs_rho_ds_zm, invrs_rho_ds_zt, & ! In
                         wpxp_upper_lim, wpxp_lower_lim, &! In
                         l_implemented, em, Lscale, thlm, exner, & ! In
-                        rtm, rcm, p_in_Pa, thvm, & ! In
+                        rtm, rcm, p_in_Pa, thvm,ice_supersat_frac, & ! In
                         lhs ) ! Out
 
       ! Compute the explicit portion of the r_t and w'r_t' equations.
@@ -938,7 +940,7 @@ module advance_xm_wpxp_module
                                        mixt_frac_zm, l_implemented, em, &
                                        wp2sclrp, sclrpthvp, sclrm_forcing, &
                                        sclrp2, exner, rcm, p_in_Pa, thvm, &
-                                       Cx_fnc_Richardson, &
+                                       Cx_fnc_Richardson,&
                                        pdf_implicit_coefs_terms, um_forcing, &
                                        vm_forcing, ug, vg, wpthvp, fcor, &
                                        um_ref, vm_ref, up2, vp2, uprcp, vprcp, &
@@ -1007,7 +1009,7 @@ module advance_xm_wpxp_module
                         invrs_rho_ds_zm, invrs_rho_ds_zt, & ! In
                         wpxp_upper_lim, wpxp_lower_lim, &! In
                         l_implemented, em, Lscale, thlm, exner, & ! In
-                        rtm, rcm, p_in_Pa, thvm, & ! In
+                        rtm, rcm, p_in_Pa, thvm,ice_supersat_frac, & ! In
                         lhs ) ! Out
 
       ! Compute the explicit portion of the th_l and w'th_l' equations.
@@ -1154,7 +1156,7 @@ module advance_xm_wpxp_module
                           invrs_rho_ds_zm, invrs_rho_ds_zt, & ! In
                           wpxp_upper_lim, wpxp_lower_lim, &! In
                           l_implemented, em, Lscale, thlm, exner, & ! In
-                          rtm, rcm, p_in_Pa, thvm, & ! In
+                          rtm, rcm, p_in_Pa, thvm, ice_supersat_frac,& ! In
                           lhs ) ! Out
 
         ! Compute the explicit portion of the sclrm and w'sclr' equations.
@@ -1280,7 +1282,7 @@ module advance_xm_wpxp_module
                         invrs_rho_ds_zm, invrs_rho_ds_zt, & ! In
                         zeros_vector, zeros_vector, &! In
                         l_implemented, em, Lscale, thlm, exner, & ! In
-                        rtm, rcm, p_in_Pa, thvm, & ! In
+                        rtm, rcm, p_in_Pa, thvm, ice_supersat_frac,& ! In
                         lhs ) ! Out
 
       ! Compute the explicit portion of the r_t and w'r_t' equations.
@@ -1892,7 +1894,7 @@ module advance_xm_wpxp_module
                           invrs_rho_ds_zm, invrs_rho_ds_zt, & ! In
                           wpxp_upper_lim, wpxp_lower_lim, &! In
                           l_implemented, em, Lscale, thlm, exner, & ! In
-                          rtm, rcm, p_in_Pa, thvm, & ! In
+                          rtm, rcm, p_in_Pa, thvm, ice_supersat_frac,& ! In
                           lhs ) ! Out
 
     ! Description:
@@ -2081,6 +2083,7 @@ module advance_xm_wpxp_module
       rcm,                    & ! cloud water mixing ratio, r_c          [kg/kg]
       p_in_Pa,                & ! Air pressure                              [Pa]
       thvm,                   & ! Virtual potential temperature              [K]
+      ice_supersat_frac,      & !
       wm_zm,                  & ! w wind component on momentum levels      [m/s]
       wm_zt,                  & ! w wind component on thermo. levels       [m/s]
       wp2,                    & ! w'^2 (momentum levels)               [m^2/s^2]
@@ -2154,7 +2157,7 @@ module advance_xm_wpxp_module
 
     if ( l_stability_correct_Kh_N2_zm ) then
       Kh_N2_zm = Kh_zm / calc_stability_correction( thlm, Lscale, em, exner, rtm, rcm, &
-                                                    p_in_Pa, thvm )
+                                                    p_in_Pa, thvm , ice_supersat_frac)
     else
       Kh_N2_zm = Kh_zm
     end if

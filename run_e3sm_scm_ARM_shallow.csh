@@ -3,8 +3,8 @@
 #######################################################################
 #######################################################################
 #######  Script to run E3SM in SCM for
-#######  DYCOMSrf01 
-#######  Non-precipitating marine stratocumulus
+#######  ARM_shallow 
+#######  ARM GCSS shallow convection
 #######  
 #######  Script Author: P. Bogenschutz (bogenschutz1@llnl.gov)
 
@@ -12,7 +12,7 @@
 #######  BEGIN USER DEFINED SETTINGS
 
   # Set the name of your case here
-  setenv casename run_e3sm_scm_DYCOMSrf01
+  setenv casename run_e3sm_scm_ARM_shallow
 
   # Set the case directory here
   setenv casedirectory $CSCRATCH/SCM_runs
@@ -61,20 +61,20 @@
 ###########################################################################
 
 # Case specific information kept here
-  set lat = 31.5 # latitude  
-  set lon = 239.0 # longitude
+  set lat = 36.6 # latitude  
+  set lon = 262.5 # longitude
   set do_iop_srf_prop = .true. # Use surface fluxes in IOP file?
   set do_scm_relaxation = .false. # Relax case to observations?
-  set do_turnoff_swrad = .true. # Turn off SW calculation
+  set do_turnoff_swrad = .false. # Turn off SW calculation
   set do_turnoff_lwrad = .false. # Turn off LW calculation
   set do_turnoff_precip = .true. # Turn off precipitation
-  set micro_nccons_val = 55.0D6 # cons_droplet value for liquid
+  set micro_nccons_val = 50.0D6 # cons_droplet value for liquid
   set micro_nicons_val = 0.0001D6 # cons_droplet value for ice
-  set startdate = 1999-07-10 # Start date in IOP file
+  set startdate = 1997-06-21 # Start date in IOP file
   set start_in_sec = 0 # start time in seconds in IOP file
   set stop_option = nhours 
-  set stop_n = 12
-  set iop_file = DYCOMSrf01_iopfile_4scam.nc #IOP file name
+  set stop_n = 14
+  set iop_file = ARM_shallow_iopfile_4scam.nc #IOP file name
 # End Case specific stuff here
 
   # Location of IOP file

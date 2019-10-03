@@ -214,11 +214,6 @@ cat <<EOF >> user_nl_cam
  use_rad_dt_cosz = .true.
  ice_sed_ai = 500.0
  cldfrc_dp1 = 0.045D0
- clubb_ice_deep = 16.e-6
- clubb_ice_sh = 50.e-6
- clubb_liq_deep = 8.e-6
- clubb_liq_sh = 10.e-6
- clubb_C2rt = 1.75D0
  zmconv_c0_lnd = 0.007
  zmconv_c0_ocn = 0.007
  zmconv_dmpdz = -0.7e-3
@@ -226,12 +221,8 @@ cat <<EOF >> user_nl_cam
  effgw_oro = 0.25
  seasalt_emis_scale = 0.85
  dust_emis_fact = 2.05D0
- clubb_gamma_coef = 0.32
- clubb_gamma_coefb = 0.32
- clubb_c1b = 1.335
- clubb_C8 = 4.3
  cldfrc2m_rhmaxi = 1.05D0
- clubb_c_K10 = 0.3 
+ clubb_c_K10 = 0.3
  effgw_beres = 0.4
  do_tms = .false.
  so4_sz_thresh_icenuc = 0.075e-6
@@ -241,16 +232,70 @@ cat <<EOF >> user_nl_cam
  zmconv_cape_cin = 1
  zmconv_mx_bot_lyr_adj = 2
  taubgnd = 2.5D-3
- clubb_C1 = 1.335
  raytau0 = 5.0D0
  prc_coef1 = 30500.0D0
- prc_exp = 3.19D0 
+ prc_exp = 3.19D0
  prc_exp1 = -1.2D0
  se_ftype = 2
- clubb_C14 = 1.3D0
- relvar_fix = .true. 
- mg_prc_coeff_fix = .true.
- rrtmg_temp_fix = .true.
+
+! dtime=300
+! clubb_timestep = 150
+ clubb_C1 = 1.0D0
+ clubb_C1b = 1.0D0
+ clubb_C2rt = 2.0D0
+ clubb_C2thl = 2.0D0
+ clubb_C2rtthl = 2.0D0
+ clubb_C4   = 2.0D0
+ clubb_C5   = 0.3D0
+ clubb_C6rt = 2.0D0
+ clubb_C6rtb = 2.0D0
+ clubb_C6thlb = 2.0D0
+ clubb_beta = 1.0D0
+ clubb_gamma_coef = 0.25D0
+ clubb_gamma_coefb = 0.25D0
+ clubb_c_K2 = 0.025D0
+ clubb_nu2  = 1.0D0
+ clubb_C14 = 1.0D0
+ clubb_C15 = 0.0D0
+ clubb_C8 = 0.5D0
+ clubb_C11  = 0.4D0
+ clubb_C11b = 0.4D0
+ clubb_C_invrs_tau_bkgnd = 1.1
+ clubb_C_invrs_tau_sfc = 0.1
+ clubb_C_invrs_tau_shear = 0.02
+ clubb_C_invrs_tau_N2 = 0.4
+ clubb_C_invrs_tau_N2_wp2 = 0.1
+ clubb_C_invrs_tau_N2_xp2 = 0.05
+ clubb_C_invrs_tau_N2_wpxp= 0.0
+ clubb_C_invrs_tau_N2_clear_wp3 = 1.0
+ clubb_ice_deep = 16.e-6
+ clubb_ice_sh = 50.e-6
+ clubb_liq_deep = 8.e-6
+ clubb_liq_sh = 10.e-6
+
+ history_amwg = .true.
+ history_budget = .true.
+ clubb_history = .true.
+ clubb_rad_history = .false.
+
+ !ice_supersat = .true.
+ macrop_scheme = 'CLUBB_SGS'
+ eddy_scheme = 'CLUBB_SGS'
+ shallow_scheme = 'CLUBB_SGS'
+ !deep_scheme = 'off'
+ !subcol_scheme = 'SILHS'
+ !use_subcol_microp = .true.
+ !microp_uniform = .true.
+ clubb_do_adv = .false.
+ clubb_expldiff = .false.
+ clubb_rainevap_turb = .false.
+ clubb_cloudtop_cooling = .false.
+
+ clubb_vars_zt = $clubb_vars_zt_list
+ clubb_vars_zm = $clubb_vars_zm_list
+
+ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list
+
 EOF
 
 # if constant droplet was selected then modify name list to reflect this

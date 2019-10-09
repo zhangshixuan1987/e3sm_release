@@ -9,7 +9,7 @@
 ###===================================================================
 
 ### BASIC INFO ABOUT RUN
-set job_name       = FC5ATMMOD_zm #A_WCYCL1850_template
+set job_name       = FC5ATMMOD_zm_L72 #A_WCYCL1850_template
 set compset        = FC5ATMMOD
 set resolution     = ne16_ne16
 set machine        = anvil
@@ -838,7 +838,7 @@ else
   e3sm_newline
   e3sm_print 'Configuring E3SM to use the COSP simulator.'
   e3sm_newline
-#  $xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-cosp'
+  $xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-dyn se -phys cam5 -clubb_sgs -rad rrtmg -chem trop_mam3 -silent -nlev 72 -microphys mg$MGVER  -cppdefs '-DUWM_MISC' '
 endif
 
 #===========================

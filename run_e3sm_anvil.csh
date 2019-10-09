@@ -9,9 +9,11 @@
 ###===================================================================
 
 ### BASIC INFO ABOUT RUN
-set job_name       = FC5ATMMOD_zm_L72 #A_WCYCL1850_template
-set compset        = FC5ATMMOD
-set resolution     = ne16_ne16
+set job_name       = test #A_WCYCL1850_template
+#set compset        = FC5ATMMOD
+#set resolution     = ne16_ne16
+set compset        = A_WCYCL1850S_CMIP6
+set resolution     = ne30_oECv3_ICG
 set machine        = anvil
 
 set walltime       = 18:00:00

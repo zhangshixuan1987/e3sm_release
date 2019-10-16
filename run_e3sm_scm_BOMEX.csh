@@ -15,8 +15,7 @@
 #######  BEGIN USER DEFINED SETTINGS
 
   # Set the name of your case here
-  setenv casename run_e3sm_scm_BOMEX_flag
-
+  setenv casename run_e3sm_scm_BOMEX_default
 
 
 
@@ -29,13 +28,12 @@
   setenv code_dir $HOME/E3SM_code
 
   # Code tag name 
-  setenv code_tag zhun   
-                                                         
+  setenv code_tag zhun 
   # Name of machine you are running on (i.e. cori, anvil, etc)                                                    
   setenv machine cori-knl
-  
+
   # Name of project to run on, if submitting to queue
-  setenv projectname m2136  
+  setenv projectname m2136
 
   # Aerosol specification
   # Options include:
@@ -58,14 +56,7 @@
 
 # User enter any needed modules to load or use below
 #  EXAMPLE:
-
   module load python
-  module load idl
-  module load ncl
-  module load ncview
-  module load cray-netcdf
-  module load cray-hdf5
-  module load craype
 
 ####### END USER DEFINED SETTINGS
 ####### Likely POSSIBLE EXCEPTION (not limited to):  
@@ -200,7 +191,6 @@ cat <<EOF >> user_nl_cam
  cld_macmic_num_steps = $clubb_micro_steps
  cosp_lite = .true.
  use_gw_front = .true.
-
  iopfile = '$input_data_dir/$iop_path/$iop_file'
  mfilt = 10000
  nhtfrq = 1
@@ -213,57 +203,120 @@ cat <<EOF >> user_nl_cam
  precip_off = $do_turnoff_precip
  scmlat = $lat 
  scmlon = $lon
- dtime=60
 EOF
 
 # CAM namelist options to match E3SMv1 settings
 #  Future implementations this block will not be needed
 #  Match settings in compset 2000_cam5_av1c-04p2
 cat <<EOF >> user_nl_cam
- clubb_C1 = 1.0D0                                                                        
- clubb_C1b = 1.0D0                                                                       
- clubb_C2rt = 2.0D0                                                                      
- clubb_C2thl = 2.0D0                                                                     
- clubb_C2rtthl = 2.0D0                                                                   
- clubb_C6rt = 2.0D0                                                                      
- clubb_C6rtb = 2.0D0                                                                     
- clubb_C6thlb = 2.0D0                                                                    
- clubb_gamma_coef = 0.25D0                                                               
- clubb_gamma_coefb = 0.25D0                                                              
- clubb_c_K2 = 0.025D0                                                                    
- clubb_nu2  = 1.0D0                                                                      
- clubb_C14 = 1.0D0                                                                       
- clubb_C8 = 0.5D0                                                                        
- clubb_C11  = 0.4D0                                                                      
- clubb_C11b = 0.4D0                                                                      
- clubb_C_invrs_tau_bkgnd = 1.1                                                           
- clubb_C_invrs_tau_sfc = 0.1                                                             
- clubb_C_invrs_tau_shear = 0.02                                                          
- clubb_C_invrs_tau_N2 = 0.4                                                              
- clubb_C_invrs_tau_N2_wp2 = 0.1                                                          
- clubb_C_invrs_tau_N2_xp2 = 0.05                                                         
- clubb_C_invrs_tau_N2_wpxp= 0.0                                                          
- clubb_C_invrs_tau_N2_clear_wp3 = 1.0                                                    
+ use_hetfrz_classnuc = .true.
+ micro_mg_dcs_tdep = .true.
+ microp_aero_wsub_scheme = 1
+ sscav_tuning = .true.
+ convproc_do_aer = .true.
+ demott_ice_nuc = .true.
+ liqcf_fix = .true.
+ regen_fix = .true.
+ resus_fix = .false.
+ mam_amicphys_optaa = 1
+ fix_g1_err_ndrop = .true.
+ ssalt_tuning = .true.
+ use_rad_dt_cosz = .true.
+ ice_sed_ai = 500.0
+ cldfrc_dp1 = 0.045D0
+ zmconv_c0_lnd = 0.007
+ zmconv_c0_ocn = 0.007
+ zmconv_dmpdz = -0.7e-3
+ zmconv_ke = 1.5E-6
+ effgw_oro = 0.25
+ seasalt_emis_scale = 0.85
+ dust_emis_fact = 2.05D0
+ cldfrc2m_rhmaxi = 1.05D0
+ clubb_c_K10 = 0.3 
+ effgw_beres = 0.4
+ do_tms = .false.
+ so4_sz_thresh_icenuc = 0.075e-6
+ n_so4_monolayers_pcage = 8.0D0
+ micro_mg_accre_enhan_fac = 1.5D0
+ zmconv_tiedke_add = 0.8D0
+ zmconv_cape_cin = 1
+ zmconv_mx_bot_lyr_adj = 2
+ taubgnd = 2.5D-3
+ raytau0 = 5.0D0
+ prc_coef1 = 30500.0D0
+ prc_exp = 3.19D0 
+ prc_exp1 = -1.2D0
+ se_ftype = 2
 
-clubb_history = .true.                                                                   
-clubb_rad_history = .false.                                                              
-history_budget = .true.                                                                  
-clubb_history = .true.                                                                   
-clubb_rad_history = .false.                                                              
-clubb_vars_zt = $clubb_vars_zt_list                                                      
-clubb_vars_zm = $clubb_vars_zm_list
+! dtime=300
+! clubb_timestep = 150
+ clubb_C1 = 1.0D0
+ clubb_C1b = 1.0D0
+ clubb_C2rt = 2.0D0
+ clubb_C2thl = 2.0D0
+ clubb_C2rtthl = 2.0D0
+ clubb_C4   = 2.0D0
+ clubb_C5   = 0.3D0
+ clubb_C6rt = 2.0D0
+ clubb_C6rtb = 2.0D0
+ clubb_C6thlb = 2.0D0
+ clubb_beta = 1.0D0
+ clubb_gamma_coef = 0.25D0
+ clubb_gamma_coefb = 0.25D0
+ clubb_c_K2 = 0.025D0
+ clubb_nu2  = 1.0D0
+ clubb_C14 = 1.0D0
+ clubb_C15 = 0.0D0
+ clubb_C8 = 0.5D0
+ clubb_C11  = 0.4D0
+ clubb_C11b = 0.4D0
+ clubb_C_invrs_tau_bkgnd = 1.1  
+ clubb_C_invrs_tau_sfc = 0.1    
+ clubb_C_invrs_tau_shear = 0.02 
+ clubb_C_invrs_tau_N2 = 0.4     
+ clubb_C_invrs_tau_N2_wp2 = 0.1 
+ clubb_C_invrs_tau_N2_xp2 = 0.05 
+ clubb_C_invrs_tau_N2_wpxp= 0.0 
+ clubb_C_invrs_tau_N2_clear_wp3 = 1.0 
+ clubb_ice_deep = 16.e-6
+ clubb_ice_sh = 50.e-6
+ clubb_liq_deep = 8.e-6
+ clubb_liq_sh = 10.e-6
 
-macrop_scheme = 'CLUBB_SGS'
-eddy_scheme = 'CLUBB_SGS'
-shallow_scheme = 'CLUBB_SGS'
-deep_scheme = 'off'
+ history_amwg = .true.
+ history_budget = .true.
+ clubb_history = .true.
+ clubb_rad_history = .false.
 
+ !ice_supersat = .true.
+ macrop_scheme = 'CLUBB_SGS'
+ eddy_scheme = 'CLUBB_SGS'
+ shallow_scheme = 'CLUBB_SGS'
+ !deep_scheme = 'off'
+ !subcol_scheme = 'SILHS'
+ !use_subcol_microp = .true.
+ !microp_uniform = .true.
+ clubb_do_adv = .false.
+ clubb_expldiff = .false.
+ clubb_rainevap_turb = .false.
+ clubb_cloudtop_cooling = .false.
 
-fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list
+ clubb_vars_zt = $clubb_vars_zt_list
+ clubb_vars_zm = $clubb_vars_zm_list
+ 
+ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list
 
  relvar_fix = .true. 
  mg_prc_coeff_fix = .true.
  rrtmg_temp_fix = .true.
+ microp_scheme = 'MG'
+ micro_mg_version = 2 
+ micro_mg_sub_version = 0
+ micro_mg_num_steps = 1
+ micro_mg_dcs = 390e-6
+ micro_mg_berg_eff_factor = 1.0
+ cldfrc2m_rhmini = 0.8
+ cldfrc2m_rhmaxi = 1.05
 EOF
 
 # if constant droplet was selected then modify name list to reflect this
@@ -338,7 +391,9 @@ set CLM_CONFIG_OPTS="-phys clm4_5"
   ./xmlchange CICE_CONFIG_OPTS="-nodecomp -maxblocks 1 -nx 1 -ny 1"
 
 # Build the case 
-  ./case.build
+
+ ./case.build
+#  ln -sf /global/cscratch1/sd/zhun/SCM_runs/run_e3sm_scm_BOMEX_dt300/e3sm.exe  $run_root_dir/build/e3sm.exe
 
   ./case.submit
   

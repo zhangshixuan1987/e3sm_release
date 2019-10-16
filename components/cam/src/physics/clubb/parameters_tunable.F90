@@ -88,7 +88,8 @@ module parameters_tunable
     clubb_C_invrs_tau_N2_wp2,      &
     clubb_C_invrs_tau_N2_xp2,      &
     clubb_C_invrs_tau_N2_wpxp,     &
-    clubb_C_invrs_tau_N2_clear_wp3 
+    clubb_C_invrs_tau_N2_clear_wp3,&
+    clubb_C_wp2_splat 
 
 
   ! Model constant parameters
@@ -128,7 +129,7 @@ module parameters_tunable
     C13     = 0.100000_core_rknd,    & ! Not currently used in model         [-]
     C14     = 1.000000_core_rknd,    & ! Constant for u'^2 and v'^2 terms    [-]
     C15     = 0.0_core_rknd,         & ! Coefficient for the wp3_bp2 term    [-]
-    C_wp2_splat = 2.0_core_rknd            ! Coefficient for gustiness near ground [-]
+    C_wp2_splat = 0.0_core_rknd            ! Coefficient for gustiness near ground [-]
 !$omp threadprivate(C1, C1b, C1c, C2, C2b, C2c, &
 !$omp   C2rt, C2thl, C2rtthl, C4, C5, C6rt, C6rtb, C6rtc, &
 !$omp   C6thl, C6thlb, C6thlc, &
@@ -506,7 +507,8 @@ module parameters_tunable
     clubb_C_invrs_tau_N2_wp2,      &
     clubb_C_invrs_tau_N2_xp2,      &
     clubb_C_invrs_tau_N2_wpxp,     &
-    clubb_C_invrs_tau_N2_clear_wp3
+    clubb_C_invrs_tau_N2_clear_wp3,&
+    clubb_C_wp2_splat
 
 
     integer :: read_status
@@ -556,6 +558,7 @@ module parameters_tunable
     clubb_C_invrs_tau_N2_xp2 = init_value
     clubb_C_invrs_tau_N2_wpxp = init_value
     clubb_C_invrs_tau_N2_clear_wp3 = init_value
+    clubb_C_wp2_splat = init_value
 
 
     if (masterproc) then
@@ -612,6 +615,7 @@ module parameters_tunable
    call mpibcast(clubb_C_invrs_tau_N2_xp2 , 1, mpir8,  0, mpicom)
    call mpibcast(clubb_C_invrs_tau_N2_wpxp , 1, mpir8,  0, mpicom)
    call mpibcast(clubb_C_invrs_tau_N2_clear_wp3 , 1, mpir8,  0, mpicom)
+   call mpibcast(clubb_C_wp2_splat, 1, mpir8,  0, mpicom)
 
 
 #endif
@@ -1245,6 +1249,7 @@ module parameters_tunable
     if (clubb_C_invrs_tau_N2_xp2  /= init_value)C_invrs_tau_N2_xp2 = clubb_C_invrs_tau_N2_xp2
     if (clubb_C_invrs_tau_N2_wpxp  /= init_value)C_invrs_tau_N2_wpxp = clubb_C_invrs_tau_N2_wpxp
     if (clubb_C_invrs_tau_N2_clear_wp3  /= init_value)C_invrs_tau_N2_clear_wp3 = clubb_C_invrs_tau_N2_clear_wp3
+    if (clubb_C_wp2_splat  /= init_value ) C_wp2_splat = clubb_C_wp2_splat
 
     ! Put the variables in the output array
     call pack_parameters &

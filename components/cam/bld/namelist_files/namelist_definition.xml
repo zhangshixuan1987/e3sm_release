@@ -3290,6 +3290,13 @@ Coefficient of inverse tau term contributed by Brunt Vaisala frequency [-]
 Default: 0.0D0
 </entry>
 
+<entry id="clubb_C_wp2_splat"  type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+Coefficient of splat [-]
+Default: 0.0D0
+</entry>
+
+
 <!-- CARMA Sectional Microphysics -->
 
 <entry id="carma_model" type="char*32" category="carma"

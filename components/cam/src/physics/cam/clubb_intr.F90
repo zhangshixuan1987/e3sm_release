@@ -1417,7 +1417,6 @@ end subroutine clubb_init_cnst
    real(r8) :: rho(pcols,pverp)                 ! Midpoint density in CAM                       [kg/m^3]
    real(r8) :: thv(pcols,pver)                  ! virtual potential temperature                 [K]
    real(r8) :: edsclr_out(pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB          [units vary]
-   !real(r8) :: cloud_frac(pcols,pverp)          ! CLUBB cloud fraction                          [fraction]
    real(r8) :: rcm(pcols,pverp)                 ! CLUBB cloud water mixing ratio                [kg/kg]
    real(r8) :: cloud_frac(pcols,pverp)          ! CLUBB cloud fraction                          [fraction]
    real(r8) :: wpthvp(pcols,pverp)              ! CLUBB buoyancy flux                           [W/m^2]
@@ -1488,8 +1487,8 @@ end subroutine clubb_init_cnst
    real(r8), dimension(nparams)          :: clubb_params                ! These adjustable CLUBB parameters (C1, C2 ...)
    real(r8), dimension(sclr_dim)         :: sclr_tol                    ! Tolerance on passive scalar       [units vary]
 ! Zhun not sure
-!   type(pdf_parameter) :: pdf_params                                    ! PDF parameters                    [units vary]
-!   type(pdf_parameter) :: pdf_params_zm                                 ! PDF parameters on momentum levels [units vary]
+   type(pdf_parameter) :: pdf_params                                    ! PDF parameters                    [units vary]
+   type(pdf_parameter) :: pdf_params_zm                                 ! PDF parameters on momentum levels [units vary]
    real(r8), dimension(pverp,num_pdf_params) :: pdf_params_packed       ! Packed for storage in pbuf
    real(r8), dimension(pverp,num_pdf_params) :: pdf_params_zm_packed    ! Packed for storage in pbuf
    integer :: stats_nsamp, stats_nout                               ! Stats sampling and output intervals for CLUBB [timestep]
@@ -1544,8 +1543,8 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:,:) :: pdf_params_zm_ptr ! putting the params (zm) in the pbuf     [variable]
    real(r8), pointer, dimension(:,:) :: cmfmc_sh ! Shallow convective mass flux--m subc (pcols,pverp) [kg/m2/s/]
    
-   type(pdf_parameter), pointer :: pdf_params
-   type(pdf_parameter), pointer :: pdf_params_zm
+!   type(pdf_parameter), pointer :: pdf_params
+!   type(pdf_parameter), pointer :: pdf_params_zm
    real(r8), pointer, dimension(:,:) :: prer_evap
    real(r8), pointer, dimension(:,:) :: qrl
    real(r8), pointer, dimension(:,:) :: radf_clubb
@@ -1752,12 +1751,12 @@ end subroutine clubb_init_cnst
    call pbuf_get_field(pbuf, accre_enhan_idx, accre_enhan)
    call pbuf_get_field(pbuf, cmeliq_idx,  cmeliq)
 
-!   call pbuf_get_field(pbuf, ice_supersat_idx, ice_supersat_frac)
-!   call pbuf_get_field(pbuf, pdf_params_idx,  pdf_params_ptr)
-!   call pbuf_get_field(pbuf, pdf_params_zm_idx,  pdf_params_zm_ptr)
+   call pbuf_get_field(pbuf, ice_supersat_idx, ice_supersat_frac)
+   call pbuf_get_field(pbuf, pdf_params_idx,  pdf_params_ptr)
+   call pbuf_get_field(pbuf, pdf_params_zm_idx,  pdf_params_zm_ptr)
 !   call pbuf_get_field(pbuf, rcm_idx,     rcm)
 !   call pbuf_get_field(pbuf, cloud_frac_idx, cloud_frac)
-!   call pbuf_get_field(pbuf, ztodt_idx,   ztodtptr)
+   call pbuf_get_field(pbuf, ztodt_idx,   ztodtptr)
 
    call pbuf_get_field(pbuf, relvar_idx,  relvar)
    call pbuf_get_field(pbuf, dp_frac_idx, deepcu)
@@ -2266,10 +2265,12 @@ end subroutine clubb_init_cnst
  
       !  Set-up CLUBB core at each CLUBB call because heights can change 
       call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), &
-         zi_g(1), zi_g, zt_g)
+         zi_g(1), zi_g(1:pverp), zt_g(1:pverp))
 
+      begin_height = 1
+      end_height = pverp
       call setup_parameters_api(zi_g(2), clubb_params, pverp, grid_type, &
-        zi_g, zt_g, err_code)
+        zi_g(begin_height:end_height), zt_g(begin_height:end_height), err_code)
  
       !  Compute some inputs from the thermodynamic grid
       !  to the momentum grid
@@ -2505,8 +2506,8 @@ end subroutine clubb_init_cnst
       ! End cloud-top radiative cooling contribution to CLUBB     !
       ! --------------------------------------------------------- !  
 
-      pdf_params    => pdf_params_chnk(i,lchnk)
-      pdf_params_zm => pdf_params_zm_chnk(i,lchnk)
+!      pdf_params    => pdf_params_chnk(i,lchnk)
+!      pdf_params_zm => pdf_params_zm_chnk(i,lchnk)
 
       call t_startf('adv_clubb_core_ts_loop')
 

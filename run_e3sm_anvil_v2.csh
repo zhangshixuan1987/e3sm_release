@@ -9,7 +9,7 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = subcol_silhs_test1 #A_WCYCL1850_template
+set job_name       = subcol_silhs_test2 #A_WCYCL1850_template
 #set compset        = FAMIPC5 
 set compset        =  FC5CLBMG2BCL72
 set resolution     = ne16_ne16

@@ -16,10 +16,11 @@ module thread_mod
   implicit none
   private
 
-  integer, public :: NThreads, nthreads_accel
-  integer, public :: vert_num_threads
-  integer, public :: nThreadsHoriz=1   ! Actuall number of threads in the horizontal dimension
-  integer, public :: vthreads
+  integer, public :: NThreads   ! total number of threads
+                                ! standalone HOMME: from namelist
+                                ! in CAM: set by driver
+  integer, public :: hthreads   ! computed based on nthreads, vthreads,nelemd
+  integer, public :: vthreads = 1   ! not used unless set in namelist
 
   public :: omp_get_thread_num
   public :: omp_in_parallel

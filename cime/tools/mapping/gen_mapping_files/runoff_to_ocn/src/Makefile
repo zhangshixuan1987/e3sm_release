@@ -37,8 +37,8 @@ VPATH    := $(shell pwd)
 SRCFILE  := NONE
 SRCS     := NONE
 DEPGEN   := ./makdep  # an externally provided dependency generator
-#compile_threaded := true
-compile_threaded := false
+#compile_threaded := TRUE
+compile_threaded := FALSE
 
 ifneq ($(VPATH),.)
   # this variable was specified on cmd line or in an env var
@@ -88,6 +88,7 @@ INCLDIR  += -I$(NETCDF_PATH)/include
 # echo file names, paths, compile flags, etc. used during build
 #-------------------------------------------------------------------------------
 
+.PHONY: db_files
 db_files:
 	@echo " "
 	@echo "* EXEC    := $(EXEC)"
@@ -99,6 +100,8 @@ db_files:
 	@echo "* SRCS    := $(SRCS)"
 	@echo "* OBJS    := $(OBJS)"
 	@echo "* DEPS    := $(DEPS)"
+
+.PHONY: db_flags
 db_flags:
 	@echo " "
 	@echo "* cc      := $(SCC)  $(CFLAGS) $(INCS) $(INCLDIR)"
@@ -129,14 +132,13 @@ else
 	$(SFC)  $(FFLAGS) $(FREEFLAGS) $(CPPDEFS) $(INCS) $(INCLDIR) $*.F90
 endif
 
+.PHONY: clean
 clean:
-	$(RM) -f *.f *.f90 *.d *.mod $(OBJS)
+	$(RM) -f *.f *.f90 *.d *.mod *.optrpt $(OBJS) $(EXEC) $(DEPGEN)
 
-realclean: clean
-	$(RM) -f $(EXEC)
-
-distclean: realclean
-	$(RM) -f $(MACFILE) env_mach_specific Depends* makdep build.csh
+.PHONY: distclean
+distclean: clean
+	../../../../configure --clean
 
 #-------------------------------------------------------------------------------
 # Build & include dependency files
@@ -169,11 +171,9 @@ $(DEPGEN) :
 # the if-tests prevent DEPS files from being created when they're not needed
 ifneq ($(MAKECMDGOALS), db_files)
 ifneq ($(MAKECMDGOALS), db_flags)
-ifneq ($(MAKECMDGOALS), mostlyclean)
 ifneq ($(MAKECMDGOALS), clean)
-ifneq ($(MAKECMDGOALS), realclean)
+ifneq ($(MAKECMDGOALS), distclean)
     -include $(DEPS)
-endif
 endif
 endif
 endif

@@ -13,7 +13,7 @@ tmax=38000
 
 ; NETCDF files to process
 fnames =  systemfunc( \
-  "ls hszonal0.nc;" \
+  "ls hszonal*.nc;" \
 )
 fuv_all   = addfiles(fnames,"r")       ; Open netCDF files.	
 print("files = "+fnames)
@@ -84,9 +84,7 @@ wks = gsn_open_wks("pdf","hszonal")
 
   res@vpWidthF            = .8           ; change aspect ratio of plot
   res@vpHeightF           = .42
-;  res@tiMainString           = ":F21:U"
-  res@tiYAxisString          = ":F21:eta"
-;  res@tiXAxisString          = ":F21:Kinetic Energy"
+  res@tiYAxisString          = "~F21~eta"
 
    field=fuv->u
    field@long_name = "Zonal-mean Zonal Wind"
@@ -113,15 +111,23 @@ wks = gsn_open_wks("pdf","hszonal")
    res@cnLevelSpacingF      = 5.
    c=gsn_csm_contour(wks,field,res)     ; Draw a contour plot.  ;
 
-
-   field=fuv->RH
-   print("RH min/max = "+min(field)+" "+max(field))
-   field@long_name = "Relative Humidity"
-   field@units = ""
-   res@cnMinLevelValF       = -.1
-   res@cnMaxLevelValF       = 1.1  
-   res@cnLevelSpacingF      = .10
+   field@long_name = "Temperature Eddy Variance"
+   print("TEV min/max = "+min(field)+" "+max(field))
+   field@units = "K^2"
+   res@cnMinLevelValF       = 0.
+   res@cnMaxLevelValF       = 150.
+   res@cnLevelSpacingF      = 10.
    c=gsn_csm_contour(wks,field,res)     ; Draw a contour plot.  ;
+
+
+;   field=fuv->RH
+;   print("RH min/max = "+min(field)+" "+max(field))
+;   field@long_name = "Relative Humidity"
+;   field@units = ""
+;   res@cnMinLevelValF       = -.1
+;   res@cnMaxLevelValF       = 1.1  
+;   res@cnLevelSpacingF      = .10
+;   c=gsn_csm_contour(wks,field,res)     ; Draw a contour plot.  ;
 
 
 

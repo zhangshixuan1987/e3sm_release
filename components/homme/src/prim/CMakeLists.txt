@@ -3,22 +3,26 @@
 # and executable prim.
 macro(prim_setup)
 
-INCLUDE_DIRECTORIES ( ${Trilinos_INCLUDE_DIRS} ${Trilinos_TPL_INCLUDE_DIRS} )
-LINK_DIRECTORIES    ( ${Trilinos_LIBRARY_DIRS} ${Trilinos_TPL_LIBRARY_DIRS} )
+INCLUDE_DIRECTORIES ( ${Trilinos_INCLUDE_DIRS} ${Trilinos_TPL_INCLUDE_DIRS})
+LINK_DIRECTORIES    ( ${Trilinos_LIBRARY_DIRS} ${Trilinos_TPL_LIBRARY_DIRS})
 
 SET(UTILS_SHARE_DIR ${HOMME_SOURCE_DIR}/utils/csm_share)
 SET(SRC_DIR         ${HOMME_SOURCE_DIR}/src)
 SET(SRC_SHARE_DIR   ${HOMME_SOURCE_DIR}/src/share)
 SET(PHYSICS_DIR     ${HOMME_SOURCE_DIR}/physics)
-SET(UTILS_TIMING_DIR ${CMAKE_BINARY_DIR}/utils/timing)
+SET(UTILS_TIMING_DIR ${HOMME_BINARY_DIR}/utils/timing)
 SET(UTILS_TRILINOS_DIR ${HOMME_SOURCE_DIR}/utils/trilinos)
 
 # Make INCLUDE_DIRS global so the tests can access it
 SET (EXEC_INCLUDE_DIRS ${PIO_INCLUDE_DIRS}
                        ${UTILS_TIMING_DIR} )
 
+FILE(GLOB SB81_SRC_F90  ${SRC_DIR}/preqx/share/*.F90)
+
 # Make SRCS global so the tests can access it
-SET(PRIM_SRCS ${SRC_SHARE_DIR}/kinds.F90
+SET(PRIM_SRCS 
+  ${SB81_SRC_F90}
+  ${SRC_SHARE_DIR}/kinds.F90
   ${SRC_DIR}/test_src/asp_tests.F90
   ${SRC_DIR}/test_src/baroclinic_inst_mod.F90
   ${SRC_SHARE_DIR}/dimensions_mod.F90
@@ -60,7 +64,6 @@ SET(PRIM_SRCS ${SRC_SHARE_DIR}/kinds.F90
   ${UTILS_SHARE_DIR}/shr_sys_mod.F90 
   ${UTILS_SHARE_DIR}/shr_file_mod.F90 
   ${UTILS_SHARE_DIR}/shr_vmath_mod.F90 
-  ${UTILS_SHARE_DIR}/shr_vmath_fwrap.c 
   ${UTILS_SHARE_DIR}/shr_spfn_mod.F90 
   ${UTILS_SHARE_DIR}/shr_const_mod.F90 
   ${SRC_SHARE_DIR}/domain_mod.F90 
@@ -75,19 +78,18 @@ SET(PRIM_SRCS ${SRC_SHARE_DIR}/kinds.F90
   ${SRC_SHARE_DIR}/prim_si_mod.F90 
   ${SRC_SHARE_DIR}/prim_state_mod.F90
   ${SRC_DIR}/prim_restart_mod.F90 
-  ${SRC_SHARE_DIR}/prim_si_ref_mod.F90 
   ${SRC_SHARE_DIR}/prim_advance_mod.F90 
   ${SRC_SHARE_DIR}/prim_advection_mod.F90
   ${SRC_SHARE_DIR}/prim_implicit_mod.F90
-  ${SRC_DIR}/forcing_mod.F90 
   ${SRC_SHARE_DIR}/metis_mod.F90 
-  ${SRC_SHARE_DIR}/prim_driver_mod.F90 
+  ${SRC_SHARE_DIR}/prim_driver_base.F90 
   ${SRC_DIR}/prim_movie_mod.F90 
   ${SRC_DIR}/surfaces_mod.F90 
   ${SRC_DIR}/repro_sum_mod.F90 
   ${SRC_DIR}/interpolate_driver_mod.F90 
   ${SRC_DIR}/netcdf_io_mod.F90 
   ${SRC_SHARE_DIR}/mesh_mod.F90 
+  ${SRC_SHARE_DIR}/sort_mod.F90 
   ${SRC_SHARE_DIR}/prim_derived_type_mod.F90 
   ${UTILS_TRILINOS_DIR}/trilinosNoxSolver.cpp 
   ${UTILS_TRILINOS_DIR}/trilinosModelEvaluator.cpp 
@@ -136,3 +138,5 @@ createTestExec(prim prim ${PRIM_NP} ${PRIM_NC} ${PRIM_PLEV}
 SET_PROPERTY(TARGET prim PROPERTY LINKER_LANGUAGE Fortran)
 
 TARGET_LINK_LIBRARIES(prim ${Trilinos_LIBRARIES} ${Trilinos_TPL_LIBRARIES})
+
+TARGET_LINK_LIBRARIES(prim ~/arkode/lib)

@@ -5,6 +5,7 @@ module landunit_varcon
   ! Module containing landunit indices and associated variables and routines.
   !
   ! !USES:
+#include "shr_assert.h"
   !
   !
   ! !PUBLIC TYPES:
@@ -29,7 +30,7 @@ module landunit_varcon
   integer, parameter, public :: isturb_md  = 9  !urban md     landunit type
   integer, parameter, public :: isturb_MAX = 9  !maximum urban type index
 
-  integer, parameter, public :: max_lunit  = 9  !maximum value that lun%itype can have
+  integer, parameter, public :: max_lunit  = 9  !maximum value that lun_pp%itype can have
                                         !(i.e., largest value in the above list)
 
   integer, parameter, public                   :: landunit_name_length = 40  ! max length of landunit names
@@ -42,6 +43,7 @@ module landunit_varcon
   !
   ! !PUBLIC MEMBER FUNCTIONS:
   public :: landunit_varcon_init  ! initialize constants in this module
+  public :: landunit_is_special   ! returns true if this is a special landunit
   
   !
   ! !PRIVATE MEMBER FUNCTIONS:
@@ -69,6 +71,33 @@ contains
 
   end subroutine landunit_varcon_init
   
+  !-----------------------------------------------------------------------
+  function landunit_is_special(ltype) result(is_special)
+    !
+    ! !DESCRIPTION:
+    ! Returns true if the landunit type ltype is a special landunit; returns false otherwise
+    !
+    ! !USES:
+    !
+    ! !ARGUMENTS:
+    logical :: is_special  ! function result
+    integer :: ltype       ! landunit type of interest
+    !
+    ! !LOCAL VARIABLES:
+
+    character(len=*), parameter :: subname = 'landunit_is_special'
+    !-----------------------------------------------------------------------
+
+    SHR_ASSERT((ltype >= 1 .and. ltype <= max_lunit), subname//': ltype out of bounds')
+
+    if (ltype == istsoil .or. ltype == istcrop) then
+       is_special = .false.
+    else
+       is_special = .true.
+    end if
+
+  end function landunit_is_special
+
   !-----------------------------------------------------------------------
   subroutine set_landunit_names
     !

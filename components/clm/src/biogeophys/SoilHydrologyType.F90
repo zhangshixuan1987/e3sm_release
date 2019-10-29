@@ -9,9 +9,9 @@ Module SoilHydrologyType
   use clm_varpar            , only : more_vertlayers, nlevsoifl, toplev_equalspace 
   use clm_varcon            , only : zsoi, dzsoi, zisoi, spval
   use clm_varctl            , only : iulog 
-  use CNSharedParamsMod     , only : CNParamsShareInst
-  use LandunitType          , only : lun                
-  use ColumnType            , only : col                
+  use SharedParamsMod     , only : ParamsShareInst
+  use LandunitType          , only : lun_pp                
+  use ColumnType            , only : col_pp                
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -34,6 +34,9 @@ Module SoilHydrologyType
      real(r8), pointer :: zwts_col          (:)     ! col water table depth, the shallower of the two water depths     
      real(r8), pointer :: zwt_perched_col   (:)     ! col perched water table depth
      real(r8), pointer :: wa_col            (:)     ! col water in the unconfined aquifer (mm)
+     real(r8), pointer :: beg_wa_grc        (:)     ! grid-level water in the unconfined aquifer at beginning of the time step (mm)
+     real(r8), pointer :: end_wa_grc        (:)     ! grid-level water in the unconfined aquifer at end of the time step (mm)
+     real(r8), pointer :: qflx_bot_col      (:)
      real(r8), pointer :: qcharge_col       (:)     ! col aquifer recharge rate (mm/s) 
      real(r8), pointer :: fracice_col       (:,:)   ! col fractional impermeability (-)
      real(r8), pointer :: icefrac_col       (:,:)   ! col fraction of ice       
@@ -115,10 +118,13 @@ contains
 
     allocate(this%frost_table_col   (begc:endc))                 ; this%frost_table_col   (:)     = nan
     allocate(this%zwt_col           (begc:endc))                 ; this%zwt_col           (:)     = nan
+    allocate(this%qflx_bot_col      (begc:endc))                 ; this%qflx_bot_col      (:)     = nan
     allocate(this%zwt_perched_col   (begc:endc))                 ; this%zwt_perched_col   (:)     = nan
     allocate(this%zwts_col          (begc:endc))                 ; this%zwts_col          (:)     = nan
 
     allocate(this%wa_col            (begc:endc))                 ; this%wa_col            (:)     = nan
+    allocate(this%beg_wa_grc        (begg:endg))                 ; this%beg_wa_grc        (:)     = nan
+    allocate(this%end_wa_grc        (begg:endg))                 ; this%end_wa_grc        (:)     = nan
     allocate(this%qcharge_col       (begc:endc))                 ; this%qcharge_col       (:)     = nan
     allocate(this%fracice_col       (begc:endc,nlevgrnd))        ; this%fracice_col       (:,:)   = nan
     allocate(this%icefrac_col       (begc:endc,nlevgrnd))        ; this%icefrac_col       (:,:)   = nan
@@ -218,7 +224,7 @@ contains
     use shr_log_mod     , only : errMsg => shr_log_errMsg
     use shr_spfn_mod    , only : shr_spfn_erf
     use shr_kind_mod    , only : r8 => shr_kind_r8
-    use clm_varctl      , only : fsurdat, iulog, use_vichydro
+    use clm_varctl      , only : fsurdat, iulog, use_vichydro, use_var_soil_thick
     use clm_varpar      , only : nlevsoi, nlevgrnd, nlevsno, nlevlak, nlevurb
     use clm_varcon      , only : denice, denh2o, sb, bdsno 
     use clm_varcon      , only : h2osno_max, zlnd, tfrz, spval, pc
@@ -236,6 +242,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     integer            :: p,c,j,l,g,lev,nlevs 
+    integer            :: nlevbed
     integer            :: ivic,ivicstrt,ivicend   
     real(r8)           :: maxslope, slopemax, minslope
     real(r8)           :: d, fd, dfdd, slope0,slopebeta
@@ -259,6 +266,7 @@ contains
     real(r8) ,pointer  :: zisoifl    (:)   ! original soil interface depth 
     real(r8) ,pointer  :: zsoifl     (:)   ! original soil midpoint 
     real(r8) ,pointer  :: dzsoifl    (:)   ! original soil thickness 
+    real(r8) ,pointer  :: fdrain     (:)   ! top-model drainage parameter
     !-----------------------------------------------------------------------
 
     ! -----------------------------------------------------------------
@@ -268,29 +276,57 @@ contains
     this%wa_col(bounds%begc:bounds%endc)  = 5000._r8
     this%zwt_col(bounds%begc:bounds%endc) = 0._r8
 
-    do c = bounds%begc,bounds%endc
-       l = col%landunit(c)
-       if (.not. lun%lakpoi(l)) then  !not lake
-          if (lun%urbpoi(l)) then
-             if (col%itype(c) == icol_road_perv) then
-                this%wa_col(c)  = 4800._r8
-                this%zwt_col(c) = (25._r8 + col%zi(c,nlevsoi)) - this%wa_col(c)/0.2_r8 /1000._r8  ! One meter below soil column
+    if (use_var_soil_thick) then
+       do c = bounds%begc,bounds%endc
+          l = col_pp%landunit(c)
+          nlevbed = col_pp%nlevbed(c)
+          if (.not. lun_pp%lakpoi(l)) then  !not lake
+             if (lun_pp%urbpoi(l)) then
+                if (col_pp%itype(c) == icol_road_perv) then
+                   this%wa_col(c)  = 0._r8
+                   this%zwt_col(c) = col_pp%zi(c,nlevbed)  ! At bedrock depth for variable soil thickness
+                else
+                   this%wa_col(c)  = spval
+                   this%zwt_col(c) = spval
+                end if
+                ! initialize frost_table, zwt_perched
+                this%zwt_perched_col(c) = spval
+                this%frost_table_col(c) = spval
              else
-                this%wa_col(c)  = spval
-                this%zwt_col(c) = spval
+                this%wa_col(c)  = 0._r8
+                this%zwt_col(c) = col_pp%zi(c,nlevbed)  ! At bedrock depth for variable soil thickness
+                ! initialize frost_table, zwt_perched to bottom of soil column
+                this%zwt_perched_col(c) = col_pp%zi(c,nlevbed)
+                this%frost_table_col(c) = col_pp%zi(c,nlevbed)
              end if
-             ! initialize frost_table, zwt_perched
-             this%zwt_perched_col(c) = spval
-             this%frost_table_col(c) = spval
-          else
-             this%wa_col(c)  = 4000._r8
-             this%zwt_col(c) = (25._r8 + col%zi(c,nlevsoi)) - this%wa_col(c)/0.2_r8 /1000._r8  ! One meter below soil column
-             ! initialize frost_table, zwt_perched to bottom of soil column
-             this%zwt_perched_col(c) = col%zi(c,nlevsoi)
-             this%frost_table_col(c) = col%zi(c,nlevsoi)
           end if
-       end if
-    end do
+       end do
+    else
+       do c = bounds%begc,bounds%endc
+          l = col_pp%landunit(c)
+          nlevbed = col_pp%nlevbed(c)
+          if (.not. lun_pp%lakpoi(l)) then  !not lake
+             if (lun_pp%urbpoi(l)) then
+                if (col_pp%itype(c) == icol_road_perv) then
+                   this%wa_col(c)  = 4800._r8
+                   this%zwt_col(c) = (25._r8 + col_pp%zi(c,nlevsoi)) - this%wa_col(c)/0.2_r8 /1000._r8  ! One meter below soil column
+                else
+                   this%wa_col(c)  = spval
+                   this%zwt_col(c) = spval
+                end if
+                ! initialize frost_table, zwt_perched
+                this%zwt_perched_col(c) = spval
+                this%frost_table_col(c) = spval
+             else
+                this%wa_col(c)  = 4000._r8
+                this%zwt_col(c) = (25._r8 + col_pp%zi(c,nlevsoi)) - this%wa_col(c)/0.2_r8 /1000._r8  ! One meter below soil column
+                ! initialize frost_table, zwt_perched to bottom of soil column
+                this%zwt_perched_col(c) = col_pp%zi(c,nlevsoi)
+                this%frost_table_col(c) = col_pp%zi(c,nlevsoi)
+             end if
+          end if
+       end do
+    end if
 
     ! Initialize VIC variables
 
@@ -341,7 +377,7 @@ contains
        end do
 
        do c = bounds%begc, bounds%endc
-          g = col%gridcell(c)
+          g = col_pp%gridcell(c)
           this%b_infil_col(c) = b2d(g)
           this%ds_col(c)      = ds2d(g)
           this%dsmax_col(c)   = dsmax2d(g)
@@ -403,16 +439,16 @@ contains
        enddo
        zisoifl(nlevsoifl) = zsoifl(nlevsoifl) + 0.5_r8*dzsoifl(nlevsoifl)
 
-       organic_max = CNParamsShareInst%organic_max
+       organic_max = ParamsShareInst%organic_max
 
        do c = bounds%begc, bounds%endc
-          g = col%gridcell(c)
-          l = col%landunit(c)
+          g = col_pp%gridcell(c)
+          l = col_pp%landunit(c)
 
-          if (lun%itype(l) /= istdlak) then  ! soil columns of both urban and non-urban types
-             if (lun%itype(l)==istwet .or. lun%itype(l)==istice .or. lun%itype(l)==istice_mec) then
+          if (lun_pp%itype(l) /= istdlak) then  ! soil columns of both urban and non-urban types
+             if (lun_pp%itype(l)==istwet .or. lun_pp%itype(l)==istice .or. lun_pp%itype(l)==istice_mec) then
                 ! do nothing
-             else if (lun%urbpoi(l) .and. (col%itype(c) /= icol_road_perv) .and. (col%itype(c) /= icol_road_imperv) )then
+             else if (lun_pp%urbpoi(l) .and. (col_pp%itype(c) /= icol_road_perv) .and. (col_pp%itype(c) /= icol_road_imperv) )then
                 ! do nothing
              else
                 do lev = 1,nlevgrnd
@@ -448,7 +484,7 @@ contains
                       endif
                    end if
 
-                   if (lun%urbpoi(l)) om_frac = 0._r8
+                   if (lun_pp%urbpoi(l)) om_frac = 0._r8
                    claycol(c,lev)    = clay
                    sandcol(c,lev)    = sand
                    om_fraccol(c,lev) = om_frac
@@ -456,13 +492,13 @@ contains
              end if
           end if ! end of if not lake
 
-          if (lun%itype(l) /= istdlak) then  ! soil columns of both urban and non-urban types
-             if (lun%urbpoi(l)) then
-                if (col%itype(c)==icol_sunwall .or. col%itype(c)==icol_shadewall .or. col%itype(c)==icol_roof) then
+          if (lun_pp%itype(l) /= istdlak) then  ! soil columns of both urban and non-urban types
+             if (lun_pp%urbpoi(l)) then
+                if (col_pp%itype(c)==icol_sunwall .or. col_pp%itype(c)==icol_shadewall .or. col_pp%itype(c)==icol_roof) then
                    ! do nothing
                 else
                    this%depth_col(c, 1:nlayer)         = dzvic
-                   this%depth_col(c, nlayer+1:nlayert) = col%dz(c, nlevsoi+1:nlevgrnd)
+                   this%depth_col(c, nlayer+1:nlayert) = col_pp%dz(c, nlevsoi+1:nlevgrnd)
 
                    ! create weights to map soil moisture profiles (10 layer) to 3 layers for VIC hydrology, M.Huang
                    call initCLMVICMap(c, this)
@@ -470,7 +506,7 @@ contains
                 end if
              else 
                 this%depth_col(c, 1:nlayer) = dzvic
-                this%depth_col(c, nlayer+1:nlayert) = col%dz(c, nlevsoi+1:nlevgrnd)
+                this%depth_col(c, nlayer+1:nlayert) = col_pp%dz(c, nlevsoi+1:nlevgrnd)
 
                 ! create weights to map soil moisture profiles (10 layer) to 3 layers for VIC hydrology, M.Huang
                 call initCLMVICMap(c, this)
@@ -487,7 +523,16 @@ contains
 
     end if ! end of if use_vichydro
 
-    associate(micro_sigma => col%micro_sigma)
+    allocate(fdrain(bounds%begg:bounds%endg))
+    call getfil (fsurdat, locfn, 0)
+    call ncd_pio_openfile (ncid, locfn, 0)
+    call ncd_io(ncid=ncid, varname='fdrain', flag='read', data=fdrain, dim1name=grlnd, readvar=readvar)
+    if (.not. readvar) then
+       fdrain(:) = 2.5_r8
+    end if
+    call ncd_pio_closefile(ncid)
+
+    associate(micro_sigma => col_pp%micro_sigma)
       do c = bounds%begc, bounds%endc
          
          ! determine h2osfc threshold ("fill & spill" concept)
@@ -518,6 +563,8 @@ contains
       end do
     end associate
 
+    deallocate(fdrain)
+
   end subroutine InitCold
 
   !------------------------------------------------------------------------
@@ -543,7 +590,7 @@ contains
          long_name='frost table depth', units='m', &
          interpinic_flag='interp', readvar=readvar, data=this%frost_table_col)
     if (flag == 'read' .and. .not. readvar) then
-       this%frost_table_col(bounds%begc:bounds%endc) = col%zi(bounds%begc:bounds%endc,nlevsoi)
+       this%frost_table_col(bounds%begc:bounds%endc) = col_pp%zi(bounds%begc:bounds%endc,nlevsoi)
     end if
 
     call restartvar(ncid=ncid, flag=flag, varname='WA', xtype=ncd_double,  & 
@@ -561,7 +608,7 @@ contains
          long_name='perched water table depth', units='m', &
          interpinic_flag='interp', readvar=readvar, data=this%zwt_perched_col)
     if (flag == 'read' .and. .not. readvar) then
-       this%zwt_perched_col(bounds%begc:bounds%endc) = col%zi(bounds%begc:bounds%endc,nlevsoi)
+       this%zwt_perched_col(bounds%begc:bounds%endc) = col_pp%zi(bounds%begc:bounds%endc,nlevsoi)
     end if
 
   end subroutine Restart
@@ -722,9 +769,9 @@ contains
      !-----------------------------------------------------------------------
 
      associate(                                                    & 
-          dz            =>    col%dz    ,                          & ! Input:  [real(r8) (:,:)   ]  layer depth (m)                       
-          zi            =>    col%zi    ,                          & ! Input:  [real(r8) (:,:)   ]  interface level below a "z" level (m) 
-          z             =>    col%z     ,                          & ! Input:  [real(r8) (:,:)   ]  layer thickness (m)                   
+          dz            =>    col_pp%dz    ,                          & ! Input:  [real(r8) (:,:)   ]  layer depth (m)                       
+          zi            =>    col_pp%zi    ,                          & ! Input:  [real(r8) (:,:)   ]  interface level below a "z" level (m) 
+          z             =>    col_pp%z     ,                          & ! Input:  [real(r8) (:,:)   ]  layer thickness (m)                   
 
           depth         =>    soilhydrology_vars%depth_col ,       & ! Input:  [real(r8) (:,:)   ]  layer depth of VIC (m)                
           vic_clm_fract =>    soilhydrology_vars%vic_clm_fract_col & ! Output: [real(r8) (:,:,:) ]  fraction of VIC layers in clm layers

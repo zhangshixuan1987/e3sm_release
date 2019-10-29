@@ -5,10 +5,14 @@
 !************************metagraph_mod.F****************************************
 
 module metagraph_mod
+!
+!  Revisions:
+!  Mark Taylor 2018/3  fix memory leak
+!
   use kinds, only : int_kind, iulog
   use gridgraph_mod, only : gridvertex_t, gridedge_t, &
-       allocate_gridvertex_nbrs, assignment ( = )
-  use pio_types ! _EXTERNAL
+       deallocate_gridvertex_nbrs, allocate_gridvertex_nbrs, assignment ( = )
+
 
   implicit none 
   private 
@@ -44,7 +48,7 @@ module metagraph_mod
   public :: PrintMetaEdge, PrintMetaVertex
   public :: LocalElemCount
   !public :: MetaEdgeCount
-  public :: initMetaGraph
+  public :: initMetaGraph, destroyMetaGraph
 
   interface assignment ( = )
      module procedure copy_metaedge
@@ -171,6 +175,7 @@ contains
 
 
   end function LocalElemCount
+
 
   function edge_uses_vertex(Vertex,Edge) result(log)
 
@@ -339,16 +344,18 @@ contains
     if(Debug) write(iulog,*)'initMetagraph: point #4.1 i,MetaVertex%nmembers',i,MetaVertex%nmembers
     allocate(MetaVertex%members(MetaVertex%nmembers))
 
-    do j=1, MetaVertex%nmembers
-       call allocate_gridvertex_nbrs(MetaVertex%members(j))
-    end do
-
+    ! dont allocate %members - struct will be allocated in the overloaded assignement
+    ! operation below
+!    do j=1, MetaVertex%nmembers
+!       call allocate_gridvertex_nbrs(MetaVertex%members(j))
+!    end do
+    
     if(Debug) write(iulog,*)'initMetagraph: point #5'
 
     !  Set the identity of the members of the MetaVertices
     ic=1
     do j=1,nelem
-       if( GridVertex(j)%processor_number .eq. ThisProcessorNumber) then 
+       if( GridVertex(j)%processor_number .eq. ThisProcessorNumber) then
           MetaVertex%members(ic) = GridVertex(j)
           ic=ic+1
        endif
@@ -473,5 +480,23 @@ contains
 
   end subroutine initMetaGraph
 
+  subroutine destroyMetaGraph(MetaVertex)
+    use gridgraph_mod, only: deallocate_gridvertex_nbrs
+
+    type (MetaVertex_t), intent(inout) :: MetaVertex
+    integer :: j
+
+    do j = 1, MetaVertex%nmembers
+       call deallocate_gridvertex_nbrs(MetaVertex%members(j))
+    end do
+    do j = 1, MetaVertex%nedges
+       deallocate(MetaVertex%edges(j)%members)
+       deallocate(MetaVertex%edges(j)%edgeptrP)
+       deallocate(MetaVertex%edges(j)%edgeptrS)
+       deallocate(MetaVertex%edges(j)%edgeptrP_ghost)
+    end do
+    deallocate(MetaVertex%edges)
+    deallocate(MetaVertex%members)
+  end subroutine destroyMetaGraph
 
 end module metagraph_mod

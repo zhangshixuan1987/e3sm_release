@@ -127,6 +127,9 @@ CONFIGURE_FILE(${HOMME_SOURCE_DIR}/test/reg_test/run_tests/testing-utils.sh
 CONFIGURE_FILE(${HOMME_SOURCE_DIR}/test/reg_test/run_tests/diffTol.py
                ${CMAKE_BINARY_DIR}/tests/diffTol.py COPYONLY)
 
+# create list of all executables needed by tests
+ADD_CUSTOM_TARGET(test-execs)
+
 ADD_CUSTOM_TARGET(check 
                   COMMAND ${CMAKE_CTEST_COMMAND} "--output-on-failure")
 
@@ -139,7 +142,8 @@ ADD_CUSTOM_TARGET(baseline
 
 # Create a target for making the reference data
 ADD_TEST(verifyBaselineResults ${CMAKE_BINARY_DIR}/tests/check_baseline.sh)
-ADD_DEPENDENCIES(check verifyBaselineResults)
+# looks like a target(check) cant depend on a test(verifyBaselineResults)
+#ADD_DEPENDENCIES(check verifyBaselineResults)
 
 IF (${HOMME_QUEUING})
   # The first CMake test is running
@@ -164,16 +168,28 @@ ENDIF()
 IF(${BUILD_HOMME_PREQX})
   ADD_SUBDIRECTORY(baroC)
   ADD_SUBDIRECTORY(baroCam)
-  
   ADD_SUBDIRECTORY(preqx-nlev20-interp)
   ADD_SUBDIRECTORY(preqx-nlev20-native)
   ADD_SUBDIRECTORY(preqx-nlev30-interp)
   ADD_SUBDIRECTORY(preqx-nlev30-native)
+  ADD_SUBDIRECTORY(preqx-nlev40-interp)
   ADD_SUBDIRECTORY(preqx-nlev60-interp)
   ADD_SUBDIRECTORY(preqx-nlev60-native)
   IF(${BUILD_HOMME_PREQX_ACC})
     ADD_SUBDIRECTORY(baroCam-acc)
   ENDIF()
+  IF(HOMME_ENABLE_COMPOSE)
+    ADD_SUBDIRECTORY(stt)
+  ENDIF()
+ENDIF()
+
+# Add the test exec subdirs for the prim executable
+
+IF(${BUILD_HOMME_THETA})
+  ADD_SUBDIRECTORY(theta-l-nlev20)
+  ADD_SUBDIRECTORY(theta-l-nlev30)
+  ADD_SUBDIRECTORY(theta-l-nlev40)
+  ADD_SUBDIRECTORY(theta-l-nlev60)
 ENDIF()
 
 # Add the test exec subdirs for the prim executable
@@ -186,12 +202,34 @@ IF(${BUILD_HOMME_SWIM})
   ADD_SUBDIRECTORY(swim5)
 ENDIF()
 
+IF (${BUILD_HOMME_PREQX_KOKKOS})
+  ADD_SUBDIRECTORY(preqx-nlev26)
+  ADD_SUBDIRECTORY(preqx-nlev26-kokkos)
+  ADD_SUBDIRECTORY(preqx-nlev72)
+  ADD_SUBDIRECTORY(preqx-nlev72-kokkos)
+  # Test some stuff in the shared folder
+  ADD_SUBDIRECTORY (share_kokkos_ut)
+ENDIF ()
+
 # Read the test-list.cmake file to get the HOMME_TESTS list
 INCLUDE(${HOMME_SOURCE_DIR}/test/reg_test/run_tests/test-list.cmake)
 # Need a properly scoped variable to store the test directories for the
 #  replaceBaselineResults target
 SET(TEST_DIR_LIST "")
 createTests(HOMME_TESTS)
+
+IF (${BUILD_HOMME_PREQX_KOKKOS})
+  MESSAGE("-- Generating tests no more intensive than profile ${HOMME_TESTING_PROFILE}.\n"
+    "   Example ctest lines:\n"
+    "     ctest -LE \"nightly\": All tests except nightly.\n"
+    "     ctest -L \"dev|unit\": Tests label dev or unit.")
+  make_profiles_up_to(${HOMME_TESTING_PROFILE} profiles)
+  FOREACH (p ${profiles})
+    MESSAGE("-- For profile ${p}:")
+    createTestsWithProfile(HOMME_PREQX_TESTS_WITH_PROFILE ${p})
+    CREATE_CXX_VS_F90_TESTS_WITH_PROFILE(PREQX_COMPARE_F_C_TEST ${p})
+  ENDFOREACH ()
+ENDIF()
 
 IF(${BUILD_HOMME_PREQX} AND ${BUILD_HOMME_PREQX_ACC})
   # add a test dependency here:

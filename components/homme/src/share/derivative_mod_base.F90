@@ -38,6 +38,7 @@ private
   public :: allocate_subcell_integration_matrix
 
   public :: derivinit
+  public :: get_deriv
 
   public :: gradient
   public :: gradient_wk
@@ -78,9 +79,14 @@ private
   public  :: divergence_sphere_wk
   public  :: laplace_sphere_wk
   public  :: vlaplace_sphere_wk
+  public  :: vlaplace_sphere_wk_contra
+  public  :: vlaplace_sphere_wk_cartesian
+!  public  :: laplace_eta
+  public  :: laplace_z
   public  :: element_boundary_integral
   public  :: edge_flux_u_cg
   public  :: limiter_optim_iter_full
+  public  :: limiter_clip_and_sum
 
 contains
 
@@ -148,6 +154,20 @@ contains
 
   end subroutine derivinit
 
+
+  ! initialize and store a deriv structure for easy access
+  subroutine get_deriv(deriv)
+    type (derivative_t), intent(inout) :: deriv
+    type (derivative_t), save :: the_deriv
+    logical :: initialized = .false.
+
+    if(.not. initialized) then
+      call derivinit(the_deriv)
+      initialized = .true.
+    endif
+
+    deriv = the_deriv
+  end subroutine
 
 ! =======================================
 ! dvvinit:
@@ -482,9 +502,9 @@ contains
 !DIR$ UNROLL(NP)
           do j=1,np
              ! phi(n)_y  sum over second index, 1st index fixed at m
-             dscontra(m,n,1)=dscontra(m,n,1)-(elem%mp(m,j)*s(m,j)*deriv%Dvv(n,j) )*rrearth
+             dscontra(m,n,1)=dscontra(m,n,1)-(elem%mp(m,j)*s(m,j)*deriv%Dvv(n,j) )
              ! phi(m)_x  sum over first index, second index fixed at n
-             dscontra(m,n,2)=dscontra(m,n,2)+(elem%mp(j,n)*s(j,n)*deriv%Dvv(m,j) )*rrearth
+             dscontra(m,n,2)=dscontra(m,n,2)+(elem%mp(j,n)*s(j,n)*deriv%Dvv(m,j) )
           enddo
        enddo
     enddo
@@ -492,8 +512,8 @@ contains
     ! convert contra -> latlon 
     do j=1,np
        do i=1,np
-          ds(i,j,1)=(elem%D(i,j,1,1)*dscontra(i,j,1) + elem%D(i,j,1,2)*dscontra(i,j,2))
-          ds(i,j,2)=(elem%D(i,j,2,1)*dscontra(i,j,1) + elem%D(i,j,2,2)*dscontra(i,j,2))
+          ds(i,j,1)=(elem%D(i,j,1,1)*dscontra(i,j,1) + elem%D(i,j,1,2)*dscontra(i,j,2))*rrearth
+          ds(i,j,2)=(elem%D(i,j,2,1)*dscontra(i,j,1) + elem%D(i,j,2,2)*dscontra(i,j,2))*rrearth
        enddo
     enddo
     end function curl_sphere_wk_testcov
@@ -546,20 +566,20 @@ contains
              dscontra(m,n,1)=dscontra(m,n,1)-(&
                   (elem%mp(j,n)*elem%metinv(m,n,1,1)*elem%metdet(m,n)*s(j,n)*deriv%Dvv(m,j) ) +&
                   (elem%mp(m,j)*elem%metinv(m,n,2,1)*elem%metdet(m,n)*s(m,j)*deriv%Dvv(n,j) ) &
-                  ) *rrearth
+                  )
 
              dscontra(m,n,2)=dscontra(m,n,2)-(&
                   (elem%mp(j,n)*elem%metinv(m,n,1,2)*elem%metdet(m,n)*s(j,n)*deriv%Dvv(m,j) ) +&
                   (elem%mp(m,j)*elem%metinv(m,n,2,2)*elem%metdet(m,n)*s(m,j)*deriv%Dvv(n,j) ) &
-                  ) *rrearth
+                  )
           enddo
        enddo
     enddo
     ! convert contra -> latlon 
     do j=1,np
        do i=1,np
-          ds(i,j,1)=(elem%D(i,j,1,1)*dscontra(i,j,1) + elem%D(i,j,1,2)*dscontra(i,j,2))
-          ds(i,j,2)=(elem%D(i,j,2,1)*dscontra(i,j,1) + elem%D(i,j,2,2)*dscontra(i,j,2))
+          ds(i,j,1)=(elem%D(i,j,1,1)*dscontra(i,j,1) + elem%D(i,j,1,2)*dscontra(i,j,2)) *rrearth
+          ds(i,j,2)=(elem%D(i,j,2,1)*dscontra(i,j,1) + elem%D(i,j,2,2)*dscontra(i,j,2)) *rrearth
        enddo
     enddo
 
@@ -1143,7 +1163,6 @@ contains
        end do
     end do
 
-!dir$ simd
     div(:,:)=(div(:,:)+vvtemp(:,:))*(elem%rmetdet(:,:)*rrearth)
     
   end function divergence_sphere
@@ -1329,6 +1348,80 @@ contains
        enddo
     enddo
   end function vlaplace_sphere_wk_contra
+
+
+
+#if 0
+  subroutine laplace_eta(v,laplace,ncomp,etam) 
+!
+!   input:  v = scalar 
+!   ouput:  vertical laplace operator in z coordinates
+!   u'(i+1/2) = u(i+1) - u(i) / deta(i+.5)      no flux b.c.  u(0)=u(1), u(nlev+1)=u(nlev)
+!   u''(i) = u'(i+1/2) - u'(i-1/2) / deta(i)
+!   
+!   NOTE: some variables in HOMME (dp3d, eta_dot_dpdn) have been scaled by deta(i) and so we remove
+!   the second deta(i) factor below.  But if this routine is used for
+!   variables like u or theta and not multiplied by eta_dot_dpdn, this will need some work
+!
+    real(kind=real_kind), intent(in) :: v(np,np,ncomp,nlev)
+    real(kind=real_kind), intent(out):: laplace(np,np,ncomp,nlev)
+    real(kind=real_kind), intent(in) :: etam(nlev)
+    integer :: ncomp
+
+    ! local
+    integer k,n
+    real(kind=real_kind) :: u_eta(np,np,nlev+1)
+
+    ! no flux b.c.
+    u_eta(:,:,1)=0
+    u_eta(:,:,nlev+1)=0
+    do n=1,ncomp
+       do k=2,nlev
+          u_eta(:,:,k) = (v(:,:,n,k)-v(:,:,n,k-1)) / ( etam(k)-etam(k-1) )
+       enddo
+       do k=1,nlev
+          laplace(:,:,n,k) = u_eta(:,:,k+1) - u_eta(:,:,k)
+       enddo
+    enddo
+    end subroutine
+#endif
+
+
+  subroutine laplace_z(v,laplace,ncomp,nk,dz) 
+!
+!   input:  v = scalar 
+!   ouput:  vertical laplace operator in z coordinates
+!   u'(i+1/2) = u(i+1) - u(i) / dz(i+.5)      no flux b.c.  u(0)=u(1), u(nlev+1)=u(nlev)
+!   u''(i) = u'(i+1/2) - u'(i-1/2) / dz(i)
+!   
+!   This routine is currently only used for the supercell test, which uses equally spaced
+!   levels ( dz=20km/nlev ) so currently only a constant dz is supported
+!
+    integer :: ncomp,nk
+    real(kind=real_kind), intent(in) :: v(np,np,ncomp,nk)
+    real(kind=real_kind), intent(out):: laplace(np,np,ncomp,nk)
+    real(kind=real_kind), intent(in) :: dz
+
+
+    ! local
+    real(kind=real_kind) :: u_z(np,np,nk+1)
+    integer :: k,n
+
+    ! no flux b.c.
+    u_z(:,:,1)=0
+    u_z(:,:,nk+1)=0
+    do n=1,ncomp
+       do k=2,nk
+          u_z(:,:,k) = (v(:,:,n,k)-v(:,:,n,k-1)) / dz        ! dz(k-.5)  
+       enddo
+       do k=1,nk
+          laplace(:,:,n,k) =( u_z(:,:,k+1) - u_z(:,:,k) )/dz    ! dz(k)
+       enddo
+    enddo
+    end subroutine
+
+
+
 
 
   function subcell_dss_fluxes(dss, p, n, metdet, C) result(fluxes)
@@ -1687,34 +1780,27 @@ contains
     use dimensions_mod, only : np, np, nlev
 
     real (kind=real_kind), dimension(nlev), intent(inout)   :: minp, maxp
-    real (kind=real_kind), dimension(np,np,nlev), intent(inout)   :: ptens
-    real (kind=real_kind), dimension(np,np,nlev), intent(in), optional  :: dpmass
-    real (kind=real_kind), dimension(np,np), intent(in)   :: sphweights
+    real (kind=real_kind), dimension(np*np,nlev), intent(inout)   :: ptens
+    real (kind=real_kind), dimension(np*np,nlev), intent(in), optional  :: dpmass
+    real (kind=real_kind), dimension(np*np), intent(in)   :: sphweights
 
-    real (kind=real_kind), dimension(np,np) :: ptens_mass
-    integer  k1, k, i, j, iter, weightsnum
-    real (kind=real_kind) :: addmass, weightssum, mass, sumc
+    integer  k1, k, iter, weightsnum
+    real (kind=real_kind) :: addmass, weightssum, mass, sumc, minpk, maxpk
     real (kind=real_kind) :: x(np*np),c(np*np)
-    integer :: maxiter = np*np-1
     real (kind=real_kind) :: tol_limiter = 5e-14
 
- 
     do k=1,nlev
 
-     k1=1
-     do i=1,np
-     do j=1,np
-       c(k1)=sphweights(i,j)*dpmass(i,j,k)
-       x(k1)=ptens(i,j,k)/dpmass(i,j,k)
-       k1=k1+1
-      enddo
+     sumc=0.0d0
+     mass=0.0d0
+     do k1=1,np*np
+       c(k1)=sphweights(k1)*dpmass(k1,k)
+       x(k1)=ptens(k1,k)/dpmass(k1,k)
+       sumc=sumc+c(k1)
+       mass=mass+c(k1)*x(k1)
      enddo
 
-     sumc=sum(c)
      if (sumc <= 0 ) CYCLE   ! this should never happen, but if it does, dont limit
-     mass=sum(c*x)
-
-    
 
       ! relax constraints to ensure limiter has a solution:
       ! This is only needed if runnign with the SSP CFL>1 or
@@ -1725,77 +1811,144 @@ contains
       if( mass > maxp(k)*sumc ) then
         maxp(k) = mass / sumc
       endif
+      minpk = minp(k)
+      maxpk = maxp(k)
 
-    
-
-     do iter=1,maxiter
+     do iter=1,np*np-1
 
       addmass=0.0d0
 
        do k1=1,np*np
-         if((x(k1)>maxp(k))) then
-           addmass=addmass+(x(k1)-maxp(k))*c(k1)
-           x(k1)=maxp(k)
-         endif
-         if((x(k1)<minp(k))) then
-           addmass=addmass-(minp(k)-x(k1))*c(k1)
-           x(k1)=minp(k)
+         if(x(k1)>maxpk) then
+           addmass=addmass+(x(k1)-maxpk)*c(k1)
+           x(k1)=maxpk
+         else if(x(k1)<minpk) then
+           addmass=addmass-(minpk-x(k1))*c(k1)
+           x(k1)=minpk
          endif
        enddo !k1
 
        if(abs(addmass)<=tol_limiter*abs(mass)) exit
 
        weightssum=0.0d0
-!       weightsnum=0
        if(addmass>0)then
         do k1=1,np*np
-          if(x(k1)<maxp(k))then
+          if(x(k1)<maxpk)then
             weightssum=weightssum+c(k1)
-!            weightsnum=weightsnum+1
           endif
         enddo !k1
         do k1=1,np*np
-          if(x(k1)<maxp(k))then
+          if(x(k1)<maxpk)then
               x(k1)=x(k1)+addmass/weightssum
-!              x(k1)=x(k1)+addmass/(c(k1)*weightsnum)
           endif
         enddo
       else
         do k1=1,np*np
-          if(x(k1)>minp(k))then
+          if(x(k1)>minpk)then
             weightssum=weightssum+c(k1)
-!            weightsnum=weightsnum+1
           endif
         enddo
         do k1=1,np*np
-          if(x(k1)>minp(k))then
+          if(x(k1)>minpk)then
             x(k1)=x(k1)+addmass/weightssum
-!           x(k1)=x(k1)+addmass/(c(k1)*weightsnum)
-          endif
+         endif
         enddo
       endif
 
-
    enddo!end of iteration
 
-   k1=1
-   do i=1,np
-    do j=1,np
-      ptens(i,j,k)=x(k1)
-      k1=k1+1
-    enddo
-   enddo
+   ptens(:,k)=x(:)*dpmass(:,k)
 
   enddo
 
-  do k=1,nlev
-    ptens(:,:,k)=ptens(:,:,k)*dpmass(:,:,k)
-  enddo
- 
   end subroutine limiter_optim_iter_full
 
+  subroutine limiter_clip_and_sum(ptens,sphweights,minp,maxp,dpmass)
+    ! Prototype limiter. This is perhaps the fastest limiter that (i) is assured
+    ! to find x in the constraint set if that set is not empty and (ii) is such
+    ! that the 1-norm of the update, norm(x*c - ptens*sphweights, 1), is
+    ! minimal. It does not require iteration. However, its solution quality is
+    ! not established.
+    use kinds         , only : real_kind
+    use dimensions_mod, only : np, np, nlev
+    implicit none
 
+    real (kind=real_kind), dimension(np,np,nlev), intent(inout) :: ptens
+    real (kind=real_kind), dimension(np,np),      intent(in)    :: sphweights
+    real (kind=real_kind), dimension(nlev),       intent(inout) :: minp, maxp
+    real (kind=real_kind), dimension(np,np,nlev), intent(in), optional :: dpmass
 
+    real (kind=real_kind), parameter :: zero = 0.0d0
 
+    integer :: k1, k, i, j
+    logical :: modified
+    real (kind=real_kind) :: addmass, mass, sumc, den
+    real (kind=real_kind) :: x(np*np),c(np*np),v(np*np)
+
+    do k=1,nlev
+
+       k1 = 1
+       do j = 1, np
+          do i = 1, np
+             c(k1) = sphweights(i,j)*dpmass(i,j,k)
+             x(k1) = ptens(i,j,k)/dpmass(i,j,k)
+             k1 = k1+1
+          enddo
+       enddo
+
+       sumc = sum(c)
+       mass = sum(c*x)
+       ! This should never happen, but if it does, don't limit.
+       if (sumc <= 0) cycle
+       ! Relax constraints to ensure limiter has a solution; this is only needed
+       ! if running with the SSP CFL>1 or due to roundoff errors.
+       if (mass < minp(k)*sumc) then
+          minp(k) = mass / sumc
+       endif
+       if (mass > maxp(k)*sumc) then
+          maxp(k) = mass / sumc
+       endif
+
+       addmass = zero
+
+       ! Clip.
+       modified = .false.
+       do k1 = 1, np*np
+          if (x(k1) > maxp(k)) then
+             modified = .true.
+             addmass = addmass + (x(k1) - maxp(k))*c(k1)
+             x(k1) = maxp(k)
+          elseif (x(k1) < minp(k)) then
+             modified = .true.
+             addmass = addmass + (x(k1) - minp(k))*c(k1)
+             x(k1) = minp(k)
+          end if
+       end do
+       if (.not. modified) cycle
+
+       if (addmass /= zero) then
+          ! Determine weights.
+          if (addmass > zero) then
+             v(:) = maxp(k) - x(:)
+          else
+             v(:) = x(:) - minp(k)
+          end if
+          den = sum(v*c)
+          if (den > zero) then
+             ! Update.
+             x(:) = x(:) + (addmass/den)*v(:)
+          end if
+       end if
+
+       k1 = 1
+       do j = 1,np
+          do i = 1,np
+             ptens(i,j,k) = x(k1)*dpmass(i,j,k)
+             k1 = k1+1
+          end do
+       end do
+
+    enddo
+  end subroutine limiter_clip_and_sum
 
 end module derivative_mod_base

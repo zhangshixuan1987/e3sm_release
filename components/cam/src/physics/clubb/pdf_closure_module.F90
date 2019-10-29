@@ -295,6 +295,18 @@ module pdf_closure_module
 
     ! Variables that are stored in derived data type pdf_params.
     real( kind = core_rknd ), dimension(gr%nz) ::  &
+      w_1,           & ! Mean of w (1st PDF component)                     [m/s]
+      w_2,           & ! Mean of w (2nd PDF component)                     [m/s]
+      varnce_w_1,    & ! Variance of w (1st PDF component)             [m^2/s^2]
+      varnce_w_2,    & ! Variance of w (2nd PDF component)             [m^2/s^2]
+      rt_1,          & ! Mean of r_t (1st PDF component)                 [kg/kg]
+      rt_2,          & ! Mean of r_t (2nd PDF component)                 [kg/kg]
+      varnce_rt_1,   & ! Variance of r_t (1st PDF component)         [kg^2/kg^2]
+      varnce_rt_2,   & ! Variance of r_t (2nd PDF component)         [kg^2/kg^2]
+      thl_1,         & ! Mean of th_l (1st PDF component)                    [K]
+      thl_2,         & ! Mean of th_l (2nd PDF component)                    [K]
+      varnce_thl_1,  & ! Variance of th_l (1st PDF component)              [K^2]
+      varnce_thl_2,  & ! Variance of th_l (2nd PDF component)              [K^2]
       u_1,           & ! Mean of eastward wind (1st PDF component)         [m/s]
       u_2,           & ! Mean of eastward wind (2nd PDF component)         [m/s]
       varnce_u_1,    & ! Variance of u (1st PDF component)             [m^2/s^2]
@@ -310,7 +322,42 @@ module pdf_closure_module
       corr_u_w_1,      & ! Correlation of u and w   (1st PDF component)      [-]
       corr_u_w_2,      & ! Correlation of u and w   (2nd PDF component)      [-]
       corr_v_w_1,      & ! Correlation of v and w   (1st PDF component)      [-]
-      corr_v_w_2         ! Correlation of v and w   (2nd PDF component)      [-]
+      corr_v_w_2,      & ! Correlation of v and w   (2nd PDF component)      [-]
+      corr_w_rt_1,   & ! Correlation of w and r_t (1st PDF component)        [-]
+      corr_w_rt_2,   & ! Correlation of w and r_t (2nd PDF component)        [-]
+      corr_w_thl_1,  & ! Correlation of w and th_l (1st PDF component)       [-]
+      corr_w_thl_2,  & ! Correlation of w and th_l (2nd PDF component)       [-]
+      corr_rt_thl_1, & ! Correlation of r_t and th_l (1st PDF component)     [-]
+      corr_rt_thl_2, & ! Correlation of r_t and th_l (2nd PDF component)     [-]
+      alpha_thl,     & ! Factor relating to normalized variance for th_l     [-]
+      alpha_rt,      & ! Factor relating to normalized variance for r_t      [-]
+      crt_1,         & ! Coef. on r_t in s/t eqns. (1st PDF comp.)           [-]
+      crt_2,         & ! Coef. on r_t in s/t eqns. (2nd PDF comp.)           [-]
+      cthl_1,        & ! Coef. on th_l in s/t eqns. (1st PDF comp.)  [(kg/kg)/K]
+      cthl_2           ! Coef. on th_l in s/t eqns. (2nd PDF comp.)  [(kg/kg)/K]
+
+    real( kind = core_rknd ), dimension(gr%nz) :: &
+      chi_1,           & ! Mean of chi (old s) (1st PDF component)       [kg/kg]
+      chi_2,           & ! Mean of chi (old s) (2nd PDF component)       [kg/kg]
+      stdev_chi_1,     & ! Standard deviation of chi (1st PDF component) [kg/kg]
+      stdev_chi_2,     & ! Standard deviation of chi (2nd PDF component) [kg/kg]
+      stdev_eta_1,     & ! Standard dev. of eta (old t) (1st PDF comp.)  [kg/kg]
+      stdev_eta_2,     & ! Standard dev. of eta (old t) (2nd PDF comp.)  [kg/kg]
+      covar_chi_eta_1, & ! Covariance of chi and eta (1st PDF comp.) [kg^2/kg^2]
+      covar_chi_eta_2, & ! Covariance of chi and eta (2nd PDF comp.) [kg^2/kg^2]
+      corr_w_chi_1,    & ! Correlation of w and chi (1st PDF component)      [-]
+      corr_w_chi_2,    & ! Correlation of w and chi (2nd PDF component)      [-]
+      corr_w_eta_1,    & ! Correlation of w and eta (1st PDF component)      [-]
+      corr_w_eta_2,    & ! Correlation of w and eta (2nd PDF component)      [-]
+      corr_chi_eta_1,  & ! Correlation of chi and eta (1st PDF component)    [-]
+      corr_chi_eta_2,  & ! Correlation of chi and eta (2nd PDF component)    [-]
+      rsatl_1,         & ! Mean of r_sl (1st PDF component)              [kg/kg]
+      rsatl_2,         & ! Mean of r_sl (2nd PDF component)              [kg/kg]
+      rc_1,            & ! Mean of r_c (1st PDF component)               [kg/kg]
+      rc_2,            & ! Mean of r_c (2nd PDF component)               [kg/kg]
+      cloud_frac_1,    & ! Cloud fraction (1st PDF component)                [-]
+      cloud_frac_2,    & ! Cloud fraction (2nd PDF component)                [-]
+      mixt_frac          ! Weight of 1st PDF component (Sk_w dependent)      [-]
 
     ! Note:  alpha coefficients = 0.5 * ( 1 - correlations^2 ).
     !        These are used to calculate the scalar widths
@@ -361,6 +408,8 @@ module pdf_closure_module
 
     ! variables for computing ice cloud fraction
     real( kind = core_rknd), dimension(gr%nz) :: &
+      ice_supersat_frac_1, & ! Ice supersaturation fraction (1st PDF comp.)  [-]
+      ice_supersat_frac_2, & ! Ice supersaturation fraction (2nd PDF comp.)  [-]
       rc_1_ice, rc_2_ice
     
     ! To test pdf parameters
@@ -571,6 +620,10 @@ module pdf_closure_module
        pdf_params%corr_w_rt_2  = zero
        pdf_params%corr_w_thl_1 = zero
        pdf_params%corr_w_thl_2 = zero
+!       corr_w_rt_1  = zero
+!       corr_w_rt_2  = zero
+!       corr_w_thl_1 = zero
+!       corr_w_thl_2 = zero
 
     else
 
@@ -695,6 +748,11 @@ module pdf_closure_module
                                     pdf_params%mixt_frac )
     endif
 
+    if ( l_explicit_turbulent_adv_xpyp .or. iwprtp2 > 0 ) then
+       wprtp2 = calc_wpxp2_pdf( wm, rtm, w_1, w_2, rt_1, rt_2, varnce_w_1, &
+                                varnce_w_2, varnce_rt_1, varnce_rt_2, &
+                                corr_w_rt_1, corr_w_rt_2, pdf_params%mixt_frac )
+    endif
 
     ! Scalar Addition to higher order moments
     if ( l_scalar_calc ) then
@@ -777,6 +835,19 @@ module pdf_closure_module
           pdf_params%rsatl_2 = sat_mixrat_liq( p_in_Pa, tl2 )
        elsewhere ( tl2 > t2_combined )
           pdf_params%rsatl_2 = sat_mixrat_liq( p_in_Pa, tl2 ) &
+=======
+          rsatl_1 = sat_mixrat_ice( p_in_Pa, tl1 ) &
+                    + sat_mixrat_ice( p_in_Pa, tl1 ) * (RH_crit(1, 1) -one ) &
+                      * ( t2_combined -tl1)/(t2_combined - t3_combined)
+       elsewhere
+          rsatl_1 = sat_mixrat_ice( p_in_Pa, tl1 ) * RH_crit(1, 1)
+       endwhere
+
+       where ( tl2 > t1_combined )
+          rsatl_2 = sat_mixrat_liq( p_in_Pa, tl2 )
+       elsewhere ( tl2 > t2_combined )
+          rsatl_2 = sat_mixrat_liq( p_in_Pa, tl2 ) &
+>>>>>>> origin/master_tmp
                     * (tl2 - t2_combined)/(t1_combined - t2_combined) &
                     + sat_mixrat_ice( p_in_Pa, tl2 ) &
                       * (t1_combined - tl2)/(t1_combined - t2_combined)
@@ -955,7 +1026,6 @@ module pdf_closure_module
                            sqrt(pdf_params%varnce_rt_2), sqrt(pdf_params%varnce_thl_2),  &
                            pdf_params%stdev_eta_2, pdf_params%corr_w_rt_2, &
                            pdf_params%corr_w_thl_2 )
-
     end if
 
 
@@ -1336,6 +1406,7 @@ module pdf_closure_module
           * ( ( pdf_params%thl_1 - thlm )**2 + three * pdf_params%varnce_thl_1 ) &
           + ( one - pdf_params%mixt_frac ) * ( pdf_params%thl_2 - thlm ) &
             * ( ( pdf_params%thl_2 - thlm )**2 + three * pdf_params%varnce_thl_2 )
+
 
         ! Skewness
         Skw_clubb_pdf &

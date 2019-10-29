@@ -16,12 +16,14 @@ module SoilStateType
   use column_varcon   , only : icol_roof, icol_sunwall, icol_shadewall, icol_road_perv, icol_road_imperv 
   use clm_varcon      , only : zsoi, dzsoi, zisoi, spval
   use clm_varcon      , only : secspday, pc, mu, denh2o, denice, grlnd
-  use clm_varctl      , only : use_cn, use_lch4,use_dynroot
+  use clm_varctl      , only : use_cn, use_lch4,use_dynroot, use_fates
+  use clm_varctl      , only : use_erosion
+  use clm_varctl      , only : use_var_soil_thick
   use clm_varctl      , only : iulog, fsurdat, hist_wrtch4diag
-  use ch4varcon       , only : allowlakeprod
-  use LandunitType    , only : lun                
-  use ColumnType      , only : col                
-  use PatchType       , only : pft                
+  use CH4varcon       , only : allowlakeprod
+  use LandunitType    , only : lun_pp                
+  use ColumnType      , only : col_pp                
+  use VegetationType  , only : veg_pp                
   !
   implicit none
   save
@@ -33,10 +35,12 @@ module SoilStateType
      ! sand/ clay/ organic matter
      real(r8), pointer :: sandfrac_patch       (:)   ! patch sand fraction
      real(r8), pointer :: clayfrac_patch       (:)   ! patch clay fraction
+     real(r8), pointer :: grvlfrac_patch       (:)   ! patch gravel fraction
      real(r8), pointer :: mss_frc_cly_vld_col  (:)   ! col mass fraction clay limited to 0.20
      real(r8), pointer :: cellorg_col          (:,:) ! col organic matter for gridcell containing column (1:nlevsoi)
      real(r8), pointer :: cellsand_col         (:,:) ! sand value for gridcell containing column (1:nlevsoi)
      real(r8), pointer :: cellclay_col         (:,:) ! clay value for gridcell containing column (1:nlevsoi)
+     real(r8), pointer :: cellgrvl_col         (:,:) ! gravel value for gridcell containing column (1:nlevsoi)
      real(r8), pointer :: bd_col               (:,:) ! col bulk density of dry soil material [kg/m^3] (CN)
 
      ! hydraulic properties
@@ -85,6 +89,7 @@ module SoilStateType
      procedure, private :: InitHistory  
      procedure, private :: InitCold    
      procedure, public  :: Restart
+     procedure, public  :: InitColdGhost
 
   end type soilstate_type
   !------------------------------------------------------------------------
@@ -117,28 +122,32 @@ contains
     integer :: begp, endp
     integer :: begc, endc
     integer :: begg, endg
+    integer :: begc_all, endc_all
     !------------------------------------------------------------------------
 
-    begp = bounds%begp; endp= bounds%endp
-    begc = bounds%begc; endc= bounds%endc
-    begg = bounds%begg; endg= bounds%endg
+    begp     = bounds%begp    ; endp     = bounds%endp
+    begc     = bounds%begc    ; endc     = bounds%endc
+    begg     = bounds%begg    ; endg     = bounds%endg
+    begc_all = bounds%begc_all; endc_all = bounds%endc_all
 
     allocate(this%mss_frc_cly_vld_col  (begc:endc))                     ; this%mss_frc_cly_vld_col  (:)   = nan
     allocate(this%sandfrac_patch       (begp:endp))                     ; this%sandfrac_patch       (:)   = nan
     allocate(this%clayfrac_patch       (begp:endp))                     ; this%clayfrac_patch       (:)   = nan
-    allocate(this%cellorg_col          (begc:endc,nlevsoi))             ; this%cellorg_col          (:,:) = nan 
-    allocate(this%cellsand_col         (begc:endc,nlevsoi))             ; this%cellsand_col         (:,:) = nan 
-    allocate(this%cellclay_col         (begc:endc,nlevsoi))             ; this%cellclay_col         (:,:) = nan 
+    allocate(this%grvlfrac_patch       (begp:endp))                     ; this%grvlfrac_patch       (:)   = nan
+    allocate(this%cellorg_col          (begc:endc,nlevgrnd))            ; this%cellorg_col          (:,:) = nan 
+    allocate(this%cellsand_col         (begc:endc,nlevgrnd))            ; this%cellsand_col         (:,:) = nan 
+    allocate(this%cellclay_col         (begc:endc,nlevgrnd))            ; this%cellclay_col         (:,:) = nan
+    allocate(this%cellgrvl_col         (begc:endc,nlevgrnd))            ; this%cellgrvl_col         (:,:) = nan 
     allocate(this%bd_col               (begc:endc,nlevgrnd))            ; this%bd_col               (:,:) = nan
 
-    allocate(this%hksat_col            (begc:endc,nlevgrnd))            ; this%hksat_col            (:,:) = spval
+    allocate(this%hksat_col            (begc_all:endc_all,nlevgrnd))    ; this%hksat_col            (:,:) = spval
     allocate(this%hksat_min_col        (begc:endc,nlevgrnd))            ; this%hksat_min_col        (:,:) = spval
     allocate(this%hk_l_col             (begc:endc,nlevgrnd))            ; this%hk_l_col             (:,:) = nan   
     allocate(this%smp_l_col            (begc:endc,nlevgrnd))            ; this%smp_l_col            (:,:) = nan   
     allocate(this%smpmin_col           (begc:endc))                     ; this%smpmin_col           (:)   = nan
 
-    allocate(this%bsw_col              (begc:endc,nlevgrnd))            ; this%bsw_col              (:,:) = nan
-    allocate(this%watsat_col           (begc:endc,nlevgrnd))            ; this%watsat_col           (:,:) = nan
+    allocate(this%bsw_col              (begc_all:endc_all,nlevgrnd))    ; this%bsw_col              (:,:) = nan
+    allocate(this%watsat_col           (begc_all:endc_all,nlevgrnd))    ; this%watsat_col           (:,:) = nan
     allocate(this%watdry_col           (begc:endc,nlevgrnd))            ; this%watdry_col           (:,:) = spval
     allocate(this%watopt_col           (begc:endc,nlevgrnd))            ; this%watopt_col           (:,:) = spval
     allocate(this%watfc_col            (begc:endc,nlevgrnd))            ; this%watfc_col            (:,:) = nan
@@ -242,7 +251,7 @@ contains
             ptr_patch=this%root_depth_patch, default='inactive' )
     end if
 
-    if (use_cn) then
+    if (use_cn .or. use_fates) then
        this%soilpsi_col(begc:endc,:) = spval
        call hist_addfld2d (fname='SOILPSI', units='MPa', type2d='levgrnd', &
             avgflag='A', long_name='soil water potential in each soil layer', &
@@ -302,7 +311,7 @@ contains
     use pftvarcon           , only : noveg, roota_par, rootb_par
     use fileutils           , only : getfil
     use organicFileMod      , only : organicrd 
-    use CNSharedParamsMod   , only : CNParamsShareInst
+    use SharedParamsMod   , only : ParamsShareInst
     use FuncPedotransferMod , only : pedotransf, get_ipedof
     use RootBiophysMod      , only : init_vegrootfr
     !
@@ -336,7 +345,7 @@ contains
     real(r8)           :: bd                            ! bulk density of dry soil material [kg/m^3]
     real(r8)           :: tkm                           ! mineral conductivity
     real(r8)           :: xksat                         ! maximum hydraulic conductivity of soil [mm/s]
-    real(r8)           :: clay,sand                     ! temporaries
+    real(r8)           :: clay,sand,gravel              ! temporaries
     real(r8)           :: organic_max                   ! organic matter (kg/m3) where soil is assumed to act like peat
     integer            :: dimid                         ! dimension id
     logical            :: readvar 
@@ -347,8 +356,10 @@ contains
     real(r8) ,pointer  :: gti (:)                       ! read in - fmax 
     real(r8) ,pointer  :: sand3d (:,:)                  ! read in - soil texture: percent sand (needs to be a pointer for use in ncdio)
     real(r8) ,pointer  :: clay3d (:,:)                  ! read in - soil texture: percent clay (needs to be a pointer for use in ncdio)
+    real(r8) ,pointer  :: grvl3d (:,:)                  ! read in - soil texture: percent gravel (needs to be a pointer for use in ncdio)
     real(r8) ,pointer  :: organic3d (:,:)               ! read in - organic matter: kg/m3 (needs to be a pointer for use in ncdio)
     character(len=256) :: locfn                         ! local filename
+    integer            :: nlevbed                       ! # of layers above bedrock
     integer            :: ipedof  
     integer            :: begc, endc
     integer            :: begg, endg
@@ -368,9 +379,9 @@ contains
 
     ! Currently pervious road has same properties as soil
     do c = bounds%begc, bounds%endc
-       l = col%landunit(c)
+       l = col_pp%landunit(c)
 
-       if (lun%urbpoi(l) .and. col%itype(c) == icol_road_perv) then 
+       if (lun_pp%urbpoi(l) .and. col_pp%itype(c) == icol_road_perv) then 
           do lev = 1, nlevgrnd
              this%rootfr_road_perv_col(c,lev) = 0._r8
           enddo
@@ -382,9 +393,9 @@ contains
 
     do c = bounds%begc,bounds%endc
        this%rootfr_col (c,nlevsoi+1:nlevgrnd) = 0._r8
-       if (lun%itype(l) == istsoil .or. lun%itype(l) == istcrop) then
+       if (lun_pp%itype(l) == istsoil .or. lun_pp%itype(l) == istcrop) then
           this%rootfr_col (c,nlevsoi+1:nlevgrnd) = 0._r8
-       else if (lun%itype(l) == istdlak .and. allowlakeprod) then
+       else if (lun_pp%itype(l) == istdlak .and. allowlakeprod) then
           this%rootfr_col (c,:) = spval
        else  ! Inactive CH4 columns
           this%rootfr_col (c,:) = spval
@@ -394,6 +405,7 @@ contains
    ! Initialize root fraction 
    
    call init_vegrootfr(bounds, nlevsoi, nlevgrnd, &
+        col_pp%nlevbed(bounds%begc:bounds%endc)    , &
         this%rootfr_patch(bounds%begp:bounds%endp,1:nlevgrnd))
 
     ! --------------------------------------------------------------------
@@ -402,6 +414,7 @@ contains
 
     allocate(sand3d(begg:endg,nlevsoifl))
     allocate(clay3d(begg:endg,nlevsoifl))
+    allocate(grvl3d(begg:endg,nlevsoifl))
 
     ! --------------------------------------------------------------------
     ! Read surface dataset
@@ -426,12 +439,12 @@ contains
 
     ! Read in organic matter dataset 
 
-    organic_max = CNParamsShareInst%organic_max
+    organic_max = ParamsShareInst%organic_max
 
     allocate(organic3d(bounds%begg:bounds%endg,nlevsoifl))
     call organicrd(organic3d)
 
-    ! Read in sand and clay data
+    ! Read in sand, clay, gravel data
 
     call ncd_io(ncid=ncid, varname='PCT_SAND', flag='read', data=sand3d, dim1name=grlnd, readvar=readvar)
     if (.not. readvar) then
@@ -443,8 +456,17 @@ contains
        call endrun(msg=' ERROR: PCT_CLAY NOT on surfdata file'//errMsg(__FILE__, __LINE__)) 
     end if
 
+    if (use_erosion) then
+       call ncd_io(ncid=ncid, varname='PCT_GRVL', flag='read', data=grvl3d, dim1name=grlnd, readvar=readvar)
+       if (.not. readvar) then
+          call endrun(msg=' ERROR: PCT_GRVL NOT on surfdata file'//errMsg(__FILE__, __LINE__))
+       end if
+    else
+       grvl3d(:,:) = 0._r8
+    end if
+
     do p = bounds%begp,bounds%endp
-       g = pft%gridcell(p)
+       g = veg_pp%gridcell(p)
        if ( sand3d(g,1)+clay3d(g,1) == 0.0_r8 )then
           if ( any( sand3d(g,:)+clay3d(g,:) /= 0.0_r8 ) )then
              call endrun(msg='found depth points that do NOT sum to zero when surface does'//&
@@ -459,6 +481,7 @@ contains
 
        this%sandfrac_patch(p) = sand3d(g,1)/100.0_r8
        this%clayfrac_patch(p) = clay3d(g,1)/100.0_r8
+       this%grvlfrac_patch(p) = grvl3d(g,1)/100.0_r8
     end do
 
     ! Read fmax
@@ -469,7 +492,7 @@ contains
        call endrun(msg=' ERROR: FMAX NOT on surfdata file'//errMsg(__FILE__, __LINE__)) 
     end if
     do c = bounds%begc, bounds%endc
-       g = col%gridcell(c)
+       g = col_pp%gridcell(c)
        this%wtfact_col(c) = gti(g)
     end do
     deallocate(gti)
@@ -511,10 +534,10 @@ contains
 
 
     do c = bounds%begc, bounds%endc
-       g = col%gridcell(c)
-       l = col%landunit(c)
+       g = col_pp%gridcell(c)
+       l = col_pp%landunit(c)
 
-       if (lun%itype(l)==istwet .or. lun%itype(l)==istice .or. lun%itype(l)==istice_mec) then
+       if (lun_pp%itype(l)==istwet .or. lun_pp%itype(l)==istice .or. lun_pp%itype(l)==istice_mec) then
 
           do lev = 1,nlevgrnd
              this%bsw_col(c,lev)    = spval
@@ -530,6 +553,7 @@ contains
              if (lev <= nlevsoi) then
                 this%cellsand_col(c,lev) = spval
                 this%cellclay_col(c,lev) = spval
+                this%cellgrvl_col(c,lev) = spval
                 this%cellorg_col(c,lev)  = spval
              end if
           end do
@@ -538,14 +562,14 @@ contains
              this%tkmg_col(c,lev)   = spval
              this%tksatu_col(c,lev) = spval
              this%tkdry_col(c,lev)  = spval
-             if (lun%itype(l)==istwet .and. lev > nlevsoi) then
+             if (lun_pp%itype(l)==istwet .and. lev > nlevsoi) then
                 this%csol_col(c,lev) = csol_bedrock
              else
                 this%csol_col(c,lev)= spval
              endif
           end do
 
-       else if (lun%urbpoi(l) .and. (col%itype(c) /= icol_road_perv) .and. (col%itype(c) /= icol_road_imperv) )then
+       else if (lun_pp%urbpoi(l) .and. (col_pp%itype(c) /= icol_road_perv) .and. (col_pp%itype(c) /= icol_road_imperv) )then
 
           ! Urban Roof, sunwall, shadewall properties set to special value
           do lev = 1,nlevgrnd
@@ -562,6 +586,7 @@ contains
              if (lev <= nlevsoi) then
                 this%cellsand_col(c,lev) = spval
                 this%cellclay_col(c,lev) = spval
+                this%cellgrvl_col(c,lev) = spval
                 this%cellorg_col(c,lev)  = spval
              end if
           end do
@@ -576,55 +601,63 @@ contains
        else
 
           do lev = 1,nlevgrnd
-
+             ! Number of soil layers in hydrologically active columns = NLEV2BED
+	     nlevbed = col_pp%nlevbed(c)
              if ( more_vertlayers )then ! duplicate clay and sand values from last soil layer
 
                 if (lev .eq. 1) then
                    clay = clay3d(g,1)
                    sand = sand3d(g,1)
+                   gravel = grvl3d(g,1)
                    om_frac = organic3d(g,1)/organic_max 
                 else if (lev <= nlevsoi) then
                    do j = 1,nlevsoifl-1
                       if (zisoi(lev) >= zisoifl(j) .AND. zisoi(lev) < zisoifl(j+1)) then
                          clay = clay3d(g,j+1)
                          sand = sand3d(g,j+1)
+                         gravel = grvl3d(g,j+1)
                          om_frac = organic3d(g,j+1)/organic_max    
                       endif
                    end do
                 else
                    clay = clay3d(g,nlevsoifl)
                    sand = sand3d(g,nlevsoifl)
+                   gravel = grvl3d(g,nlevsoifl)
                    om_frac = 0._r8
                 endif
              else
                 if (lev <= nlevsoi) then ! duplicate clay and sand values from 10th soil layer
                    clay = clay3d(g,lev)
                    sand = sand3d(g,lev)
+                   gravel = grvl3d(g,lev)
                    om_frac = (organic3d(g,lev)/organic_max)**2._r8
                 else
                    clay = clay3d(g,nlevsoi)
                    sand = sand3d(g,nlevsoi)
+                   gravel = grvl3d(g,nlevsoi)
                    om_frac = 0._r8
                 endif
              end if
 
-             if (lun%itype(l) == istdlak) then
+             if (lun_pp%itype(l) == istdlak) then
 
                 if (lev <= nlevsoi) then
                    this%cellsand_col(c,lev) = sand
                    this%cellclay_col(c,lev) = clay
+                   this%cellgrvl_col(c,lev) = gravel
                    this%cellorg_col(c,lev)  = om_frac*organic_max
                 end if
 
-             else if (lun%itype(l) /= istdlak) then  ! soil columns of both urban and non-urban types
+             else if (lun_pp%itype(l) /= istdlak) then  ! soil columns of both urban and non-urban types
 
-                if (lun%urbpoi(l)) then
+                if (lun_pp%urbpoi(l)) then
                    om_frac = 0._r8 ! No organic matter for urban
                 end if
 
-                if (lev <= nlevsoi) then
+                if (lev <= nlevbed) then
                    this%cellsand_col(c,lev) = sand
                    this%cellclay_col(c,lev) = clay
+                   this%cellgrvl_col(c,lev) = gravel
                    this%cellorg_col(c,lev)  = om_frac*organic_max
                 end if
 
@@ -681,7 +714,7 @@ contains
                 this%csol_col(c,lev)   = ((1._r8-om_frac)*(2.128_r8*sand+2.385_r8*clay) / (sand+clay) + &
                      om_csol*om_frac)*1.e6_r8  ! J/(m3 K)
 
-                if (lev > nlevsoi) then
+                if (lev > nlevbed) then
                    this%csol_col(c,lev) = csol_bedrock
                 endif
 
@@ -705,13 +738,13 @@ contains
           end do
 
           ! Urban pervious and impervious road
-          if (col%itype(c) == icol_road_imperv) then
+          if (col_pp%itype(c) == icol_road_imperv) then
              ! Impervious road layers -- same as above except set watdry and watopt as missing
              do lev = 1,nlevgrnd
                 this%watdry_col(c,lev) = spval 
                 this%watopt_col(c,lev) = spval 
              end do
-          else if (col%itype(c) == icol_road_perv) then 
+          else if (col_pp%itype(c) == icol_road_perv) then 
              ! pervious road layers  - set in UrbanInitTimeConst
           end if
 
@@ -723,19 +756,21 @@ contains
     ! --------------------------------------------------------------------
 
     do c = bounds%begc, bounds%endc
-       g = col%gridcell(c)
-       l = col%landunit(c)
+       g = col_pp%gridcell(c)
+       l = col_pp%landunit(c)
 
-       if (lun%itype(l)==istdlak) then
+       if (lun_pp%itype(l)==istdlak) then
 
           do lev = 1,nlevgrnd
              if ( lev <= nlevsoi )then
                 clay    =  this%cellclay_col(c,lev)
                 sand    =  this%cellsand_col(c,lev)
+                gravel  =  this%cellgrvl_col(c,lev)
                 om_frac = (this%cellorg_col(c,lev)/organic_max)**2._r8
              else
                 clay    = this%cellclay_col(c,nlevsoi)
                 sand    = this%cellsand_col(c,nlevsoi)
+                gravel  = this%cellgrvl_col(c,nlevsoi)
                 om_frac = 0.0_r8
              end if
 
@@ -797,7 +832,7 @@ contains
     ! --------------------------------------------------------------------
 
     do c = bounds%begc, bounds%endc
-       g = col%gridcell(c)
+       g = col_pp%gridcell(c)
 
        this%gwc_thr_col(c) = 0.17_r8 + 0.14_r8 * clay3d(g,1) * 0.01_r8
        this%mss_frc_cly_vld_col(c) = min(clay3d(g,1) * 0.01_r8, 0.20_r8)
@@ -807,7 +842,7 @@ contains
     ! Deallocate memory
     ! --------------------------------------------------------------------
 
-    deallocate(sand3d, clay3d, organic3d)
+    deallocate(sand3d, clay3d, grvl3d, organic3d)
     deallocate(zisoifl, zsoifl, dzsoifl)
 
   end subroutine InitCold
@@ -832,27 +867,154 @@ contains
     !
     ! !LOCAL VARIABLES:
     logical          :: readvar   ! determine if variable is on initial file
+    logical          :: readrootfr = .false.
     !-----------------------------------------------------------------------
 
-if(use_dynroot) then
-    call restartvar(ncid=ncid, flag=flag, varname='root_depth', xtype=ncd_double,  &
-         dim1name='pft', &
-         long_name='root depth', units='m', &
-         interpinic_flag='interp', readvar=readvar, data=this%root_depth_patch)
+    if(use_dynroot) then
+       call restartvar(ncid=ncid, flag=flag, varname='root_depth', xtype=ncd_double,  &
+            dim1name='pft', &
+            long_name='root depth', units='m', &
+            interpinic_flag='interp', readvar=readvar, data=this%root_depth_patch)
 
-    call restartvar(ncid=ncid, flag=flag, varname='rootfr', xtype=ncd_double,  &
-         dim1name='pft', dim2name='levgrnd', switchdim=.true., &
-         long_name='root fraction', units='', &
-         interpinic_flag='interp', readvar=readvar, data=this%rootfr_patch)
-    if (flag=='read' .and. .not. readvar) then
+       call restartvar(ncid=ncid, flag=flag, varname='rootfr', xtype=ncd_double,  &
+            dim1name='pft', dim2name='levgrnd', switchdim=.true., &
+            long_name='root fraction', units='', &
+            interpinic_flag='interp', readvar=readrootfr, data=this%rootfr_patch)
+    else
+       readrootfr = .false.
+    end if
+    if (flag=='read' .and. .not. readrootfr) then
        if (masterproc) then
           write(iulog,*) "can't find rootfr in restart (or initial) file..."
           write(iulog,*) "Initialize rootfr to default"
        end if
        call init_vegrootfr(bounds, nlevsoi, nlevgrnd, &
-       this%rootfr_patch(bounds%begp:bounds%endp,1:nlevgrnd))
+            col_pp%nlevbed(bounds%begc:bounds%endc), &
+            this%rootfr_patch(bounds%begp:bounds%endp,1:nlevgrnd))
     end if
-end if
   end subroutine Restart
+
+
+  !------------------------------------------------------------------------
+#ifdef USE_PETSC_LIB
+  subroutine InitColdGhost(this, bounds_proc)
+    !
+    ! !DESCRIPTION:
+    ! Assign soil properties for ghost/halo columns
+    !
+    ! !USES:
+    use domainLateralMod       , only : ExchangeColumnLevelGhostData
+    use shr_infnan_mod         , only : shr_infnan_isnan
+    use shr_infnan_mod         , only : isnan => shr_infnan_isnan
+    use landunit_varcon        , only : max_lunit
+    !
+    implicit none
+    !
+    ! !ARGUMENTS:
+    class(soilstate_type)            :: this
+    type(bounds_type), intent(in)    :: bounds_proc
+    !
+    integer             :: c,j                     ! indices
+    integer             :: nvals_col               ! number of values per subgrid category
+    integer             :: beg_idx, end_idx        ! begin/end index for accessing values in data_send/data_recv
+    real(r8) , parameter:: FILL_VALUE = -999999.d0 ! temporary
+    real(r8) , pointer  :: data_send_col(:)        ! data sent by local mpi rank
+    real(r8) , pointer  :: data_recv_col(:)        ! data received by local mpi rank
+
+    ! Number of values per soil column
+    nvals_col = 4*nlevgrnd ! (watsat + hksat + bsw + sucsat) * nlevgrnd
+
+    ! Allocate value
+    allocate(data_send_col((bounds_proc%endc     - bounds_proc%begc     + 1)*nvals_col))
+    allocate(data_recv_col((bounds_proc%endc_all - bounds_proc%begc_all + 1)*nvals_col))
+
+    ! Assemble the data to send
+    do c = bounds_proc%begc, bounds_proc%endc
+
+       beg_idx = (c - bounds_proc%begc)*nvals_col
+
+       do j = 1, nlevgrnd
+
+          beg_idx = beg_idx + 1
+          if (.not. isnan(this%watsat_col(c,j)) .and. this%watsat_col(c,j) /= spval) then
+             data_send_col(beg_idx) = this%watsat_col(c,j)
+          else
+             data_send_col(beg_idx) = FILL_VALUE
+          endif
+
+          beg_idx = beg_idx + 1
+          if (.not. isnan(this%hksat_col(c,j)) .and. this%hksat_col(c,j) /= spval) then
+             data_send_col(beg_idx) = this%hksat_col(c,j)
+          else
+             data_send_col(beg_idx) = FILL_VALUE
+          endif
+
+          beg_idx = beg_idx + 1
+          if (.not. isnan(this%bsw_col(c,j)) .and. this%bsw_col(c,j) /= spval) then
+             data_send_col(beg_idx) = this%bsw_col(c,j)
+          else
+             data_send_col(beg_idx) = FILL_VALUE
+          endif
+
+          beg_idx = beg_idx + 1
+          if (.not. isnan(this%sucsat_col(c,j)) .and. this%sucsat_col(c,j) /= spval) then
+             data_send_col(beg_idx) = this%sucsat_col(c,j)
+          else
+             data_send_col(beg_idx) = FILL_VALUE
+          endif
+       enddo
+    enddo
+
+    ! Send the data
+    call ExchangeColumnLevelGhostData(bounds_proc, nvals_col, data_send_col, data_recv_col)
+
+    ! Assign data corresponding to ghost/halo soil columns
+    do c = bounds_proc%endc + 1, bounds_proc%endc_all
+       beg_idx = (c - bounds_proc%begc)*nvals_col
+       do j = 1, nlevgrnd
+          beg_idx = beg_idx + 1
+          this%watsat_col(c,j) = data_recv_col(beg_idx)
+
+          beg_idx = beg_idx + 1
+          this%hksat_col(c,j) = data_recv_col(beg_idx)
+
+          beg_idx = beg_idx + 1
+          this%bsw_col(c,j) = data_recv_col(beg_idx)
+
+          beg_idx = beg_idx + 1
+          this%sucsat_col(c,j) = data_recv_col(beg_idx)
+       enddo
+    enddo
+
+    ! Free up memory
+    deallocate(data_send_col)
+    deallocate(data_recv_col)
+
+  end subroutine InitColdGhost
+
+#else
+
+  !------------------------------------------------------------------------
+  subroutine InitColdGhost(this, bounds_proc)
+    !
+    ! !DESCRIPTION:
+    ! Assign soil properties for ghost/halo columns
+    !
+    ! !USES:
+    implicit none
+    !
+    ! !ARGUMENTS:
+    class(soilstate_type)            :: this
+    type(bounds_type), intent(in)    :: bounds_proc
+
+    character(len=*), parameter :: subname = 'InitColdGhost'
+
+    call endrun(msg='ERROR ' // trim(subname) //': Requires '//&
+         'PETSc, but the code was compiled without -DUSE_PETSC_LIB')
+
+  end subroutine InitColdGhost
+
+#endif
+  !------------------------------------------------------------------------
 
 end module SoilStateType

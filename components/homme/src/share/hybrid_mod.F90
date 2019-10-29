@@ -9,31 +9,30 @@
 
 module hybrid_mod
   use parallel_mod, only : parallel_t
-!  use thread_mod
 implicit none
 private
 
   type, public :: hybrid_t
      type (parallel_t) :: par
      integer           :: ithr
-     integer           :: NThreads
-     integer           :: vert_num_threads
+     integer           :: hthreads
+     integer           :: vthreads
      logical           :: masterthread
   end type
 
   public :: hybrid_create
 
 contains
-  
-  function hybrid_create(par,ithr,NThreads) result(hybrid)
+
+  function hybrid_create(par,ithr,hthreads) result(hybrid)
       type (parallel_t), intent(in) :: par
       integer          , intent(in) :: ithr
-      integer          , intent(in) :: NThreads
+      integer          , intent(in) :: hthreads
       type (hybrid_t)               :: hybrid
 
       hybrid%par      = par      ! relies on parallel_mod copy constructor
-      hybrid%ithr     = ithr     
-      hybrid%NThreads = NThreads
+      hybrid%ithr     = ithr
+      hybrid%hthreads = hthreads
       hybrid%masterthread = (par%masterproc .and. ithr==0)
 
   end function hybrid_create 

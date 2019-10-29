@@ -5,16 +5,15 @@ module clm_instMod
   use shr_kind_mod               , only : r8 => shr_kind_r8
   use shr_log_mod                , only : errMsg => shr_log_errMsg
   use decompMod                  , only : bounds_type, get_proc_bounds
-  use clm_varctl                 , only : use_cn, use_voc, use_c13, use_c14, use_ed
+  use clm_varctl                 , only : use_cn, use_voc, use_c13, use_c14, use_fates, use_betr
   !-----------------------------------------
   ! Definition of component types
   !-----------------------------------------
   use AerosolType                , only : aerosol_type
   use CanopyStateType            , only : canopystate_type
-  use ch4Mod                     , only : ch4_type
+  use CH4Mod                     , only : ch4_type
   use CNCarbonFluxType           , only : carbonflux_type
   use CNCarbonStateType          , only : carbonstate_type
-  use CNDVType                   , only : dgvs_type
   use CNStateType                , only : cnstate_type
   use CNNitrogenFluxType         , only : nitrogenflux_type
   use CNNitrogenStateType        , only : nitrogenstate_type
@@ -29,6 +28,7 @@ module clm_instMod
   use FrictionVelocityType       , only : frictionvel_type
   use LakeStateType              , only : lakestate_type
   use PhotosynthesisType         , only : photosyns_type
+  use SedFluxType                , only : sedflux_type
   use SoilHydrologyType          , only : soilhydrology_type
   use SoilStateType              , only : soilstate_type
   use SolarAbsorbedType          , only : solarabs_type
@@ -38,7 +38,6 @@ module clm_instMod
   use TemperatureType            , only : temperature_type
   use WaterfluxType              , only : waterflux_type
   use WaterstateType             , only : waterstate_type
-  use UrbanParamsType            , only : urbanparams_type
   use VOCEmissionMod             , only : vocemis_type
   use atm2lndType                , only : atm2lnd_type
   use lnd2atmType                , only : lnd2atm_type
@@ -46,21 +45,39 @@ module clm_instMod
   use glc2lndMod                 , only : glc2lnd_type
   use glcDiagnosticsMod          , only : glc_diagnostics_type
   use SoilWaterRetentionCurveMod , only : soil_water_retention_curve_type
-  use UrbanParamsType            , only : urbanparams_type   ! Constants
-
-  use EcophysConType             , only : ecophyscon         ! Constants
+  use VegetationPropertiesType   , only : veg_vp             ! Ecophysical Constants
   use SoilorderConType           , only : soilordercon         ! Constants
 
-  use LandunitType               , only : lun
-  use ColumnType                 , only : col
-  use PatchType                  , only : pft
-  use EDEcophysConType           , only : EDecophyscon       ! ED Constants
+  use GridcellDataType           , only : grc_es, grc_ef, grc_ws, grc_wf
+  use GridcellDataType           , only : grc_cs, c13_grc_cs, c14_grc_cs
+  use GridcellDataType           , only : grc_cf, c13_grc_cf, c14_grc_cf
+  use GridcellDataType           , only : grc_ns, grc_nf
+  use GridcellDataType           , only : grc_ps, grc_pf
+  use LandunitType               , only : lun_pp
+  use LandunitDataType           , only : lun_es, lun_ef, lun_ws
+  use ColumnType                 , only : col_pp
+  use ColumnDataType             , only : col_es, col_ef, col_ws, col_wf
+  use ColumnDataType             , only : col_cs, c13_col_cs, c14_col_cs
+  use ColumnDataType             , only : col_cf, c13_col_cf, c14_col_cf
+  use ColumnDataType             , only : col_ns, col_nf
+  use ColumnDataType             , only : col_ps, col_pf
+  use VegetationType             , only : veg_pp
+  use VegetationDataType         , only : veg_es, veg_ef, veg_ws, veg_wf
+  use VegetationDataType         , only : veg_cs, c13_veg_cs, c14_veg_cs
+  use VegetationDataType         , only : veg_cf, c13_veg_cf, c14_veg_cf
+  use VegetationDataType         , only : veg_ns, veg_nf
+  use VegetationDataType         , only : veg_ps, veg_pf
 
-  use EDBioType                  , only : EDbio_type         ! ED type used to interact with CLM variables
-  use EDVecPatchType             , only : EDpft
-  use EDVecCohortType            , only : coh                ! unique to ED, used for domain decomp
-  use clm_bgc_interface_data     , only : clm_bgc_interface_data_type
+  use clm_interface_dataType     , only : clm_interface_data_type
   use ChemStateType              , only : chemstate_type     ! structure for chemical indices of the soil, such as pH and Eh
+  use BeTRSimulationALM          , only : betr_simulation_alm_type
+  use PlantMicKineticsMod        , only : PlantMicKinetics_type
+  use CLMFatesInterfaceMod       , only : hlm_fates_interface_type
+
+  ! instances declared in their own modules
+  use UrbanParamsType            , only : urbanparams_vars
+
+
   !
   implicit none
   save
@@ -80,7 +97,6 @@ module clm_instMod
   type(carbonflux_type)                               :: c14_carbonflux_vars
   type(nitrogenstate_type)                            :: nitrogenstate_vars
   type(nitrogenflux_type)                             :: nitrogenflux_vars
-  type(dgvs_type)                                     :: dgvs_vars
   type(crop_type)                                     :: crop_vars
   type(cnstate_type)                                  :: cnstate_vars
   type(dust_type)                                     :: dust_vars
@@ -92,13 +108,13 @@ module clm_instMod
   type(frictionvel_type)                              :: frictionvel_vars
   type(lakestate_type)                                :: lakestate_vars
   type(photosyns_type)                                :: photosyns_vars
+  type(sedflux_type)                                  :: sedflux_vars
   type(soilstate_type)                                :: soilstate_vars
   type(soilhydrology_type)                            :: soilhydrology_vars
   type(solarabs_type)                                 :: solarabs_vars
   type(surfalb_type)                                  :: surfalb_vars
   type(surfrad_type)                                  :: surfrad_vars
   type(temperature_type)                              :: temperature_vars
-  type(urbanparams_type)                              :: urbanparams_vars
   type(waterflux_type)                                :: waterflux_vars
   type(waterstate_type)                               :: waterstate_vars
   type(atm2lnd_type)                                  :: atm2lnd_vars
@@ -107,14 +123,16 @@ module clm_instMod
   type(lnd2glc_type)                                  :: lnd2glc_vars
   type(glc_diagnostics_type)                          :: glc_diagnostics_vars
   class(soil_water_retention_curve_type), allocatable :: soil_water_retention_curve
-  type(EDbio_type)                                    :: EDbio_vars
   type(phosphorusstate_type)                          :: phosphorusstate_vars
   type(phosphorusflux_type)                           :: phosphorusflux_vars
-  type(clm_bgc_interface_data_type)                   :: clm_bgc_data
+  type(clm_interface_data_type)                       :: clm_interface_data
   type(chemstate_type)                                :: chemstate_vars
-
+  type(hlm_fates_interface_type)                      :: alm_fates
+  class(betr_simulation_alm_type), pointer            :: ep_betr
+  type(PlantMicKinetics_type)                         :: PlantMicKinetics_vars
   public :: clm_inst_biogeochem
   public :: clm_inst_biogeophys
+  public :: alm_fates
 
 contains
 
@@ -133,79 +151,87 @@ contains
     integer               :: begp, endp
     integer               :: begc, endc
     integer               :: begl, endl
+    integer               :: begg, endg
 
     begp = bounds_proc%begp; endp = bounds_proc%endp
     begc = bounds_proc%begc; endc = bounds_proc%endc
     begl = bounds_proc%begl; endl = bounds_proc%endl
+    begg = bounds_proc%begg; endg = bounds_proc%endg
 
 
     if (use_voc ) then
        call vocemis_vars%Init(bounds_proc)
     end if
-    if (use_cn) then
+    if (use_cn .or. use_fates) then
 
-       ! Note - always initialize the memory for the c13_carbonstate_vars and
-       ! c14_carbonstate_vars data structure so that they can be used in
+       ! Note - always initialize the memory for the c13_cs and
+       ! c14_cs data structure so that they can be used in
        ! associate statements (nag compiler complains otherwise)
 
-       call carbonstate_vars%Init(bounds_proc, carbon_type='c12', ratio=1._r8)
+       call grc_cs%Init(begg, endg)
+       call col_cs%Init(begc, endc, carbon_type='c12', ratio=1._r8)
+       call veg_cs%Init(begp, endp, carbon_type='c12', ratio=1._r8)
        if (use_c13) then
-          call c13_carbonstate_vars%Init(bounds_proc, carbon_type='c13', ratio=c13ratio, &
-               c12_carbonstate_vars=carbonstate_vars)
+          call c13_grc_cs%Init(begg, endg)
+          call c13_col_cs%Init(begc, endc, carbon_type='c13', ratio=c13ratio, &
+               c12_carbonstate_vars=col_cs)
+          call c13_veg_cs%Init(begc, endc, carbon_type='c13', ratio=c13ratio)
        end if
        if (use_c14) then
-          call c14_carbonstate_vars%Init(bounds_proc, carbon_type='c14', ratio=c14ratio, &
-               c12_carbonstate_vars=carbonstate_vars)
+          call c14_grc_cs%Init(begg, endg)
+          call c14_col_cs%Init(begc, endc, carbon_type='c14', ratio=c14ratio, &
+               c12_carbonstate_vars=col_cs)
+          call c14_veg_cs%Init(begc, endc, carbon_type='c14', ratio=c14ratio)
        end if
 
        ! Note - always initialize the memory for the c13_carbonflux_vars and
        ! c14_carbonflux_vars data structure so that they can be used in
        ! associate statements (nag compiler complains otherwise)
 
-       call carbonflux_vars%Init(bounds_proc, carbon_type='c12')
+       call grc_cf%Init(begg, endg, carbon_type='c12')
+       call col_cf%Init(begc, endc, carbon_type='c12')
+       call veg_cf%Init(begp, endp, carbon_type='c12')
        if (use_c13) then
-          call c13_carbonflux_vars%Init(bounds_proc, carbon_type='c13')
+          call c13_grc_cf%Init(begg, endg, carbon_type='c13')
+          call c13_col_cf%Init(begc, endc, carbon_type='c13')
+          call c13_veg_cf%Init(begp, endp, carbon_type='c13')
        end if
        if (use_c14) then
-          call c14_carbonflux_vars%Init(bounds_proc, carbon_type='c14')
+          call c14_grc_cf%Init(begg, endg, carbon_type='c14')
+          call c14_col_cf%Init(begc, endc, carbon_type='c14')
+          call c14_veg_cf%Init(begp, endp, carbon_type='c14')
        end if
+    endif
 
-       call nitrogenstate_vars%Init(bounds_proc,                      &
-            carbonstate_vars%leafc_patch(begp:endp),                  &
-            carbonstate_vars%leafc_storage_patch(begp:endp),          &
-            carbonstate_vars%frootc_patch(begp:endp),                 &
-            carbonstate_vars%frootc_storage_patch(begp:endp),         &
-            carbonstate_vars%deadstemc_patch(begp:endp),              &
-            carbonstate_vars%decomp_cpools_vr_col(begc:endc, 1:, 1:), &
-            carbonstate_vars%decomp_cpools_col(begc:endc, 1:),        &
-            carbonstate_vars%decomp_cpools_1m_col(begc:endc, 1:))
+    if (use_cn) then
+       call grc_ns%Init(begg, endg)
+       call col_ns%Init(begc, endc, col_cs)
+       call veg_ns%Init(begp, endp, veg_cs)
+       
+       call grc_nf%Init(begg, endg)
+       call col_nf%Init(begc, endc)
+       call veg_nf%Init(begp, endp)
 
-       call nitrogenflux_vars%Init(bounds_proc)
+       call grc_ps%Init(begg, endg)
+       call col_ps%Init(begc, endc, col_cs)
+       call veg_ps%Init(begp, endp, veg_cs)
 
-       call phosphorusstate_vars%Init(bounds_proc,                    &
-            carbonstate_vars%leafc_patch(begp:endp),                  &
-            carbonstate_vars%leafc_storage_patch(begp:endp),          &
-            carbonstate_vars%frootc_patch(begp:endp),                 &
-            carbonstate_vars%frootc_storage_patch(begp:endp),         &
-            carbonstate_vars%deadstemc_patch(begp:endp),              &
-            carbonstate_vars%decomp_cpools_vr_col(begc:endc, 1:, 1:), &
-            carbonstate_vars%decomp_cpools_col(begc:endc, 1:),        &
-            carbonstate_vars%decomp_cpools_1m_col(begc:endc, 1:))
-
-       call phosphorusflux_vars%Init(bounds_proc)
-
-       ! Note - always initialize the memory for the dgvs_vars data structure so
-       ! that it can be used in associate statements (nag compiler complains otherwise)
-       call dgvs_vars%Init(bounds_proc)
+       call grc_pf%Init(begg, endg)
+       call col_pf%Init(begc, endc)
+       call veg_pf%Init(begp, endp)
 
        call crop_vars%Init(bounds_proc)
 
+       if(use_betr)then
+         call PlantMicKinetics_vars%Init(bounds_proc)
+       endif
     end if
-
-    if ( use_ed ) then
-       call EDbio_vars%Init(bounds_proc)
+    
+    ! Initialize the Functionaly Assembled Terrestrial Ecosystem Simulator (FATES)
+    if (use_fates) then
+       call alm_fates%Init(bounds_proc)
     end if
-
+       
     call hist_printflds()
 
   end subroutine clm_inst_biogeochem
@@ -222,14 +248,12 @@ contains
     use landunit_varcon                   , only : istice, istice_mec, istsoil
     use clm_varcon                        , only : h2osno_max, bdsno
     use domainMod                         , only : ldomain
-    use EDPftVarcon                       , only : EDpftvarcon_inst
     use clm_varpar                        , only : nlevsno, numpft
     use clm_varctl                        , only : single_column, fsurdat, scmlat, scmlon
     use controlMod                        , only : nlfilename
     use SoilWaterRetentionCurveFactoryMod , only : create_soil_water_retention_curve
     use fileutils                         , only : getfil
-    use EcophysConType                    , only : ecophysconInit
-    use EDEcophysConType                  , only : EDecophysconInit
+    use VegetationPropertiesType          , only : veg_vp
     use SoilorderConType                  , only : soilorderconInit
     use LakeCon                           , only : LakeConInit
     use initVerticalMod                   , only : initVertical
@@ -263,13 +287,13 @@ contains
     ! for columns with net ablation, at the cost of delaying ice formation
     ! in columns with net accumulation.
     do c = begc,endc
-       l = col%landunit(c)
-       g = col%gridcell(c)
+       l = col_pp%landunit(c)
+       g = col_pp%gridcell(c)
 
-       if (lun%itype(l)==istice) then
+       if (lun_pp%itype(l)==istice) then
           h2osno_col(c) = h2osno_max
-       elseif (lun%itype(l)==istice_mec .or. &
-              (lun%itype(l)==istsoil .and. ldomain%glcmask(g) > 0._r8)) then
+       elseif (lun_pp%itype(l)==istice_mec .or. &
+              (lun_pp%itype(l)==istsoil .and. ldomain%glcmask(g) > 0._r8)) then
           ! Initialize a non-zero snow thickness where the ice sheet can/potentially operate.
           ! Using glcmask to capture all potential vegetated points around GrIS (ideally
           ! we would use icemask from CISM, but that isn't available until after initialization.)
@@ -286,10 +310,7 @@ contains
 
     ! Initialize ecophys constants
 
-    call ecophysconInit()
-    if (use_ed) then
-       call EDecophysconInit( EDpftvarcon_Inst, numpft)
-    end if
+    call veg_vp%Init()
 
     ! Initialize soil order related constants
 
@@ -331,12 +352,11 @@ contains
 
     ! Initialization of public data types
 
-    call temperature_vars%init(bounds_proc,      &
-         urbanparams_vars%em_roof(begl:endl),    &
-         urbanparams_vars%em_wall(begl:endl),    &
-         urbanparams_vars%em_improad(begl:endl), &
-         urbanparams_vars%em_perroad(begl:endl))
-
+    call grc_es%Init(bounds_proc%begg_all, bounds_proc%endg_all)
+    call lun_es%Init(bounds_proc%begl_all, bounds_proc%endl_all)
+    call col_es%Init(bounds_proc%begc_all, bounds_proc%endc_all)
+    call veg_es%Init(bounds_proc%begp_all, bounds_proc%endp_all)
+    
     call canopystate_vars%init(bounds_proc)
 
     call soilstate_vars%init(bounds_proc)
@@ -345,16 +365,32 @@ contains
          h2osno_col(begc:endc),                    &
          snow_depth_col(begc:endc),                &
          soilstate_vars%watsat_col(begc:endc, 1:), &
-         temperature_vars%t_soisno_col(begc:endc, -nlevsno+1:) )
+         col_es%t_soisno(begc:endc, -nlevsno+1:) )
 
+    call grc_ws%Init(bounds_proc%begg_all, bounds_proc%endg_all)
+    call lun_ws%Init(bounds_proc%begl_all, bounds_proc%endl_all)
+    call col_ws%Init(bounds_proc%begc_all, bounds_proc%endc_all, &
+         h2osno_col(begc:endc),                    &
+         snow_depth_col(begc:endc),                &
+         soilstate_vars%watsat_col(begc:endc, 1:))
+    call veg_ws%Init(bounds_proc%begp_all, bounds_proc%endp_all)
 
     call waterflux_vars%init(bounds_proc)
+
+    call grc_wf%Init(bounds_proc%begg_all, bounds_proc%endg_all, bounds_proc)
+    call col_wf%Init(bounds_proc%begc_all, bounds_proc%endc_all)
+    call veg_wf%Init(bounds_proc%begp_all, bounds_proc%endp_all)
 
     call chemstate_vars%Init(bounds_proc)
     ! WJS (6-24-14): Without the following write statement, the assertion in
     ! energyflux_vars%init fails with pgi 13.9 on yellowstone. So for now, I'm leaving
     ! this write statement in place as a workaround for this problem.
-    call energyflux_vars%init(bounds_proc, temperature_vars%t_grnd_col(begc:endc))
+    call energyflux_vars%init(bounds_proc, col_es%t_grnd(begc:endc))
+
+    call grc_ef%Init(bounds_proc%begg_all, bounds_proc%endg_all)
+    call lun_ef%Init(bounds_proc%begl_all, bounds_proc%endl_all)
+    call col_ef%Init(bounds_proc%begc_all, bounds_proc%endc_all)
+    call veg_ef%Init(bounds_proc%begp_all, bounds_proc%endp_all)
 
     call aerosol_vars%Init(bounds_proc)
 
@@ -388,6 +424,8 @@ contains
 
     ! Note - always initialize the memory for cnstate_vars (used in biogeophys/)
     call cnstate_vars%Init(bounds_proc)
+
+    call sedflux_vars%Init(bounds_proc)
     ! --------------------------------------------------------------
     ! Initialise the BeTR
     ! --------------------------------------------------------------

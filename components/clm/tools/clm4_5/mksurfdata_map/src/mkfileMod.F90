@@ -14,6 +14,7 @@ contains
     use mkglcmecMod  , only : nglcec
     use mkpftMod     , only : mkpftAtt
     use mksoilMod    , only : mksoilAtt
+    use mkSedMod     , only : mksedAtt
     use mkharvestMod , only : mkharvest_fieldname, mkharvest_numtypes, mkharvest_longname
     use mkncdio      , only : check_ret, ncd_defvar
     use mkdomainMod  
@@ -280,6 +281,18 @@ contains
     call check_ret(nf_put_att_text(ncid, NF_GLOBAL, &
          'map_ch4_params_file', len_trim(str), trim(str)), subname)
 
+    str = get_filename(map_fgrvl)
+    call check_ret(nf_put_att_text(ncid, NF_GLOBAL, &
+         'map_gravel_file', len_trim(str), trim(str)), subname)
+
+    str = get_filename(map_fslp10)
+    call check_ret(nf_put_att_text(ncid, NF_GLOBAL, &
+         'map_slp10_file', len_trim(str), trim(str)), subname)
+
+    str = get_filename(map_fero)
+    call check_ret(nf_put_att_text(ncid, NF_GLOBAL, &
+         'map_erosion_file', len_trim(str), trim(str)), subname)
+
     ! ----------------------------------------------------------------------
     ! Define variables
     ! ----------------------------------------------------------------------
@@ -293,6 +306,8 @@ contains
     call mksoilAtt( ncid, dynlanduse, xtype )
 
     call mkpftAtt(  ncid, dynlanduse, xtype )
+
+    call mksedAtt(  ncid, dynlanduse, xtype )
 
     if (outnc_1d) then
        call ncd_defvar(ncid=ncid, varname='AREA' , xtype=nf_double, &
@@ -943,6 +958,46 @@ contains
                   long_name=mkharvest_longname(j), units='unitless')
           end if
        end do
+    end if
+
+    if (outnc_1d) then
+       call ncd_defvar(ncid=ncid, varname='APATITE_P', xtype=xtype, &
+            dim1name='gridcell',&
+            long_name='Apatite Phosphorus ', units='gP/m2')
+    else
+       call ncd_defvar(ncid=ncid, varname='APATITE_P', xtype=xtype, &
+            dim1name='lsmlon', dim2name='lsmlat', &
+            long_name='Apatite Phosphorus', units='gP/m2')
+    end if
+
+    if (outnc_1d) then
+       call ncd_defvar(ncid=ncid, varname='LABILE_P', xtype=xtype, &
+            dim1name='gridcell',&
+            long_name='Labile Inorganic Phosphorus', units='gP/m2')
+    else
+       call ncd_defvar(ncid=ncid, varname='LABILE_P', xtype=xtype, &
+            dim1name='lsmlon', dim2name='lsmlat', &
+            long_name='Labile Inorganic Phosphorus', units='gP/m2')
+    end if
+
+    if (outnc_1d) then
+       call ncd_defvar(ncid=ncid, varname='OCCLUDED_P', xtype=xtype, &
+            dim1name='gridcell',&
+            long_name='Occluded Phosphorus', units='gP/m2')
+    else
+       call ncd_defvar(ncid=ncid, varname='OCCLUDED_P', xtype=xtype, &
+            dim1name='lsmlon', dim2name='lsmlat', &
+            long_name='Occluded Phosphorus', units='gP/m2')
+    end if
+
+    if (outnc_1d) then
+       call ncd_defvar(ncid=ncid, varname='SECONDARY_P', xtype=xtype, &
+            dim1name='gridcell',&
+            long_name='Secondary Mineral Phosphorus', units='gP/m2')
+    else
+       call ncd_defvar(ncid=ncid, varname='SECONDARY_P', xtype=xtype, &
+            dim1name='lsmlon', dim2name='lsmlat', &
+            long_name='Secondary Mineral Phosphorus', units='gP/m2')
     end if
 
     ! End of define mode

@@ -24,8 +24,9 @@ use cam_history,    only: addfld, add_default, outfld
 
 use ref_pres,       only: top_lev => trop_cloud_top_lev
 use wv_saturation,  only: qsat_water
+#ifndef HAVE_ERF_INTRINSICS
 use shr_spfn_mod,   only: erf => shr_spfn_erf
-
+#endif
 use cam_logfile,    only: iulog
 use cam_abortutils, only: endrun
 
@@ -742,8 +743,7 @@ subroutine nucleate_ice_cam_calc( &
                end if
 
                if (use_nie_nucleate .or. use_dem_nucleate) then
-                  dst1_num = fine_dust(i,k) * dst1_num_to_mass * 1.0e-6_r8
-
+                  dst1_num = fine_dust(i,k) * rho(i,k) * dst1_num_to_mass * 1.0e-6_r8
                   alnsg = log(sigmag_coarse)
                   dst3_sfc_to_num = pi*dgnum(i,k,mode_coarse_idx)**2.0_r8*exp(2.0_r8*alnsg**2.0_r8) ! m2/#, individual particle sfc 
 
@@ -793,6 +793,7 @@ subroutine nucleate_ice_cam_calc( &
 
             ! *** Turn off soot nucleation ***
             soot_num = 0.0_r8
+            organic_num = 0.0_r8
 
             call nucleati( &
                wsubi(i,k), t(i,k), pmid(i,k), relhum(i,k), icldm(i,k),   &

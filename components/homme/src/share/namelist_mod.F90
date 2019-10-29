@@ -5,31 +5,40 @@
 module namelist_mod
 
   use kinds,      only: real_kind, iulog
-  use params_mod, only: recursive, sfcurve
+  use params_mod, only: recursive, sfcurve, SPHERE_COORDS, Z2_NO_TASK_MAPPING
   use cube_mod,   only: rotate_grid
+#ifdef CAM
+  use dyn_grid,   only: fv_nphys
+#endif
   use physical_constants, only: rearth, rrearth, omega
+#if (defined MODEL_THETA_L && defined ARKODE)
+  use arkode_mod, only: rel_tol, abs_tol, calc_nonlinear_stats, use_column_solver
+#endif
 
   use control_mod, only : &
     MAX_STRING_LEN,&
     MAX_FILE_LEN,  &
     partmethod,    &       ! Mesh partitioning method (METIS)
+    coord_transform_method,    &       !how to represent the coordinates.
+    z2_map_method,    &       !zoltan2 how to perform mapping (network-topology aware)
     topology,      &       ! Mesh topology
     test_case,     &       ! test case
     uselapi,       &
-    multilevel,    &
     numnodes,      &
     sub_case,      &
     tasknum,       &       ! used dg model in AIX machine
-    remapfreq,     &       ! number of steps per remapping call
-    remap_type,    &       ! selected remapping option
     statefreq,     &       ! number of steps per printstate call
     restartfreq,   &
     restartfile,   &       ! name of the restart file for INPUT
     restartdir,    &       ! name of the restart directory for OUTPUT
     runtype,       &
     integration,   &       ! integration method
-    use_semi_lagrange_transport , &   ! conservation or non-conservation formulaton
-    use_semi_lagrange_transport_local_conservation , &   ! local conservation vs. global 
+    theta_hydrostatic_mode,       &   
+    transport_alg , &      ! SE Eulerian, classical SL, cell-integrated SL
+    semi_lagrange_cdr_alg, &     ! see control_mod for semi_lagrange_* descriptions
+    semi_lagrange_cdr_check, &
+    semi_lagrange_hv_q, &
+    semi_lagrange_nearest_point_lev, &
     tstep_type,    &
     cubed_sphere_map, &
     qsplit,        &
@@ -38,7 +47,6 @@ module namelist_mod
     LFTfreq,       &
     prescribed_wind, &
     ftype,         &
-    energy_fixer,  &
     limiter_option,&
     fine_ne,       &
     max_hypervis_courant, &
@@ -48,19 +56,24 @@ module namelist_mod
     nu_div,        &
     nu_p,          &
     nu_top,        &
+    dcmip16_mu,     &
+    dcmip16_mu_s,   &
+    dcmip16_mu_q,   &
+    dcmip16_prec_type, &
+    dcmip16_pbl_type,&
+    interp_lon0,    &
     hypervis_scaling,   &  ! use tensor HV instead of scalar coefficient
     disable_diagnostics, & ! use to disable diagnostics for timing reasons
     psurf_vis,    &
     hypervis_order,       &
     hypervis_power,       &
     hypervis_subcycle,    &
+    hypervis_subcycle_tom,&
     hypervis_subcycle_q,  &
     smooth_phis_numcycle, &
-    smooth_sgh_numcycle,  &
     smooth_phis_nudt,     &
     initial_total_mass,   & ! set > 0 to set the initial_total_mass
     u_perturb,     &        ! J&W baroclinic test perturbation size
-    columnpackage, &
     moisture,      &
     vform,         &
     vfile_mid,     &
@@ -71,7 +84,9 @@ module namelist_mod
     maxits,        &
     tol,           &
     debug_level,   &
-    vert_remap_q_alg
+    theta_advect_form,   &
+    vert_remap_q_alg, &
+    se_fv_phys_remap_alg
 
 #ifndef CAM
   use control_mod, only:              &
@@ -82,10 +97,12 @@ module namelist_mod
     dcmip2_x_ueq,                     &
     dcmip2_x_h0,                      &
     dcmip2_x_d,                       &
-    dcmip2_x_xi
+    dcmip2_x_xi,                      &
+    dcmip4_moist,                     &
+    dcmip4_X
 #endif
 
-  use thread_mod,     only: nthreads, nthreads_accel, omp_set_num_threads, omp_get_max_threads, vert_num_threads, vthreads
+  use thread_mod,     only: nthreads, omp_set_num_threads, omp_get_max_threads, vthreads
   use dimensions_mod, only: ne, np, nnodes, nmpi_per_node, npart, qsize, qsize_d, set_mesh_dimensions
 #ifdef CAM
   use time_mod,       only: nsplit, smooth, phys_tscale
@@ -93,7 +110,7 @@ module namelist_mod
   use time_mod,       only: tstep, ndays,nmax, nendstep,secpday, smooth, secphr, nsplit, phys_tscale
 #endif
   use parallel_mod,   only: parallel_t,  iam, abortmp, &
-       partitionfornodes, useframes, mpireal_t, mpilogical_t, mpiinteger_t, mpichar_t
+       partitionfornodes, mpireal_t, mpilogical_t, mpiinteger_t, mpichar_t
   use cg_mod,         only: cg_no_debug
 
 #ifndef CAM
@@ -118,7 +135,6 @@ module namelist_mod
        varname_len,         &
        infilenames,         &
        MAX_INFILES
-
   use physical_constants, only: omega
   use common_movie_mod,   only : setvarnames
 #endif
@@ -145,11 +161,15 @@ module namelist_mod
 #ifdef CAM
   subroutine readnl(par, NLFileName)
     use units, only : getunit, freeunit
+#ifndef HOMME_WITHOUT_PIOLIBRARY
     use mesh_mod, only : MeshOpen
+#endif
     character(len=*), intent(in) :: NLFilename  ! namelist filename
 #else
   subroutine readnl(par)
+#ifndef HOMME_WITHOUT_PIOLIBRARY
     use mesh_mod, only : MeshOpen
+#endif
 #endif
     type (parallel_t), intent(in) ::  par
     character(len=MAX_FILE_LEN) :: mesh_file
@@ -166,48 +186,45 @@ module namelist_mod
     integer :: se_ne
     integer :: unitn
     character(len=*), parameter ::  subname = "homme:namelist_mod"
-    ! These items are only here to keep readnl from crashing. Remove when possible
-    integer :: se_fv_nphys
-    character(len=80)  :: se_write_phys_grid
-    character(len=256) :: se_phys_grid_file
 #endif
     ! ============================================
     ! Namelists
     ! ============================================
 
-    namelist /ctl_nl/ PARTMETHOD,       &         ! mesh partitioning method
-                      TOPOLOGY,         &         ! mesh topology
+    namelist /ctl_nl/ PARTMETHOD,                &         ! mesh partitioning method
+                      COORD_TRANSFORM_METHOD,    &         ! Zoltan2 coordinate transformation method.
+                      Z2_MAP_METHOD,             &         ! Zoltan2 processor mapping (network-topology aware) method.
+                      TOPOLOGY,                  &         ! mesh topology
 #ifdef CAM
       se_partmethod,     &
       se_topology,       &
       se_ne,             &
       se_limiter_option, &
-      vthreads,          &         ! number of vertical/column threads per horizontal thread
 #else
       qsize,             &         ! number of SE tracers
       nthreads,          &         ! number of threads per process
-      vert_num_threads,  &         ! number of threads per process
-      nthreads_accel,    &         ! number of threads per an accelerator process
       limiter_option,    &
       smooth,            &         ! timestep Filter
-      omega,             &
       pertlim,           &         ! temperature initial perturbation
       omega,                   &   ! scaled rotation rate
       rearth,                  &   ! scaled earth radius
 #endif
+      COORD_TRANSFORM_METHOD, &
+      Z2_MAP_METHOD,  &
+      vthreads,      &             ! number of vertical/column threads per horizontal thread
       npart,         &
       uselapi,       &
-      multilevel,    &
-      useframes,     &
       numnodes,      &
       ne,            &             ! element resolution factor
       tasknum,       &
-      remapfreq,     &             ! number of steps per remapping call
-      remap_type,    &             ! selected remapping option
       statefreq,     &             ! number of steps per printstate call
       integration,   &             ! integration method
-      use_semi_lagrange_transport , &
-      use_semi_lagrange_transport_local_conservation , &
+      theta_hydrostatic_mode,       &   
+      transport_alg , &      ! SE Eulerian, classical SL, cell-integrated SL
+      semi_lagrange_cdr_alg, &
+      semi_lagrange_cdr_check, &
+      semi_lagrange_hv_q, &
+      semi_lagrange_nearest_point_lev, &
       tstep_type,    &
       cubed_sphere_map, &
       qsplit,        &
@@ -217,7 +234,6 @@ module namelist_mod
       disable_diagnostics, &
       prescribed_wind, &
       se_ftype,        &           ! forcing type
-      energy_fixer,    &
       fine_ne,         &
       max_hypervis_courant, &
       nu,            &
@@ -226,20 +242,27 @@ module namelist_mod
       nu_div,        &
       nu_p,          &
       nu_top,        &
+      dcmip16_mu,     &
+      dcmip16_mu_s,   &
+      dcmip16_mu_q,   &
+      dcmip16_prec_type,&
+      dcmip16_pbl_type,&
       psurf_vis,     &
       hypervis_order,    &
       hypervis_power,    &
       hypervis_subcycle, &
+      hypervis_subcycle_tom, &
       hypervis_subcycle_q, &
       hypervis_scaling, &
       smooth_phis_numcycle, &
-      smooth_sgh_numcycle, &
       smooth_phis_nudt, &
       initial_total_mass, &
       u_perturb,     &
       rotate_grid,   &
       mesh_file,     &               ! Name of mesh file
-      vert_remap_q_alg
+      theta_advect_form,     & 
+      vert_remap_q_alg, &
+      se_fv_phys_remap_alg
 
 
 #ifdef CAM
@@ -255,7 +278,6 @@ module namelist_mod
       restartdir,      &             ! name of the restart directory for OUTPUT
       runtype,         &
       tstep,           &             ! tracer time step
-      columnpackage,   &
       moisture
     ! control parameters for dcmip stand-alone tests
     namelist /ctl_nl/     &
@@ -265,14 +287,15 @@ module namelist_mod
       dcmip2_x_ueq,       & !dcmip2-x windspeed at equator      (m/s)
       dcmip2_x_h0,        & !dcmip2-x mountain height           (m)
       dcmip2_x_d,         & !dcmip2-x mountain half-width       (m)
-      dcmip2_x_xi           !dcmip2-x mountain wavelength       (m)
+      dcmip2_x_xi,        & !dcmip2-x mountain wavelength       (m)
+      dcmip4_moist,       & !dcmip4   moist, 0 or 1
+      dcmip4_X              !dcmip4   scaling factor, nondim
     namelist /vert_nl/        &
       vform,              &
       vfile_mid,          &
       vfile_int,          &
       vanalytic,          & ! use analytically generated vertical levels
       vtop                  ! top coordinate level. used when vanaltic=1
-
     namelist /analysis_nl/    &
       output_prefix,       &
       output_timeunits,    &
@@ -294,6 +317,7 @@ module namelist_mod
       output_varnames5,    &
       interp_nlat,         &
       interp_nlon,         &
+      interp_lon0,         &
       interp_gridtype,     &
       interp_type,         &
       interpolate_analysis
@@ -306,15 +330,23 @@ module namelist_mod
       tol,           &
       debug_level
 
+#if (defined MODEL_THETA_L && defined ARKODE)
+    namelist /arkode_nl/ &
+      rel_tol, &
+      abs_tol, &
+      calc_nonlinear_stats, &
+      use_column_solver
+#endif
+
 
     ! ==========================
     ! Set the default partmethod
     ! ==========================
-
-    PARTMETHOD    = RECURSIVE
+    PARTMETHOD    = SFCURVE
+!    PARTMETHOD    = RECURSIVE
+    COORD_TRANSFORM_METHOD = SPHERE_COORDS
+    Z2_MAP_METHOD = Z2_NO_TASK_MAPPING
     npart         = 1
-    useframes     = 0
-    multilevel    = 1
     uselapi       = .TRUE.
 #ifdef CAM
     ! set all CAM defaults
@@ -330,13 +362,10 @@ module namelist_mod
     se_phys_tscale=0
     se_nsplit = 1
     qsize = qsize_d
-    vthreads = 1
 #else
     ndays         = 0
     nmax          = 12
     nthreads = 1
-    vert_num_threads = 1
-    nthreads_accel = -1
     se_ftype = ftype   ! MNL: For non-CAM runs, ftype=0 in control_mod
     phys_tscale=0
     nsplit = 1
@@ -348,19 +377,25 @@ module namelist_mod
     restartdir    = "./restart/"
     runtype       = 0
     statefreq     = 1
-    remapfreq     = 240
-    remap_type    = "parabolic"
     tasknum       =-1
     integration   = "explicit"
     moisture      = "dry"
-    columnpackage = "none"
     nu_top=0
     initial_total_mass=0
     mesh_file='none'
     ne              = 0
-    use_semi_lagrange_transport   = .false.
-    use_semi_lagrange_transport_local_conservation   = .false.
+    transport_alg = 0
+    semi_lagrange_cdr_alg = 2
+    semi_lagrange_cdr_check = .false.
+    semi_lagrange_hv_q = 0
+    semi_lagrange_nearest_point_lev = 0
     disable_diagnostics = .false.
+    se_fv_phys_remap_alg = 0
+
+    theta_hydrostatic_mode = .true.    ! for preqx, this must be .true.
+#if ( defined MODEL_THETA_C || defined MODEL_THETA_L ) 
+    theta_hydrostatic_mode = .false.   ! default NH
+#endif
 
 
     ! =======================
@@ -394,11 +429,8 @@ module namelist_mod
       read(*,nml=ctl_nl)
 #endif
 #ifndef _USEMETIS
-      !=================================
-      ! override the selected partition
-      ! method and set it to SFCURVE
-      !=================================
-      PARTMETHOD = SFCURVE
+      ! override METIS options to SFCURVE
+      if (partmethod>=0 .and. partmethod<=3) partmethod=SFCURVE
 #endif
        ! ========================
        ! if this is a restart run
@@ -420,9 +452,9 @@ module namelist_mod
        if (tstep <= 0) then
           call abortmp('tstep must be > 0')
        end if
-       if (ndays .gt. 0) then
+       if (ndays>0) then
           nmax = ndays * (secpday/tstep)
-          restartfreq  = restartfreq*(secpday/tstep)
+          if (restartfreq>0) restartfreq=restartfreq*(secpday/tstep)
        end if
        nEndStep = nmax
 #endif
@@ -448,6 +480,7 @@ module namelist_mod
            test_case(1:10)== "baroclinic"     .or. &
            test_case(1:13)== "jw_baroclinic"  .or. &
            test_case(1:5) == "dcmip"          .or. &
+           test_case(1:5) == "mtest"          .or. &
            test_case(1:4) == "asp_")  then
          write(iulog,*) "reading vertical namelist..."
 
@@ -460,9 +493,9 @@ module namelist_mod
          vfile_mid  = trim(adjustl(vfile_mid))
          vfile_int  = trim(adjustl(vfile_int))
 
-         write(iulog,*) '  vform =',vform
-         write(iulog,*) '  vfile_mid=',vfile_mid
-         write(iulog,*) '  vfile_int=',vfile_int
+         write(iulog,*) '  vform =',trim(vform)
+         write(iulog,*) '  vfile_mid=',trim(vfile_mid)
+         write(iulog,*) '  vfile_int=',trim(vfile_int)
          write(iulog,*) '  vanalytic=',vanalytic
          if(vanalytic==1) then
          write(iulog,*) '  vtop=',vtop
@@ -470,6 +503,7 @@ module namelist_mod
 
        end if
 #endif
+
 
 !      Default interpolation grid  (0 = auto compute based on ne,nv)  interpolation is off by default
 #ifdef PIO_INTERP
@@ -479,6 +513,7 @@ module namelist_mod
 #endif
        interp_nlat =  0
        interp_nlon = 0
+       interp_lon0 = 0
        interp_gridtype = 2
        interp_type = 0
        replace_vec_by_vordiv(:)=.false.
@@ -510,6 +545,8 @@ module namelist_mod
        output_type = 'netcdf' ! Change by MNL
 !     output_type = 'pnetcdf'
 
+
+#ifndef HOMME_WITHOUT_PIOLIBRARY
        write(iulog,*)"reading analysis namelist..."
 #if defined(OSF1) || defined(_NAMELIST_FROM_FILE)
        read(unit=7,nml=analysis_nl)
@@ -545,16 +582,32 @@ module namelist_mod
           if(output_timeunits(i).eq.1) then  ! per_day
              output_frequency(i) = output_frequency(i)*(secpday/tstep)
              output_start_time(i)= output_start_time(i)*(secpday/tstep)
-             output_end_time(i)  = output_end_time(i)*(secpday/tstep)
+             if (output_end_time(i)>=0) &
+                  output_end_time(i)  = output_end_time(i)*(secpday/tstep)
           else if(output_timeunits(i).eq.2) then  ! per_hour
              output_frequency(i) = output_frequency(i)*(secphr/tstep)
              output_start_time(i)= output_start_time(i)*(secphr/tstep)
-             output_end_time(i)  = output_end_time(i)*(secphr/tstep)
+             if (output_end_time(i)>=0) &
+                  output_end_time(i)  = output_end_time(i)*(secphr/tstep)
+          else if(output_timeunits(i).eq.3) then  ! per_seconds
+             output_frequency(i) = output_frequency(i)/tstep
+             output_start_time(i)= output_start_time(i)/tstep
+             if (output_end_time(i)>=0) &
+                  output_end_time(i)  = output_end_time(i)/tstep
           end if
-          if(output_end_time(i)<0) then
-             output_end_time(i)=nEndStep
-          endif
+          if(output_end_time(i)<0) output_end_time(i)=nEndStep
+          if ( output_start_time(i) > output_end_time(i) ) output_frequency(i)=0
        end do
+#endif
+
+#if (defined MODEL_THETA_L && defined ARKODE)
+       write(iulog,*)"reading arkode namelist..."
+#if defined(OSF1) || defined(_NAMELIST_FROM_FILE)
+       read(unit=7,nml=arkode_nl)
+#else
+       read(*,nml=arkode_nl)
+#endif
+#endif
 
 !=======================================================================================================!
 
@@ -577,6 +630,8 @@ module namelist_mod
 
     ! Broadcast namelist variables to all MPI processes
 
+    call MPI_bcast(Z2_MAP_METHOD ,1,MPIinteger_t,par%root,par%comm,ierr)
+    call MPI_bcast(COORD_TRANSFORM_METHOD ,1,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(PARTMETHOD ,     1,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(TOPOLOGY,        MAX_STRING_LEN,MPIChar_t  ,par%root,par%comm,ierr)
     call MPI_bcast(test_case,       MAX_STRING_LEN,MPIChar_t  ,par%root,par%comm,ierr)
@@ -584,27 +639,24 @@ module namelist_mod
     call MPI_bcast(ne,              1,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(qsize,           1,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(sub_case,        1,MPIinteger_t,par%root,par%comm,ierr)
-    call MPI_bcast(remapfreq,       1,MPIinteger_t,par%root,par%comm,ierr)
-    call MPI_bcast(remap_type, MAX_STRING_LEN, MPIChar_t, par%root, par%comm, ierr)
     call MPI_bcast(statefreq,       1,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(restartfreq,     1,MPIinteger_t,par%root,par%comm,ierr)
-    call MPI_bcast(multilevel,      1,MPIinteger_t,par%root,par%comm,ierr)
-    call MPI_bcast(useframes,       1,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(runtype,         1,MPIinteger_t,par%root,par%comm,ierr)
 
 #ifdef CAM
     phys_tscale     = se_phys_tscale
     limiter_option  = se_limiter_option
     nsplit          = se_nsplit
-    call MPI_bcast(vthreads  ,      1, MPIinteger_t, par%root,par%comm,ierr)
 #else
-    call MPI_bcast(omega,           1, MPIreal_t   , par%root,par%comm,ierr)
+    if(test_case == "dcmip2012_test4") then
+       rearth = rearth/dcmip4_X
+       omega = omega*dcmip4_X
+    endif
+
     call MPI_bcast(pertlim,         1, MPIreal_t   , par%root,par%comm,ierr)
     call MPI_bcast(tstep,           1, MPIreal_t   , par%root,par%comm,ierr)
     call MPI_bcast(nmax,            1, MPIinteger_t, par%root,par%comm,ierr)
     call MPI_bcast(NTHREADS,        1, MPIinteger_t, par%root,par%comm,ierr)
-    call MPI_bcast(vert_num_threads,1, MPIinteger_t, par%root,par%comm,ierr)
-    call MPI_bcast(nthreads_accel,  1, MPIinteger_t, par%root,par%comm,ierr)
     call MPI_bcast(ndays,           1, MPIinteger_t, par%root,par%comm,ierr)
     nEndStep = nmax
 
@@ -619,12 +671,16 @@ module namelist_mod
     call MPI_bcast(dcmip2_x_h0,     1, MPIreal_t,    par%root,par%comm,ierr)
     call MPI_bcast(dcmip2_x_d,      1, MPIreal_t,    par%root,par%comm,ierr)
     call MPI_bcast(dcmip2_x_xi,     1, MPIreal_t,    par%root,par%comm,ierr)
+    call MPI_bcast(dcmip4_moist,    1, MPIinteger_t, par%root,par%comm,ierr)
+    call MPI_bcast(dcmip4_X,        1, MPIreal_t,    par%root,par%comm,ierr)
 #endif
+    call MPI_bcast(vthreads  ,      1, MPIinteger_t, par%root,par%comm,ierr)
     call MPI_bcast(smooth,          1, MPIreal_t,    par%root,par%comm,ierr)
     call MPI_bcast(phys_tscale,     1, MPIreal_t,    par%root,par%comm,ierr)
     call MPI_bcast(NSPLIT,          1, MPIinteger_t, par%root,par%comm,ierr)
     call MPI_bcast(limiter_option,  1, MPIinteger_t, par%root,par%comm,ierr)
     call MPI_bcast(se_ftype,        1, MPIinteger_t, par%root,par%comm,ierr)
+    call MPI_bcast(theta_advect_form,1, MPIinteger_t, par%root,par%comm,ierr)
     call MPI_bcast(vert_remap_q_alg,1, MPIinteger_t, par%root,par%comm,ierr)
 
     call MPI_bcast(fine_ne,         1, MPIinteger_t, par%root,par%comm,ierr)
@@ -636,23 +692,36 @@ module namelist_mod
     call MPI_bcast(nu_p,            1, MPIreal_t   , par%root,par%comm,ierr)
     call MPI_bcast(nu_top,          1, MPIreal_t   , par%root,par%comm,ierr)
 
+    call MPI_bcast(dcmip16_mu,      1, MPIreal_t   , par%root,par%comm,ierr)
+    call MPI_bcast(dcmip16_mu_s,    1, MPIreal_t   , par%root,par%comm,ierr)
+    call MPI_bcast(dcmip16_mu_q,    1, MPIreal_t   , par%root,par%comm,ierr)
+
+    call MPI_bcast(dcmip16_prec_type, 1, MPIinteger_t, par%root,par%comm,ierr)
+    call MPI_bcast(dcmip16_pbl_type , 1, MPIinteger_t, par%root,par%comm,ierr)
+
     call MPI_bcast(disable_diagnostics,1,MPIlogical_t,par%root,par%comm,ierr)
     call MPI_bcast(psurf_vis,1,MPIinteger_t   ,par%root,par%comm,ierr)
     call MPI_bcast(hypervis_order,1,MPIinteger_t   ,par%root,par%comm,ierr)
     call MPI_bcast(hypervis_power,1,MPIreal_t   ,par%root,par%comm,ierr)
     call MPI_bcast(hypervis_scaling,1,MPIreal_t   ,par%root,par%comm,ierr)
     call MPI_bcast(hypervis_subcycle,1,MPIinteger_t   ,par%root,par%comm,ierr)
+    call MPI_bcast(hypervis_subcycle_tom,1,MPIinteger_t   ,par%root,par%comm,ierr)
     call MPI_bcast(hypervis_subcycle_q,1,MPIinteger_t   ,par%root,par%comm,ierr)
     call MPI_bcast(smooth_phis_numcycle,1,MPIinteger_t   ,par%root,par%comm,ierr)
-    call MPI_bcast(smooth_sgh_numcycle,1,MPIinteger_t   ,par%root,par%comm,ierr)
     call MPI_bcast(smooth_phis_nudt,1,MPIreal_t   ,par%root,par%comm,ierr)
     call MPI_bcast(initial_total_mass ,1,MPIreal_t   ,par%root,par%comm,ierr)
     call MPI_bcast(u_perturb     ,1,MPIreal_t   ,par%root,par%comm,ierr)
     call MPI_bcast(rotate_grid   ,1,MPIreal_t   ,par%root,par%comm,ierr)
     call MPI_bcast(integration,MAX_STRING_LEN,MPIChar_t ,par%root,par%comm,ierr)
+#ifndef HOMME_WITHOUT_PIOLIBRARY
     call MPI_bcast(mesh_file,MAX_FILE_LEN,MPIChar_t ,par%root,par%comm,ierr)
-    call MPI_bcast(use_semi_lagrange_transport ,1,MPIlogical_t,par%root,par%comm,ierr)
-    call MPI_bcast(use_semi_lagrange_transport_local_conservation ,1,MPIlogical_t,par%root,par%comm,ierr)
+#endif
+    call MPI_bcast(theta_hydrostatic_mode ,1,MPIlogical_t,par%root,par%comm,ierr)
+    call MPI_bcast(transport_alg ,1,MPIinteger_t,par%root,par%comm,ierr)
+    call MPI_bcast(semi_lagrange_cdr_alg ,1,MPIinteger_t,par%root,par%comm,ierr)
+    call MPI_bcast(semi_lagrange_cdr_check ,1,MPIlogical_t,par%root,par%comm,ierr)
+    call MPI_bcast(semi_lagrange_hv_q ,1,MPIinteger_t,par%root,par%comm,ierr)
+    call MPI_bcast(semi_lagrange_nearest_point_lev ,1,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(tstep_type,1,MPIinteger_t ,par%root,par%comm,ierr)
     call MPI_bcast(cubed_sphere_map,1,MPIinteger_t ,par%root,par%comm,ierr)
     call MPI_bcast(qsplit,1,MPIinteger_t ,par%root,par%comm,ierr)
@@ -661,7 +730,7 @@ module namelist_mod
     call MPI_bcast(LFTfreq,1,MPIinteger_t ,par%root,par%comm,ierr)
     call MPI_bcast(prescribed_wind,1,MPIinteger_t ,par%root,par%comm,ierr)
     call MPI_bcast(moisture,MAX_STRING_LEN,MPIChar_t ,par%root,par%comm,ierr)
-    call MPI_bcast(columnpackage,MAX_STRING_LEN,MPIChar_t ,par%root,par%comm,ierr)
+    call MPI_bcast(se_fv_phys_remap_alg,1,MPIinteger_t ,par%root,par%comm,ierr)
 
     call MPI_bcast(restartfile,MAX_STRING_LEN,MPIChar_t ,par%root,par%comm,ierr)
     call MPI_bcast(restartdir,MAX_STRING_LEN,MPIChar_t ,par%root,par%comm,ierr)
@@ -681,6 +750,7 @@ module namelist_mod
     call MPI_bcast(vtop     , 1,              MPIreal_t   , par%root, par%comm,ierr)
 
 #ifndef CAM
+#ifndef HOMME_WITHOUT_PIOLIBRARY
     call MPI_bcast(output_prefix,MAX_STRING_LEN,MPIChar_t  ,par%root,par%comm,ierr)
     call MPI_bcast(output_timeunits ,max_output_streams,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(output_start_time ,max_output_streams,MPIinteger_t,par%root,par%comm,ierr)
@@ -697,23 +767,27 @@ module namelist_mod
     call MPI_bcast(num_io_procs , 1,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(output_type , 9,MPIChar_t,par%root,par%comm,ierr)
     call MPI_bcast(infilenames ,160*MAX_INFILES ,MPIChar_t,par%root,par%comm,ierr)
-
-#ifdef IS_ACCELERATOR
-    if (nthreads_accel > 0) then
-        nthreads = nthreads_accel
-    end if
 #endif
+
+#if (defined MODEL_THETA_L && defined ARKODE)
+    call MPI_bcast(rel_tol, 1, MPIreal_t, par%root, par%comm, ierr)
+    call MPI_bcast(abs_tol, 1, MPIreal_t, par%root, par%comm, ierr)
+    call MPI_bcast(calc_nonlinear_stats, 1, MPIlogical_t, par%root, par%comm, ierr)
+    call MPI_bcast(use_column_solver, 1, MPIlogical_t, par%root, par%comm, ierr)
+#endif
+
+    ! use maximum available:
+    if (NThreads == -1) NThreads = omp_get_max_threads()
 
     ! sanity check on thread count
     ! HOMME will run if if nthreads > max, but gptl will print out GB of warnings.
-    if (NThreads*vert_num_threads > omp_get_max_threads()) then
-       if(par%masterproc) write(iulog,*) "Main:NThreads=",NThreads
-       if(par%masterproc) print *,'omp_get_max_threads() = ',OMP_get_max_threads()
-       if(par%masterproc) print *,'requested threads exceeds OMP_get_max_threads()'
+    if (NThreads > omp_get_max_threads()) then
+       if(par%masterproc) print *, "Main:NThreads=",NThreads
+       if(par%masterproc) print *, 'omp_get_max_threads() = ',OMP_get_max_threads()
+       if(par%masterproc) print *, 'requested threads exceeds OMP_get_max_threads()'
        call abortmp('stopping')
     endif
-    call omp_set_num_threads(NThreads*vert_num_threads)
-
+    call omp_set_num_threads(NThreads)
 
     ! if user sets hypervis_subcycle=-1, then use automatic formula
     if (hypervis_subcycle==-1) then
@@ -732,6 +806,19 @@ module namelist_mod
     endif
 #endif
 
+    ! more thread error checks:  
+#ifdef HORIZ_OPENMP
+    if(par%masterproc) write(iulog,*)'-DHORIZ_OPENMP enabled'
+#else
+    if(par%masterproc) write(iulog,*)'-DHORIZ_OPENMP disabled'
+#endif
+#ifdef COLUMN_OPENMP
+    if(par%masterproc) write(iulog,*)'-DCOLUMN_OPENMP enabled'
+#else
+    if(par%masterproc) write(iulog,*)'-DCOLUMN_OPENMP disabled'
+#endif
+
+
     if (ne /=0) then
     if (mesh_file /= "none" .and. mesh_file /= "/dev/null") then
       write (*,*) "namelist_mod: mesh_file:",trim(mesh_file), &
@@ -742,14 +829,25 @@ module namelist_mod
     end if
     if (par%masterproc) write (iulog,*) "Mesh File:", trim(mesh_file)
     if (ne.eq.0) then
+#ifndef HOMME_WITHOUT_PIOLIBRARY
+       call set_mesh_dimensions()
        if (par%masterproc) write (iulog,*) "Opening Mesh File:", trim(mesh_file)
-      call set_mesh_dimensions()
-      call MeshOpen(mesh_file, par)
+       call MeshOpen(mesh_file, par)
+#else
+       call abortmp("Build is without PIO library, mesh runs (ne=0) are not supported.")
+#endif
     end if
     ! set map
     if (cubed_sphere_map<0) then
+#if ( defined MODEL_THETA_C || defined MODEL_THETA_L ) 
+       cubed_sphere_map=2  ! theta model default = element local
+#else
        cubed_sphere_map=0  ! default is equi-angle gnomonic
-       if (ne.eq.0) cubed_sphere_map=2  ! element_local for var-res grids
+#endif
+       if (ne.eq.0) cubed_sphere_map=2  ! must use element_local for var-res grids
+#ifdef CAM
+       if (fv_nphys.gt.0) cubed_sphere_map=2  ! must use element_local for FV physics grid
+#endif
     endif
     if (par%masterproc) write (iulog,*) "Reference element projection: cubed_sphere_map=",cubed_sphere_map
 
@@ -769,14 +867,19 @@ module namelist_mod
 
 #ifdef _PRIM
     rk_stage_user=3  ! 3d PRIM code only supports 3 stage RK tracer advection
-    ! CHECK phys timescale, requires se_ftype=0 (pure tendencies for forcing)
-    if (phys_tscale/=0) then
-       if (ftype>0) call abortmp('user specified se_phys_tscale requires se_ftype<=0')
-    endif
-    if (limiter_option==8 .or. limiter_option==84) then
-       if (hypervis_subcycle_q/=1) then
-          call abortmp('limiter 8,84 requires hypervis_subcycle_q=1')
+    if (limiter_option==8 .or. limiter_option==84 .or. limiter_option == 9) then
+       if (hypervis_subcycle_q/=1 .and. transport_alg == 0) then
+          call abortmp('limiter 8,84,9 require hypervis_subcycle_q=1')
        endif
+    endif
+#endif
+
+#ifndef CAM
+!standalone homme does not support ftype=1 (cause it is identical to ftype=0).
+!also, standalone ftype=0 is the same as standalone ftype=2.
+    if ((ftype == 0).or.(ftype == 2).or.(ftype == 3).or.(ftype == 4).or.(ftype == -1)) then
+    else
+       call abortmp('Standalone homme supports only se_ftype=-1,0,2,3,4')
     endif
 #endif
 
@@ -785,7 +888,7 @@ module namelist_mod
     endif
 
     
-    if (use_semi_lagrange_transport .and. rsplit == 0) then
+    if (transport_alg > 0 .and. rsplit == 0) then
        call abortmp('The semi-Lagrange Transport option requires 0 < rsplit')
     end if
 
@@ -797,6 +900,7 @@ module namelist_mod
     call MPI_bcast(interpolate_analysis, 7,MPIlogical_t,par%root,par%comm,ierr)
     call MPI_bcast(interp_nlat , 1,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(interp_nlon , 1,MPIinteger_t,par%root,par%comm,ierr)
+    call MPI_bcast(interp_lon0 , 1,MPIreal_t   ,par%root,par%comm,ierr)
     call MPI_bcast(interp_gridtype , 1,MPIinteger_t,par%root,par%comm,ierr)
     call MPI_bcast(interp_type , 1,MPIinteger_t,par%root,par%comm,ierr)
 
@@ -821,18 +925,14 @@ module namelist_mod
 ! ^ ifndef CAM
 
     ! some default diffusion coefficiets
-    if(nu_s<0) nu_s=nu
-    if(nu_q<0) nu_q=nu
-    if(nu_div<0) nu_div=nu
-
-
-    if (multilevel <= 0) then
-      nmpi_per_node = 1
-    endif
+    if(nu_s<0)    nu_s  = nu
+    if(nu_q<0)    nu_q  = nu
+    if(nu_div<0)  nu_div= nu
+    if(dcmip16_mu_s<0)    dcmip16_mu_s  = dcmip16_mu
+    if(dcmip16_mu_q<0)    dcmip16_mu_q  = dcmip16_mu_s
 
     nnodes = npart/nmpi_per_node
-
-    if(numnodes > 0 .and. multilevel .eq. 1) then
+    if(numnodes > 0 ) then
         nnodes = numnodes
         nmpi_per_node = npart/nnodes
     endif
@@ -860,16 +960,15 @@ module namelist_mod
           call abortmp('user specified qsize > qsize_d parameter in dimensions_mod.F90')
        endif
        write(iulog,*)"readnl: NThreads      = ",NTHREADS
-       write(iulog,*)"readnl: vert_num_threads = ",vert_num_threads
-       write(iulog,*)"readnl: nthreads_accel = ",nthreads_accel
 #endif
 
        write(iulog,*)"readnl: ne,np         = ",NE,np
        write(iulog,*)"readnl: partmethod    = ",PARTMETHOD
+       write(iulog,*)"readnl: COORD_TRANSFORM_METHOD    = ",COORD_TRANSFORM_METHOD
+       write(iulog,*)"readnl: Z2_MAP_METHOD    = ",Z2_MAP_METHOD
+
        write(iulog,*)'readnl: nmpi_per_node = ',nmpi_per_node
        write(iulog,*)"readnl: vthreads      = ",vthreads
-       write(iulog,*)'readnl: multilevel    = ',multilevel
-       write(iulog,*)'readnl: useframes     = ',useframes
        write(iulog,*)'readnl: nnodes        = ',nnodes
        write(iulog,*)'readnl: npart         = ',npart
 
@@ -881,9 +980,14 @@ module namelist_mod
        if (integration == "runge_kutta"  ) then
           write(iulog,*)"readnl: rk_stage_user   = ",rk_stage_user
        endif
-       write(iulog,*)"readnl: use_semi_lagrange_transport   = ",use_semi_lagrange_transport
-       write(iulog,*)"readnl: use_semi_lagrange_transport_local_conservation=",use_semi_lagrange_transport_local_conservation
+       write(iulog,*)"readnl: theta_hydrostatic_mode = ",theta_hydrostatic_mode
+       write(iulog,*)"readnl: transport_alg   = ",transport_alg
+       write(iulog,*)"readnl: semi_lagrange_cdr_alg   = ",semi_lagrange_cdr_alg
+       write(iulog,*)"readnl: semi_lagrange_cdr_check   = ",semi_lagrange_cdr_check
+       write(iulog,*)"readnl: semi_lagrange_hv_q   = ",semi_lagrange_hv_q
+       write(iulog,*)"readnl: semi_lagrange_nearest_point_lev   = ",semi_lagrange_nearest_point_lev
        write(iulog,*)"readnl: tstep_type    = ",tstep_type
+       write(iulog,*)"readnl: theta_advect_form = ",theta_advect_form
        write(iulog,*)"readnl: vert_remap_q_alg  = ",vert_remap_q_alg
 #ifdef CAM
        write(iulog,*)"readnl: se_nsplit         = ", NSPLIT
@@ -898,6 +1002,7 @@ module namelist_mod
        write(iulog,*)"readnl: vertical remap frequency rsplit (0=disabled): ",rsplit
 
        write(iulog,*)"readnl: runtype       = ",runtype
+       write(iulog,*)"readnl: se_fv_phys_remap_alg = ",se_fv_phys_remap_alg
 
        if (hypervis_power /= 0)then
           write(iulog,*)"Variable scalar hyperviscosity: hypervis_power=",hypervis_power
@@ -909,8 +1014,9 @@ module namelist_mod
           write(iulog,*)"Constant (hyper)viscosity used."
        endif
 
-       write(iulog,*)"hypervis_subcycle, hypervis_subcycle_q = ",&
-            hypervis_subcycle,hypervis_subcycle_q
+       write(iulog,*)"hypervis_subcycle     = ",hypervis_subcycle
+       write(iulog,*)"hypervis_subcycle_tom = ",hypervis_subcycle_tom
+       write(iulog,*)"hypervis_subcycle_q   = ",hypervis_subcycle_q
        !write(iulog,*)"psurf_vis: ",psurf_vis
        write(iulog,'(a,2e9.2)')"viscosity:  nu (vor/div) = ",nu,nu_div
        write(iulog,'(a,2e9.2)')"viscosity:  nu_s      = ",nu_s
@@ -918,13 +1024,17 @@ module namelist_mod
        write(iulog,'(a,2e9.2)')"viscosity:  nu_p      = ",nu_p
        write(iulog,'(a,2e9.2)')"viscosity:  nu_top      = ",nu_top
        write(iulog,*)"PHIS smoothing:  ",smooth_phis_numcycle,smooth_phis_nudt
-       write(iulog,*)"SGH  smoothing:  ",smooth_sgh_numcycle
+
+       if(dcmip16_mu/=0)  write(iulog,'(a,2e9.2)')"1st order viscosity:  dcmip16_mu   = ",dcmip16_mu
+       if(dcmip16_mu_s/=0)write(iulog,'(a,2e9.2)')"1st order viscosity:  dcmip16_mu_s = ",dcmip16_mu_s
+       if(dcmip16_mu_q/=0)write(iulog,'(a,2e9.2)')"1st order viscosity:  dcmip16_mu_q = ",dcmip16_mu_q
 
        if(initial_total_mass>0) then
           write(iulog,*) "initial_total_mass = ",initial_total_mass
        end if
 
 #ifndef CAM
+#ifndef HOMME_WITHOUT_PIOLIBRARY
        write(iulog,*)"  analysis: output_prefix = ",TRIM(output_prefix)
        write(iulog,*)"  analysis: io_stride = ",io_stride
        write(iulog,*)"  analysis: num_io_procs = ",num_io_procs
@@ -949,6 +1059,15 @@ module namelist_mod
              end select
           end if
        end do
+#endif
+
+#if (defined MODEL_THETA_L && defined ARKODE)
+       write(iulog,*)""
+       write(iulog,*)"arkode: rel_tol = ",rel_tol
+       write(iulog,*)"arkode: abs_tol = ",abs_tol
+       write(iulog,*)"arkode: calc_nonlinear_stats = ",calc_nonlinear_stats
+       write(iulog,*)"arkode: use_column_solver = ",use_column_solver
+#endif
 
        ! display physical constants for HOMME stand alone simulations
        write(iulog,*)""
@@ -964,11 +1083,19 @@ module namelist_mod
        if(any(interpolate_analysis)) then
           write(iulog,*)" analysis interp nlat = ",interp_nlat
           write(iulog,*)" analysis interp nlon = ",interp_nlon
+          write(iulog,*)" analysis interp lon0 = ",interp_lon0
           write(iulog,*)" analysis interp gridtype = ",interp_gridtype
           write(iulog,*)" analysis interpolation type = ",interp_type
        end if
 #endif
 ! ^ ifndef CAM
+
+#ifndef CAM
+#ifdef HOMME_SHA1
+      write(iulog,*)"HOMME SHA = ", HOMME_SHA1
+#endif
+#endif
+
 
 !=======================================================================================================!
     endif

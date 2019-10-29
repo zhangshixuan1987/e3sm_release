@@ -30,6 +30,9 @@ module phys_grid
 !       rlon               for longitude coordinate (in radians)
 !       wght               for column integration weight
 !
+!      print_cost_p        print measured cost (for all chunks)
+!      update_cost_p       add walltime to chunk cost for a given chunk
+!
 !      scatter_field_to_chunk
 !                          distribute field
 !                          to decomposed chunk data structure
@@ -99,6 +102,10 @@ module phys_grid
    use cam_abortutils,   only: endrun
    use perf_mod
    use cam_logfile,      only: iulog
+   use scamMod,          only: single_column, scmlat, scmlon
+   use shr_const_mod,    only: SHR_CONST_PI
+   use dycore,           only: dycore_is
+   use units,            only: getunit, freeunit
 
    implicit none
    save
@@ -117,15 +124,22 @@ module phys_grid
                                        ! dimensions of rectangular horizontal grid
                                        ! data structure, If 1D data structure, then
                                        ! hdim2_d == 1.
+   logical, private :: use_cost_d
+                                       ! flag indicating that nontrivial colum cost 
+                                       ! estimates are available for use in load 
+                                       ! balancing
+   real(r8), dimension(:), allocatable, private :: cost_d
+                                       ! normalized estimated column computational 
+                                       ! cost (from dynamics)
 
 ! physics field data structures
    integer         :: ngcols           ! global column count in physics grid (all)
    integer, public :: ngcols_p         ! global column count in physics grid 
                                        ! (without holes)
 
-   integer, dimension(:), allocatable, private :: dyn_to_latlon_gcol_map
+   integer, dimension(:), allocatable, public :: dyn_to_latlon_gcol_map
                                        ! map from unsorted (dynamics) to lat/lon sorted grid indices
-   integer, dimension(:), allocatable, private :: latlon_to_dyn_gcol_map
+   integer, dimension(:), allocatable, public :: latlon_to_dyn_gcol_map !now beingh used in RRTMG radiation.F90
                                        ! map from lat/lon sorted grid to unsorted (dynamics) indices
    integer, dimension(:), allocatable, private :: lonlat_to_dyn_gcol_map
                                        ! map from lon/lat sorted grid to unsorted (dynamics) indices
@@ -144,6 +158,9 @@ module phys_grid
 
 
    integer, dimension(:), allocatable, private :: clon_p_cnt ! number of repeats for each longitude
+   integer, dimension(:), allocatable, private :: clon_p_idx ! index in lonlat ordering for first 
+                                                             ! occurrence of longitude corresponding to 
+                                                             ! given latitude index
    real(r8), dimension(:), allocatable :: clon_p  ! unique longitudes (radians, increasing)
 
    integer, dimension(:), allocatable, private :: lat_p      ! index into list of unique column latitudes
@@ -157,6 +174,7 @@ module phys_grid
      integer  :: lat(pcols)            ! global latitude indices
      integer  :: owner                 ! id of process where chunk assigned
      integer  :: lcid                  ! local chunk index
+     real(r8) :: estcost               ! estimated computational cost (normalized)
    end type chunk
 
    integer :: nchunks                  ! global chunk count
@@ -175,6 +193,7 @@ module phys_grid
      integer  :: gcol(pcols)           ! global physics column indices
      real(r8) :: area(pcols)           ! column surface area (from dynamics)
      real(r8) :: wght(pcols)           ! column integration weight (from dynamics)
+     real(r8) :: cost                  ! measured computational cost (seconds)
    end type lchunk
 
    integer, private :: nlchunks        ! local chunk count
@@ -186,7 +205,7 @@ module phys_grid
      integer  :: col                   ! column index in chunk
    end type knuhc
 
-   type (knuhc), dimension(:), allocatable, private :: knuhcs
+   type (knuhc), dimension(:), allocatable, public :: knuhcs !now beingh used in RRTMG radiation.F90
                                        ! map from global column indices
                                        ! to chunk'ed grid
 
@@ -261,7 +280,7 @@ module phys_grid
 !  4: concatenated blocks, no load balancing, no interprocess communication
    integer, private, parameter :: min_lbal_opt = -1
    integer, private, parameter :: max_lbal_opt = 5
-   integer, private, parameter :: def_lbal_opt = 2               ! default
+   integer, private, parameter :: def_lbal_opt = 2               ! default 
    integer, private :: lbal_opt = def_lbal_opt
 
 ! Physics grid load balancing options:  
@@ -273,6 +292,12 @@ module phys_grid
    integer, private, parameter :: def_twin_alg_lonlat = 1         ! default
    integer, private, parameter :: def_twin_alg_unstructured = 0
    integer, private :: twin_alg = def_twin_alg_lonlat
+
+! Physics grid load balancing output options:  
+!  T: write out both estimated (normalized) and actual (seconds) cost per chunk
+!  F: do not write out costs
+   logical, private, parameter :: def_output_chunk_costs = .false.
+   logical, private :: output_chunk_costs = def_output_chunk_costs
 
 ! target number of chunks per thread
    integer, private, parameter :: min_chunks_per_thread = 1
@@ -298,7 +323,7 @@ module phys_grid
    integer, private, parameter :: modmin_alltoall = 11
    integer, private, parameter :: modmax_alltoall = 13
 # endif
-   integer, private, parameter :: def_alltoall = -1                ! default
+   integer, private, parameter :: def_alltoall = 1                ! default
    integer, private :: phys_alltoall = def_alltoall
 
 contains
@@ -324,19 +349,19 @@ contains
     ! Author: John Drake and Patrick Worley
     ! 
     !-----------------------------------------------------------------------
-    use pmgrid, only: plev
-    use dycore, only: dycore_is
-    use dyn_grid, only: get_block_bounds_d, &
-         get_block_gcol_d, get_block_gcol_cnt_d, &
-         get_block_levels_d, get_block_lvl_cnt_d, &
-         get_block_owner_d, &
-         get_gcol_block_d, get_gcol_block_cnt_d, &
-         get_horiz_grid_dim_d, get_horiz_grid_d, physgrid_copy_attributes_d
-    use spmd_utils, only: pair, ceil2
-    use cam_grid_support, only: cam_grid_register, iMap, max_hcoordname_len
+    use pmgrid,           only: plev
+    use dycore,           only: dycore_is
+    use dyn_grid,         only: get_block_bounds_d, get_block_gcol_d,     &
+                                get_block_gcol_cnt_d, get_block_levels_d, &
+                                get_block_lvl_cnt_d, get_block_owner_d,   &
+                                get_gcol_block_d, get_gcol_block_cnt_d,   &
+                                get_horiz_grid_dim_d, get_horiz_grid_d,   &
+                                physgrid_copy_attributes_d
+    use spmd_utils,       only: pair, ceil2
+    use cam_grid_support, only: cam_grid_register, iMap
+    use cam_grid_support, only: hcoord_len => max_hcoordname_len
     use cam_grid_support, only: horiz_coord_t, horiz_coord_create
     use cam_grid_support, only: cam_grid_attribute_copy
-
     !
     !------------------------------Arguments--------------------------------
     !
@@ -359,54 +384,45 @@ contains
     integer :: block_cnt                  ! number of blocks containing data
     ! for a given vertical column
     integer :: numlvl                     ! number of vertical levels in block 
-    ! column
     integer :: levels(plev+1)             ! vertical level indices
     integer :: owner_d                    ! process owning given block column
     integer :: owner_p                    ! process owning given chunk column
     integer :: blockids(plev+1)           ! block indices
     integer :: bcids(plev+1)              ! block column indices
-
-
-    ! column surface area (from dynamics)
-    real(r8), dimension(:), allocatable :: area_d
-
-    ! column integration weight (from dynamics)
-    real(r8), dimension(:), allocatable :: wght_d
-
-    ! chunk global ordering
-    integer, dimension(:), allocatable :: pchunkid
+    real(r8), parameter :: deg2rad = SHR_CONST_PI/180.0
+    real(r8), dimension(:), allocatable :: area_d     ! column surface area (from dynamics)
+    real(r8), dimension(:), allocatable :: wght_d     ! column integration weight (from dynamics)
+    integer,  dimension(:), allocatable :: pchunkid   ! chunk global ordering
 
     ! permutation array used in physics column sorting;
     ! reused later as work space in (lbal_opt == -1) logic
     integer, dimension(:), allocatable :: cdex
 
-    ! latitudes and longitudes and column area for dynamics columns
-    real(r8), dimension(:), allocatable :: clat_d
-    real(r8), dimension(:), allocatable :: clon_d
-    real(r8), dimension(:), allocatable :: lat_d
-    real(r8), dimension(:), allocatable :: lon_d
+    real(r8), dimension(:), allocatable :: clat_d   ! lat (radians) from dynamics columns
+    real(r8), dimension(:), allocatable :: clon_d   ! lon (radians) from dynamics columns
+    real(r8), dimension(:), allocatable :: lat_d    ! lat from dynamics columns
+    real(r8), dimension(:), allocatable :: lon_d    ! lon from dynamics columns
     real(r8) :: clat_p_tmp
     real(r8) :: clon_p_tmp
 
     ! Maps and values for physics grid
-    real(r8),       pointer             :: lonvals(:)
-    real(r8),       pointer             :: latvals(:)
+    real(r8),                   pointer :: lonvals(:)
+    real(r8),                   pointer :: latvals(:)
     real(r8),               allocatable :: latdeg_p(:)
     real(r8),               allocatable :: londeg_p(:)
-    integer(iMap),  pointer             :: grid_map(:,:)
-    integer(iMap),  pointer             :: coord_map(:)
-    type(horiz_coord_t), pointer        :: lat_coord
-    type(horiz_coord_t), pointer        :: lon_coord
+    integer(iMap),              pointer :: grid_map(:,:)
+    integer(iMap),          allocatable :: coord_map(:)
+    type(horiz_coord_t),        pointer :: lat_coord
+    type(horiz_coord_t),        pointer :: lon_coord
     integer                             :: gcols(pcols)
-    character(len=max_hcoordname_len), pointer :: copy_attributes(:)
-    character(len=max_hcoordname_len)   :: copy_gridname
+    character(len=hcoord_len),  pointer :: copy_attributes(:)
+    character(len=hcoord_len)           :: copy_gridname
     logical                             :: unstructured
     real(r8)                            :: lonmin, latmin
 
     nullify(lonvals)
     nullify(latvals)
     nullify(grid_map)
-    nullify(coord_map)
     nullify(lat_coord)
     nullify(lon_coord)
 
@@ -417,9 +433,13 @@ contains
     !
     ! Initialize physics grid, using dynamics grid
     ! a) column coordinates
-
+    if (single_column .and. dycore_is ('SE')) lbal_opt = -1 !+PAB make this default option for SCM
     call get_horiz_grid_dim_d(hdim1_d,hdim2_d)
-    ngcols = hdim1_d*hdim2_d
+    if (single_column .and. dycore_is('SE')) then
+      ngcols = 1
+    else
+      ngcols = hdim1_d*hdim2_d
+    endif
     allocate( clat_d(1:ngcols) )
     allocate( clon_d(1:ngcols) )
     allocate( lat_d(1:ngcols) )
@@ -427,9 +447,26 @@ contains
     allocate( cdex(1:ngcols) )
     clat_d = 100000.0_r8
     clon_d = 100000.0_r8
-    call get_horiz_grid_d(ngcols, clat_d_out=clat_d, clon_d_out=clon_d, lat_d_out=lat_d, lon_d_out=lon_d)
+    if (single_column .and. dycore_is('SE')) then
+      lat_d = scmlat
+      lon_d = scmlon
+      clat_d = scmlat * deg2rad
+      clon_d = scmlon * deg2rad
+    else
+      call get_horiz_grid_d(ngcols, clat_d_out=clat_d, clon_d_out=clon_d, lat_d_out=lat_d, lon_d_out=lon_d)
+    endif
     latmin = MINVAL(ABS(lat_d))
     lonmin = MINVAL(ABS(lon_d))
+
+    ! Get estimated computational cost weight for each column (only from SE dynamics currently)
+    allocate( cost_d (1:ngcols) )
+    cost_d(:) = 1.0_r8
+    use_cost_d = .false.
+    if ((.not. single_column) .and. dycore_is('SE')) then
+      call get_horiz_grid_d(ngcols, cost_d_out=cost_d)
+      if (minval(cost_d) .ne. maxval(cost_d)) use_cost_d = .true.
+    endif
+
 !!XXgoldyXX: To do: replace collection above with local physics points
 
     ! count number of "real" column indices
@@ -509,8 +546,8 @@ contains
        clat_p_idx(j) = clat_p_idx(j-1) + clat_p_cnt(j-1)
     enddo
 
-    deallocate(lat_d)
-    deallocate(lon_d)
+    deallocate( lat_d )
+    deallocate( lon_d )
 
     ! sort by longitude within latitudes
     end_dex = 0
@@ -598,14 +635,19 @@ contains
 
     !
     ! Option -1: each dynamics block is a single chunk
-    !            
+    !          
     if (lbal_opt == -1) then
+
        !
        ! Check that pcols >= maxblksiz
        !
        maxblksiz = 0
        do jb=firstblock,lastblock
-          maxblksiz = max(maxblksiz,get_block_gcol_cnt_d(jb))
+          if (single_column .and. dycore_is('SE')) then
+	    maxblksiz = 1
+	  else
+            maxblksiz = max(maxblksiz,get_block_gcol_cnt_d(jb))
+	  endif
        enddo
        if (pcols < maxblksiz) then
 	  write(iulog,*) 'pcols = ',pcols, ' maxblksiz=',maxblksiz
@@ -615,7 +657,11 @@ contains
        !
        ! Determine total number of chunks
        !
-       nchunks = (lastblock-firstblock+1)
+       if (single_column .and. dycore_is('SE')) then
+         nchunks = 1
+       else
+	 nchunks = (lastblock-firstblock+1)
+       endif
 
        !
        ! Set max virtual SMP node size
@@ -627,10 +673,15 @@ contains
        !
        allocate( cdex(1:maxblksiz) )
        allocate( chunks(1:nchunks) )
+       chunks(:)%estcost = 0.0_r8
 
        do cid=1,nchunks
           ! get number of global column indices in block
-          max_ncols = get_block_gcol_cnt_d(cid+firstblock-1)
+          if (single_column .and. dycore_is('SE')) then
+	    max_ncols = 1
+	  else
+	    max_ncols = get_block_gcol_cnt_d(cid+firstblock-1)
+	  endif
           ! fill cdex array with global indices from current block
           call get_block_gcol_d(cid+firstblock-1,max_ncols,cdex)
 
@@ -644,7 +695,8 @@ contains
                 ncols = ncols + 1
                 chunks(cid)%gcol(ncols) = curgcol_d
                 chunks(cid)%lat(ncols) = lat_p(curgcol_d)
-                chunks(cid)%lon(ncols) = lon_p(curgcol_d)
+                chunks(cid)%lon(ncols) = lon_p(curgcol_d)		
+                chunks(cid)%estcost = chunks(cid)%estcost + cost_d(curgcol_d)
              endif
           enddo
           chunks(cid)%ncols = ncols
@@ -703,14 +755,29 @@ contains
        ! Allocate and initialize chunks data structure, then
        ! assign chunks to processes.
        !
+
+       if  (twin_alg .eq. 1) then
+          ! precompute clon_p_idx: index in lonlat ordering for first 
+          ! occurrence of longitude corresponding to given latitude index,
+          ! used in twin option in create_chunks
+          allocate( clon_p_idx(1:clon_p_tot) )
+          clon_p_idx(1) = 1
+          do i=2,clon_p_tot
+             clon_p_idx(i) = clon_p_idx(i-1) + clon_p_cnt(i-1)
+          enddo
+       endif
+
+       call t_startf("create_chunks")
        call create_chunks(lbal_opt, chunks_per_thread)
+       call t_stopf("create_chunks")
 
        ! Early clean-up, to minimize memory high water mark
        deallocate( lat_p )
        deallocate( lon_p )
-       deallocate( latlon_to_dyn_gcol_map )
+       !deallocate( latlon_to_dyn_gcol_map ) !do not deallocate as it is being used in RRTMG radiation.F90
        if  (twin_alg .eq. 1) deallocate( lonlat_to_dyn_gcol_map )
        if  (twin_alg .eq. 1) deallocate( clon_p_cnt )
+       if  (twin_alg .eq. 1) deallocate( clon_p_idx )
        if ((twin_alg .eq. 1) .or. (lbal_opt .eq. 3)) deallocate( clat_p_cnt )
 
        !
@@ -732,6 +799,12 @@ contains
           enddo
        enddo
     endif
+
+    !
+    ! Deallocate unneeded work space
+    !
+    deallocate( cost_d )
+
     !
     ! Allocate and initialize data structures for gather/scatter
     !  
@@ -784,6 +857,7 @@ contains
     endchunk = pchunkid(iam+1) + lastblock - 1
     !
     allocate( lchunks(begchunk:endchunk) )
+    lchunks(:)%cost = 0.0_r8
     do cid=1,nchunks
        if (chunks(cid)%owner == iam) then
           lcid = chunks(cid)%lcid
@@ -796,7 +870,7 @@ contains
     enddo
 
     deallocate( pchunkid )
-    deallocate( npchunks )
+    !deallocate( npchunks ) !do not deallocate as it is being used in RRTMG radiation.F90
     !
     !-----------------------------------------------------------------------
     !
@@ -808,8 +882,12 @@ contains
     area_d = 0.0_r8
     wght_d = 0.0_r8
 
-    call get_horiz_grid_d(ngcols, area_d_out=area_d, wght_d_out=wght_d)
-
+    if (single_column .and. dycore_is('SE')) then
+      area_d = 4.0_r8*pi
+      wght_d = 4.0_r8*pi
+    else
+      call get_horiz_grid_d(ngcols, area_d_out=area_d, wght_d_out=wght_d)
+    endif
 
     if ( abs(sum(area_d) - 4.0_r8*pi) > 1.e-10_r8 ) then
        write(iulog,*) ' ERROR: sum of areas on globe does not equal 4*pi'
@@ -834,6 +912,7 @@ contains
     deallocate( wght_d )
 
     if (.not. local_dp_map) then
+
        !
        ! allocate and initialize data structures for transposes
        !  
@@ -877,6 +956,7 @@ contains
              endif
           enddo
        enddo
+       
        btofc_blk_num(curp) = curcnt
        block_buf_nrecs = glbcnt
        !  
@@ -937,6 +1017,7 @@ contains
        !
        ! Second, determine swap partners.
        !
+
        allocate( dp_coup_proc(dp_coup_steps) )
        dp_coup_steps = 0
        do i=1,ceil2(npes)-1
@@ -1013,14 +1094,17 @@ contains
     !      However, these will be in the dynamics decomposition
 
     if (unstructured) then
-      coord_map => grid_map(3,:)
-      lon_coord => horiz_coord_create('lon', 'ncol', ngcols_p, 'longitude',   &
-           'degrees_east', 1, size(lonvals), lonvals, map=coord_map)
-      lat_coord => horiz_coord_create('lat', 'ncol', ngcols_p, 'latitude',    &
-           'degrees_north', 1, size(latvals), latvals, map=coord_map)
+      lon_coord => horiz_coord_create('lon', 'ncol', ngcols_p,                 &
+                                      'longitude', 'degrees_east', 1,          &
+                                      size(lonvals), lonvals, map=grid_map(3,:))
+      lat_coord => horiz_coord_create('lat', 'ncol', ngcols_p,                 &
+                                      'latitude', 'degrees_north', 1,          &
+                                      size(latvals), latvals, map=grid_map(3,:))
     else
-      ! Create a lon coord map which only writes from one of each unique lon
+
       allocate(coord_map(size(grid_map, 2)))
+
+      ! Create a lon coord map which only writes from one of each unique lon
       where(latvals == latmin)
         coord_map(:) = grid_map(3, :)
       elsewhere
@@ -1028,9 +1112,8 @@ contains
       end where
       lon_coord => horiz_coord_create('lon', 'lon', hdim1_d, 'longitude',     &
            'degrees_east', 1, size(lonvals), lonvals, map=coord_map)
-      nullify(coord_map)
+
       ! Create a lat coord map which only writes from one of each unique lat
-      allocate(coord_map(size(grid_map, 2)))
       where(lonvals == lonmin)
         coord_map(:) = grid_map(4, :)
       elsewhere
@@ -1038,8 +1121,11 @@ contains
       end where
       lat_coord => horiz_coord_create('lat', 'lat', hdim2_d, 'latitude',      &
            'degrees_north', 1, size(latvals), latvals, map=coord_map)
-    end if
-    nullify(coord_map)
+
+      deallocate(coord_map)
+
+    end if ! unstructured
+    
     call cam_grid_register('physgrid', phys_decomp, lat_coord, lon_coord,     &
          grid_map, unstruct=unstructured, block_indexed=.true.)
     ! Copy required attributes from the dynamics array
@@ -1261,7 +1347,8 @@ logical function phys_grid_initialized ()
    subroutine phys_grid_defaultopts(phys_loadbalance_out, &
                                     phys_twin_algorithm_out, &
                                     phys_alltoall_out, &
-                                    phys_chnk_per_thd_out )
+                                    phys_chnk_per_thd_out, &
+                                    phys_chnk_cost_write_out )
 !----------------------------------------------------------------------- 
 ! Purpose: Return default runtime options
 ! Author: Tom Henderson
@@ -1276,6 +1363,8 @@ logical function phys_grid_initialized ()
      integer, intent(out), optional :: phys_alltoall_out
      ! number of chunks per thread
      integer, intent(out), optional :: phys_chnk_per_thd_out
+     ! flag whether to write out estimated and actual cost per chunk
+     logical, intent(out), optional :: phys_chnk_cost_write_out
 !-----------------------------------------------------------------------
      if ( present(phys_loadbalance_out) ) then
        phys_loadbalance_out = def_lbal_opt
@@ -1293,6 +1382,9 @@ logical function phys_grid_initialized ()
      if ( present(phys_chnk_per_thd_out) ) then
        phys_chnk_per_thd_out = def_chunks_per_thread
      endif
+     if ( present(phys_chnk_cost_write_out) ) then
+       phys_chnk_cost_write_out = def_output_chunk_costs
+     endif
    end subroutine phys_grid_defaultopts
 !
 !========================================================================
@@ -1300,7 +1392,8 @@ logical function phys_grid_initialized ()
    subroutine phys_grid_setopts(phys_loadbalance_in, &
                                 phys_twin_algorithm_in, &
                                 phys_alltoall_in,    &
-                                phys_chnk_per_thd_in )
+                                phys_chnk_per_thd_in, &
+                                phys_chnk_cost_write_in )
 !----------------------------------------------------------------------- 
 ! Purpose: Set runtime options
 ! Author: Tom Henderson
@@ -1318,6 +1411,8 @@ logical function phys_grid_initialized ()
      integer, intent(in), optional :: phys_alltoall_in
      ! number of chunks per thread
      integer, intent(in), optional :: phys_chnk_per_thd_in
+     ! flag whether to write out estimated and actual cost per chunk
+     logical, intent(in), optional :: phys_chnk_cost_write_in
 !-----------------------------------------------------------------------
      if ( present(phys_loadbalance_in) ) then
         lbal_opt = phys_loadbalance_in
@@ -1390,6 +1485,10 @@ logical function phys_grid_initialized ()
            endif
            call endrun
         endif
+     endif
+!
+     if ( present(phys_chnk_cost_write_in) ) then
+        output_chunk_costs = phys_chnk_cost_write_in
      endif
    end subroutine phys_grid_setopts
 !
@@ -2034,6 +2133,136 @@ logical function phys_grid_initialized ()
 
    return
    end function get_rlon_p
+!
+!========================================================================
+
+   subroutine print_cost_p()
+!----------------------------------------------------------------------- 
+! 
+! Purpose: Print walltime cost for all chunks.
+! 
+! Method: 
+! 
+! Author: P. Worley
+! 
+!-----------------------------------------------------------------------
+!---------------------------Local workspace-----------------------------
+   integer  :: unitn                  ! file unit number
+   integer  :: signal                 ! handshake variable
+   integer  :: lcid                   ! local chunk id
+   integer  :: cid                    ! global chunk id
+   integer  :: owner                  ! chunk owner
+   integer  :: ncols                  ! number of columns in chunk
+   integer  :: ierr                   ! error return
+
+   real(r8) :: cost_lsum, cost_gsum   ! local and global sums of 
+                                      !  chunk costs
+   real(r8) :: avg_cost               ! average chunk cost
+   real(r8) :: avg_estcost            ! average estimated chunk cost
+   real(r8) :: cost                   ! chunk cost
+   real(r8) :: norm_cost              ! normalized chunk cost
+   real(r8) :: norm_est_cost          ! normalized estimated chunk cost
+
+   character(len=*), parameter :: fname = 'atm_chunk_costs.txt'
+
+!-----------------------------------------------------------------------
+   if (output_chunk_costs) then
+      unitn = getunit()
+
+      ! Calculate normalized measured cost
+      cost_gsum = 0.0_r8
+      cost_lsum = 0.0_r8
+      do lcid = begchunk, endchunk
+         cost_lsum = cost_lsum + lchunks(lcid)%cost
+      enddo
+#if ( defined SPMD )
+      call MPI_ALLREDUCE(cost_lsum, cost_gsum, 1, MPI_REAL8, MPI_SUM, &
+                         mpicom, ierr)
+#else
+      cost_gsum = cost_lsum
+#endif
+      if (abs(cost_gsum) > 0.000001_r8) then
+         avg_cost = cost_gsum/nchunks
+      else
+         avg_cost = 1.0_r8
+      endif
+
+      ! Calculate normalized estimated cost
+      cost_gsum = 0.0_r8
+      do cid = 1,nchunks
+         cost_gsum = cost_gsum + chunks(cid)%estcost
+      enddo
+      if (abs(cost_gsum) > 0.000001_r8) then
+         avg_estcost = cost_gsum/nchunks
+      else
+         avg_estcost = 1.0_r8
+      endif
+
+      ! Take turns writing to fname.
+      if (iam == 0) then
+         open( unitn, file=trim(fname), status='REPLACE', &
+                      form='FORMATTED', access='SEQUENTIAL' )
+
+         write(unitn,'(a)') "ATM CHUNK COST"
+         write(unitn,'(a)') &
+            " owner   lcid    cid  ncols  estcost (norm)  cost (norm)  cost (seconds)"
+
+         signal = 1
+#if ( defined SPMD )
+      else
+         call mpirecv(signal, 1, mpiint, iam-1, iam, mpicom) 
+         open( unitn, file=trim(fname), status='OLD', &
+                      form='FORMATTED', access='SEQUENTIAL', position='APPEND' )
+#endif
+      endif
+
+      do lcid = begchunk, endchunk
+         cid   = lchunks(lcid)%cid
+         owner = chunks(cid)%owner
+         ncols = lchunks(lcid)%ncols
+         cost  = lchunks(lcid)%cost
+         norm_cost = cost/avg_cost
+         norm_est_cost = chunks(cid)%estcost/avg_estcost
+         write(unitn,'(i6,1x,i6,1x,i6,1x,i6,6x,f10.3,3x,f10.3,2x,e14.3)') &
+               owner, lcid, cid, ncols, norm_est_cost, norm_cost, cost
+      enddo
+
+      close(unitn)
+
+#if ( defined SPMD )
+      if (iam+1 < npes) then
+         call mpisend(signal, 1, mpiint, iam+1, iam+1, mpicom)
+      endif
+#endif
+
+      call freeunit(unitn)
+   endif
+
+   return
+   end subroutine print_cost_p
+!
+!========================================================================
+
+   subroutine update_cost_p(lcid, cost_increment)
+!----------------------------------------------------------------------- 
+! 
+! Purpose: Add cost_increment to walltime cost for chunk given the local
+!          chunk id.
+! 
+! Method: 
+! 
+! Author: P. Worley
+! 
+!-----------------------------------------------------------------------
+!------------------------------Arguments--------------------------------
+   integer, intent(in)  :: lcid          ! local chunk id
+   real(r8), intent(in) :: cost_increment! increment to running walltime
+
+!-----------------------------------------------------------------------
+   lchunks(lcid)%cost = lchunks(lcid)%cost + cost_increment
+
+   return
+   end subroutine update_cost_p
 !
 !========================================================================
 !
@@ -3881,12 +4110,14 @@ logical function phys_grid_initialized ()
    integer :: jb, ib                     ! global block and columns indices
    integer :: blksiz                     ! current block size
    integer :: ntmp1, ntmp2, nlchunks     ! work variables
+   integer :: lcol                       ! chunk column index
    integer :: max_ncols                  ! upper bound on number of columns in a block
    integer :: ncols                      ! number of columns in current chunk
+
    logical :: error                      ! error flag 
 
    ! indices for dynamics columns in given block
-   integer, dimension(:), allocatable :: cols
+   integer, dimension(:), allocatable :: cols_d
 
    ! number of MPI processes per virtual SMP node (0:nsmpx-1)
    integer, dimension(:), allocatable :: nsmpprocs      
@@ -3925,6 +4156,19 @@ logical function phys_grid_initialized ()
 
    ! process-local chunk id (0:nsmpx-1)
    integer, dimension(:), allocatable :: local_cid
+
+   ! permutation array used to sort columns by their computation cost
+   integer, dimension(:), allocatable :: cdex
+
+   ! array used to mark whether a column has been assigned when sorting
+   ! by dynamics block
+   logical, dimension(:), allocatable :: udex
+
+   ! min heap array used to maintain chunks sorted by assigned computational
+   ! cost. A separate heap is created for each virtual smp, but all
+   ! heaps are implemented in this one 1-D array
+   integer, dimension(:), allocatable :: heap
+   integer, dimension(:), allocatable :: heap_len
 
 #if ( defined _OPENMP )
    integer omp_get_max_threads
@@ -4103,7 +4347,7 @@ logical function phys_grid_initialized ()
    enddo
    max_nproc_smpx = maxval(nsmpprocs)
 !
-   deallocate( nsmpprocs )
+   deallocate( nsmpprocs )   
 
 !
 ! Determine number of columns assigned to each
@@ -4113,34 +4357,45 @@ logical function phys_grid_initialized ()
 !
    col_smp_mapx(:) = -1
    error = .false.
-   do i=1,ngcols_p
-      curgcol = latlon_to_dyn_gcol_map(i)
-      block_cnt = get_gcol_block_cnt_d(curgcol)
-      call get_gcol_block_d(curgcol,block_cnt,blockids,bcids)
-      do jb=1,block_cnt
-         p = get_block_owner_d(blockids(jb)) 
-         if (col_smp_mapx(i) .eq. -1) then
-            col_smp_mapx(i) = proc_smp_mapx(p)
-         elseif (col_smp_mapx(i) .ne. proc_smp_mapx(p)) then
-            error = .true.
-         endif
-      enddo
-   end do
+   do i=1,ngcols
+      if (dyn_to_latlon_gcol_map(i) .ne. -1) then
+         block_cnt = get_gcol_block_cnt_d(i)
+         call get_gcol_block_d(i,block_cnt,blockids,bcids)
+         do jb=1,block_cnt
+            p = get_block_owner_d(blockids(jb))
+            if (col_smp_mapx(i) .eq. -1) then
+               col_smp_mapx(i) = proc_smp_mapx(p)
+            elseif (col_smp_mapx(i) .ne. proc_smp_mapx(p)) then
+               error = .true.
+            endif
+         enddo
+      endif
+   enddo
    if (error) then
       write(iulog,*) "PHYS_GRID_INIT error: opt", opt, "specified, ", &
                "but vertical decomposition not limited to virtual SMP"
       call endrun()
-   endif
+   endif  
 !
    allocate( nsmpcolumns(0:nsmpx-1) )
+!
    nsmpcolumns(:) = 0
+   error = .false.
    do i=1,ngcols_p
       curgcol = latlon_to_dyn_gcol_map(i)
       smp = col_smp_mapx(curgcol)
-      nsmpcolumns(smp) = nsmpcolumns(smp) + 1
+      if (smp >= 0) then
+         nsmpcolumns(smp) = nsmpcolumns(smp) + 1
+      else
+         error = .true.
+         exit
+     endif
    end do
-!
-   deallocate( col_smp_mapx )
+   if (error) then
+      write(iulog,*) "PHYS_GRID_INIT error: no SMP found for ", &
+                     "column ", curgcol
+      call endrun()
+   endif
 
 !
 !  Allocate other work space
@@ -4151,7 +4406,8 @@ logical function phys_grid_initialized ()
    allocate( maxcol_chks(0:nsmpx-1) )
    allocate( cid_offset (0:nsmpx-1) )
    allocate( local_cid  (0:nsmpx-1) )
-   allocate( cols(1:maxblksiz) )
+   allocate( cols_d   (1:maxblksiz) )
+
 !
 ! Options 0-3: split local dynamics blocks into chunks,
 !              using wrap-map assignment of columns and
@@ -4194,7 +4450,7 @@ logical function phys_grid_initialized ()
             nsmpchunks(smp) = nsmpcolumns(smp)
          endif
          nchunks = nchunks + nsmpchunks(smp)
-      enddo
+      enddo      
 !
 ! Determine maximum number of columns to assign to chunks
 ! in a given SMP
@@ -4214,7 +4470,7 @@ logical function phys_grid_initialized ()
             maxcol_chk(smp) = 0
             maxcol_chks(smp) = 0
          endif
-      enddo
+      enddo      
 !
 ! Allocate chunks and knuhcs data structures
 !
@@ -4224,6 +4480,7 @@ logical function phys_grid_initialized ()
 ! Initialize chunks and knuhcs data structures
 !
       chunks(:)%ncols = 0
+      chunks(:)%estcost = 0.0_r8
       knuhcs(:)%chunkid = -1
       knuhcs(:)%col = -1
 !
@@ -4234,24 +4491,98 @@ logical function phys_grid_initialized ()
       do smp=1,nsmpx-1
          cid_offset(smp) = cid_offset(smp-1) + nsmpchunks(smp-1)
          local_cid(smp) = 0
+      enddo    
+
+!
+! Determine order in which to traverse columns for assignment to chunks
+!
+      allocate( cdex(1:ngcols) )
+
+      if ((use_cost_d) .and. (opt < 4)) then
+! If load balancing using column cost, then sort columns by cost first,
+! maximum to minimum
+         call IndexSet(ngcols,cdex)
+         call IndexSort(ngcols,cdex,cost_d,descend=.true.)
+      else
+! If not using column cost, then sort columns by block ordering,
+! as done in the original algorithm
+         allocate( udex(1:ngcols) )
+         udex(:) = .false.
+         i = 0
+         do jb=firstblock,lastblock
+            blksiz = get_block_gcol_cnt_d(jb)
+            call get_block_gcol_d(jb,blksiz,cols_d)
+!
+            do ib = 1,blksiz
+               curgcol = cols_d(ib)
+!
+! Record column in cdex in block order if not already recorded
+               if (.not. udex(curgcol)) then
+                  i=i+1
+                  if (i > ngcols) then
+                     if (masterproc) then
+                        write(iulog,*) &
+                           "PHYS_GRID_INIT error: more dynamics ", &
+                           "columns found in block traversal ", &
+                           "than expected."
+                     endif
+                     call endrun()
+                  endif
+                  cdex(i) = curgcol
+                  udex(curgcol) = .true.
+               endif
+!
+            enddo
+!
+         enddo
+         deallocate( udex )
+      endif
+
+!
+! Allocate and initialize min heap data structure, for use in 
+! maintaining list of chunks sorted by the assigned computional
+! cost (sum of estimated cost for assigned columns)
+!
+      allocate( heap(1:nchunks) )
+      do cid=1,nchunks
+         heap(cid) = cid
       enddo
+
+      allocate( heap_len(0:nsmpx-1) )
+      do smp=0,nsmpx-1
+         heap_len(smp) = nsmpchunks(smp)
+      enddo
+
 !
 ! Assign columns to chunks
 !
-      do jb=firstblock,lastblock
-         p = get_block_owner_d(jb)
-         smp = proc_smp_mapx(p)
-         blksiz = get_block_gcol_cnt_d(jb)
-         call get_block_gcol_d(jb,blksiz,cols)
-         do ib = 1,blksiz
+      do i=1,ngcols
+         curgcol = cdex(i)
+         smp = col_smp_mapx(i)
 !
 ! Assign column to a chunk if not already assigned
-            curgcol = cols(ib)
-            if ((dyn_to_latlon_gcol_map(curgcol) .ne. -1) .and. &
-                (knuhcs(curgcol)%chunkid == -1)) then
+         if ((dyn_to_latlon_gcol_map(curgcol) .ne. -1) .and. &
+             (knuhcs(curgcol)%chunkid == -1)) then
 !
-! Find next chunk with space
-! (maxcol_chks > 0 test necessary for opt=4 block map)
+            if ((use_cost_d) .and. (opt < 4)) then
+!
+! For opt==0,1,2,3 and when using column cost estimates, add column 
+! to chunk with lowest estimated cost chunk (and with space), 
+! i.e. to chunk at root of heap for current SMP
+               if (heap_len(smp) > 0) then
+                  cid = heap(cid_offset(smp))
+               else
+                  if (masterproc) then
+                     write(iulog,*) &
+                        "PHYS_GRID_INIT error: not enough chunks ", &
+                        "or too many columns assigned to current SMP"
+                  endif
+                  call endrun()
+               endif
+
+            else
+! For opt==4, find next chunk with space
+! (maxcol_chks > 0 test necessary for opt==4 block map)
                cid = cid_offset(smp) + local_cid(smp)
                if (maxcol_chks(smp) > 0) then
                   do while (chunks(cid)%ncols >=  maxcol_chk(smp))
@@ -4264,40 +4595,57 @@ logical function phys_grid_initialized ()
                      cid = cid_offset(smp) + local_cid(smp)
                   enddo
                endif
-               chunks(cid)%ncols = chunks(cid)%ncols + 1
-               if (chunks(cid)%ncols .eq. maxcol_chk(smp)) &
-                  maxcol_chks(smp) = maxcol_chks(smp) - 1
+
+            endif
+
 !
-               i = chunks(cid)%ncols
-               chunks(cid)%gcol(i) = curgcol
-               chunks(cid)%lon(i)  = lon_p(curgcol)
-               chunks(cid)%lat(i)  = lat_p(curgcol)
-               knuhcs(curgcol)%chunkid = cid
-               knuhcs(curgcol)%col = i
+! Update chunk with new column
+            chunks(cid)%ncols = chunks(cid)%ncols + 1
+            if (chunks(cid)%ncols .eq. maxcol_chk(smp)) &
+               maxcol_chks(smp) = maxcol_chks(smp) - 1
 !
-               if (opt < 4) then
+            lcol = chunks(cid)%ncols
+            chunks(cid)%gcol(lcol) = curgcol
+            chunks(cid)%lon(lcol)  = lon_p(curgcol)
+            chunks(cid)%lat(lcol)  = lat_p(curgcol)
+            chunks(cid)%estcost = chunks(cid)%estcost + cost_d(curgcol)
+            knuhcs(curgcol)%chunkid = cid
+            knuhcs(curgcol)%col = lcol
+!
+            if (opt < 4) then
 !
 ! If space available, look to assign a load-balancing "twin" to same chunk
-                  if ( (chunks(cid)%ncols <  maxcol_chk(smp)) .and. &
-                       (maxcol_chks(smp) > 0) .and. (twin_alg > 0)) then
+               if ( (chunks(cid)%ncols <  maxcol_chk(smp)) .and. &
+                    (maxcol_chks(smp) > 0) .and. (twin_alg > 0)) then
 
-                     call find_twin(curgcol, smp, &
-                                    proc_smp_mapx, twingcol)
+                  call find_twin(curgcol, smp, &
+                                 proc_smp_mapx, twingcol)
 
-                     if (twingcol > 0) then
-                        chunks(cid)%ncols = chunks(cid)%ncols + 1
-                        if (chunks(cid)%ncols .eq. maxcol_chk(smp)) &
-                           maxcol_chks(smp) = maxcol_chks(smp) - 1
+                  if (twingcol > 0) then
 !
-                        i = chunks(cid)%ncols
-                        chunks(cid)%gcol(i) = twingcol
-                        chunks(cid)%lon(i) = lon_p(twingcol)
-                        chunks(cid)%lat(i) = lat_p(twingcol)
-                        knuhcs(twingcol)%chunkid = cid
-                        knuhcs(twingcol)%col = i
-                     endif
+! Update chunk with twin column
+                     chunks(cid)%ncols = chunks(cid)%ncols + 1
+                     if (chunks(cid)%ncols .eq. maxcol_chk(smp)) &
+                        maxcol_chks(smp) = maxcol_chks(smp) - 1
 !
+                      lcol = chunks(cid)%ncols
+                      chunks(cid)%gcol(lcol) = twingcol
+                      chunks(cid)%lon(lcol) = lon_p(twingcol)
+                      chunks(cid)%lat(lcol) = lat_p(twingcol)
+                      chunks(cid)%estcost = chunks(cid)%estcost + cost_d(twingcol)
+                      knuhcs(twingcol)%chunkid = cid
+                      knuhcs(twingcol)%col = lcol
                   endif
+!
+               endif
+!
+               if (use_cost_d) then
+!
+! Re-heapify the min heap
+                  call adjust_heap(nchunks, maxcol_chk(smp), &
+                                   cid_offset(smp), heap_len(smp), heap)
+!
+               else
 !
 ! Move on to next chunk (wrap map)
                   local_cid(smp) = mod(local_cid(smp)+1,nsmpchunks(smp))
@@ -4305,9 +4653,18 @@ logical function phys_grid_initialized ()
                endif
 !
             endif
-         enddo
-      enddo
 !
+         endif
+
+      enddo
+
+!
+! Opt-specific clean up
+!
+      deallocate( heap_len )
+      deallocate( heap     )
+      deallocate( cdex     )
+
    else
 !
 ! Option 5: split individual dynamics blocks into chunks,
@@ -4345,6 +4702,8 @@ logical function phys_grid_initialized ()
 !
 ! Initialize chunks and knuhcs data structures
 !
+      chunks(:)%ncols = 0
+      chunks(:)%estcost = 0.0_r8
       knuhcs(:)%chunkid = -1
       knuhcs(:)%col = -1
       cid = 0
@@ -4352,7 +4711,7 @@ logical function phys_grid_initialized ()
          p = get_block_owner_d(jb)
          smp = proc_smp_mapx(p)
          blksiz = get_block_gcol_cnt_d(jb)
-         call get_block_gcol_d(jb,blksiz,cols)
+         call get_block_gcol_d(jb,blksiz,cols_d)
 
          ib = 0
          do while (ib < blksiz)
@@ -4365,13 +4724,14 @@ logical function phys_grid_initialized ()
                ib = ib + 1
                ! check whether global index is for a column that dynamics
                ! intends to pass to the physics
-               curgcol = cols(ib)
+               curgcol = cols_d(ib)
                if (dyn_to_latlon_gcol_map(curgcol) .ne. -1) then
                   ! yes - then save the information
                   ncols = ncols + 1
                   chunks(cid)%gcol(ncols) = curgcol
                   chunks(cid)%lon(ncols)  = lon_p(curgcol)
                   chunks(cid)%lat(ncols)  = lat_p(curgcol)
+                  chunks(cid)%estcost = chunks(cid)%estcost + cost_d(curgcol)
                   knuhcs(curgcol)%chunkid = cid
                   knuhcs(curgcol)%col = ncols
                endif
@@ -4393,19 +4753,20 @@ logical function phys_grid_initialized ()
 ! Assign chunks to processes.
 !
    call assign_chunks(npthreads, nsmpx, proc_smp_mapx, &
-                      nsmpthreads, nsmpchunks)
+                      nsmpthreads, nsmpchunks)		      
 !
 ! Clean up
 !
-   deallocate( nsmpcolumns )
-   deallocate( nsmpthreads )
-   deallocate( nsmpchunks  )
-   deallocate( maxcol_chk  )
-   deallocate( maxcol_chks )
-   deallocate( cid_offset  )
-   deallocate( local_cid   )
-   deallocate( cols )
-   deallocate( knuhcs )
+   deallocate( col_smp_mapx )
+   deallocate( nsmpcolumns  )
+   deallocate( nsmpthreads  )
+   deallocate( nsmpchunks   )
+   deallocate( maxcol_chk   )
+   deallocate( maxcol_chks  )
+   deallocate( cid_offset   )
+   deallocate( local_cid    )
+   deallocate( cols_d       )
+  !deallocate( knuhcs ) !do not deallocate as it is being used in RRTMG radiation.F90
 
    return
    end subroutine create_chunks
@@ -4617,10 +4978,6 @@ logical function phys_grid_initialized ()
    integer :: ibtwin(npes)               ! global column indices
    integer :: twinproc, twinsmp          ! process and smp ids
 
-   integer :: clon_p_idx(clon_p_tot)     ! index in lonlat ordering for first 
-                                         !  occurrence of longitude corresponding to 
-                                         !  given latitude index
-
    real(r8):: twopi                      ! 2*pi
    real(r8):: clat, twinclat             ! latitude and twin
    real(r8):: clon, twinclon             ! longitude and twin
@@ -4628,11 +4985,6 @@ logical function phys_grid_initialized ()
 !-----------------------------------------------------------------------
    twingcol_f = -1
 
-   ! precompute clon_p_idx
-   clon_p_idx(1) = 1
-   do i=2,clon_p_tot
-      clon_p_idx(i) = clon_p_idx(i-1) + clon_p_cnt(i-1)
-   enddo
 !
 ! Try day/night and north/south hemisphere complement first
 !
@@ -4791,6 +5143,143 @@ logical function phys_grid_initialized ()
 !
 !========================================================================
 
+   subroutine adjust_heap(nchunks, maxcol_chk, &
+                          cid_offset, heap_len, heap)
+!----------------------------------------------------------------------- 
+! 
+! Purpose: Adjust heap after adding columns (and updating the associated
+!          computational cost) to the current root, restoring the min 
+!          heap property
+! 
+! Method: Percolate the root down through the heap until find a legal
+!         new location. This is a modified version of an algorithm 
+!         described in Aho, Hopcroft and Ullman ("The Design and 
+!         Analysis of Computer Algorithms") used in sorting. Here it
+!         is customized for this slightly different application.
+! 
+! Author: Patrick Worley
+! 
+!-----------------------------------------------------------------------
+!------------------------------Arguments--------------------------------
+
+   ! size of min heap array (for all virtual SMPs)
+   integer, intent(in)    :: nchunks
+
+   ! maximum number of columns assigned to a chunk in current
+   ! virtual SMP node
+   integer, intent(in)    :: maxcol_chk
+
+   ! beginning of min heap for current virtual SMP in heap array
+   integer, intent(in)    :: cid_offset
+
+   ! size of min heap for current virtual SMP (including only chunks
+   ! that still have space to be assigned more columns)
+   integer, intent(inout) :: heap_len
+
+   ! min heap array used to maintain chunks sorted by assigned 
+   ! computational cost
+   integer, intent(inout) :: heap(1:nchunks)
+
+!---------------------------Local workspace-----------------------------
+   integer :: root                     ! first chunk id in heap (root)
+   integer :: heap_last                ! index for last chunk id in heap
+   integer :: last_nonleaf             ! index for last non-leaf in heap
+   integer :: heap_i, heap_il, heap_ir ! indices used in navigating the 
+                                       !  heap
+   integer :: parent, lchild, rchild   ! column ids used in maintaining 
+                                       !  the heap 
+   logical :: done                     ! flag indicating whether heap
+                                       !  adjustment is done or not
+   real(r8):: min_cost                 ! minimum of two chunk estimated
+                                       !  costs
+!-----------------------------------------------------------------------
+!
+   root = heap(cid_offset)
+!
+   if (chunks(root)%ncols .eq. maxcol_chk) then
+! Move chunk to the end of the heap (bringing end to the root)
+! and decrement heap length by 1
+      heap_last = cid_offset + heap_len - 1
+      heap(cid_offset) = heap(heap_last)
+      heap(heap_last) = root
+      heap_len = heap_len - 1
+!
+   endif
+
+! Percolate new or updated root to its proper location in the min heap.
+! Swapping parent with child if chunk estimated cost is greater than or equal, 
+! not just greater than (as in usual heap operations), so that increase
+! likelihood of cycling through all chunks
+   last_nonleaf = heap_len/2
+   heap_i  = 1
+   done = .false.
+!
+   do while (.not. done)
+      if (heap_i > last_nonleaf) then
+! If no children (a leaf), then done.
+         done = .true.
+!
+      else if (2*heap_i == heap_len) then
+! If only a left child, then only a single test.
+         heap_il = 2*heap_i
+         parent = heap(cid_offset+heap_i-1)
+         lchild = heap(cid_offset+heap_il-1)
+!
+         if (chunks(parent)%estcost >= chunks(lchild)%estcost) then
+! If larger or equal, then swap. 
+            heap(cid_offset+heap_i-1)  = lchild
+            heap(cid_offset+heap_il-1) = parent
+            heap_i = heap_il
+!
+         else
+! If smaller, then done.
+            done = .true.
+!
+         endif
+!
+      else
+! If both left and right children, then a number of different possibilities.
+         heap_il = 2*heap_i
+         heap_ir = heap_il+1
+         parent = heap(cid_offset+heap_i-1)
+         lchild = heap(cid_offset+heap_il-1)
+         rchild = heap(cid_offset+heap_ir-1)
+         min_cost = min(chunks(lchild)%estcost,chunks(rchild)%estcost)
+!
+         if (chunks(parent)%estcost < min_cost) then
+! If smaller than both, then done.
+            done = .true.
+!
+         else
+            if (chunks(rchild)%estcost > chunks(lchild)%estcost) then
+! If rchild has the larger cost, then parent cost must be larger than
+! or equal to lchild, so swap with lchild. (For equal lchild and
+! rchild values, go with right child since more likely to be a leaf,
+! so a little less expensive.)
+               heap(cid_offset+heap_i-1)  = lchild
+               heap(cid_offset+heap_il-1) = parent
+               heap_i = heap_il
+!
+            else
+! If lchild has the larger or equal cost, then parent cost must be 
+! larger than or equal to rchild, so swap with rchild. 
+               heap(cid_offset+heap_i-1)  = rchild
+               heap(cid_offset+heap_ir-1) = parent
+               heap_i = heap_ir
+!
+            endif
+!
+         endif
+!
+      endif
+!
+   enddo
+
+   return
+   end subroutine adjust_heap
+!
+!========================================================================
+
    subroutine assign_chunks(npthreads, nsmpx, proc_smp_mapx, &
                             nsmpthreads, nsmpchunks)
 !----------------------------------------------------------------------- 
@@ -4830,7 +5319,7 @@ logical function phys_grid_initialized ()
    integer :: blockids(plev+1)           ! block indices
    integer :: bcids(plev+1)              ! block column indices
    integer :: ntsks_smpx(0:nsmpx-1)      ! number of processes per virtual SMP
-   integer :: smp_proc_mapx(0:nsmpx-1,max_nproc_smpx)   
+   integer :: smp_proc_mapx(max_nproc_smpx,0:nsmpx-1)   
                                          ! virtual smp to process id map
    integer :: cid_offset(0:nsmpx)        ! chunk id virtual smp offset
    integer :: ntmp1_smp(0:nsmpx-1)       ! minimum number of chunks per thread
@@ -4850,6 +5339,15 @@ logical function phys_grid_initialized ()
    integer :: column_count(0:npes-1)     ! number of columns from current chunk
                                          !  assigned to each process in dynamics
                                          !  decomposition
+   integer :: first_nonfull              ! first process (in smp_proc_mapx 
+                                         !  ordering) that has room to be assigned
+                                         !  another chunk
+   integer :: ndyn_task                  ! number of processes in the dynamics 
+                                         !  decomposition that were assigned columns
+                                         !  in the current chunk
+   integer :: dyn_task(npes)             ! list of process ids that were assigned
+                                         !  columns in the current chunk in the
+                                         !  dynamics decomposition
 !-----------------------------------------------------------------------
 !
 ! Count number of processes per virtual SMP and determine virtual SMP
@@ -4860,7 +5358,7 @@ logical function phys_grid_initialized ()
    do p=0,npes-1
       smp = proc_smp_mapx(p)
       ntsks_smpx(smp) = ntsks_smpx(smp) + 1
-      smp_proc_mapx(smp,ntsks_smpx(smp)) = p
+      smp_proc_mapx(ntsks_smpx(smp),smp) = p
    enddo
 !
 ! Determine chunk id ranges for each virtual SMP
@@ -4917,52 +5415,96 @@ logical function phys_grid_initialized ()
 !
 ! Assign chunks to processes: 
 !
+!  First, initialize number of chunks assigned to each process.
+!  Then initialize number of chunk columns assigned to each process 
+!  in the dynamics decomposition (column_count). column_count is
+!  chunk-specific, and is reset for each chunk in the loop over
+!  chunks below, except that '-1' values are retained, where '-1' indicates
+!  that the process has already been assigned its quota of chunks.
+!
    cur_npchunks(:) = 0
+   column_count(:) = 0
 !
    do smp=0,nsmpx-1
+!
+!  Initialize pointer to first process (in smp_proc_mapx ordering) that
+!  has room to be assigned another chunk
+      first_nonfull = 1
+!
       do cid=cid_offset(smp),cid_offset(smp+1)-1
 !
-         do i=1,ntsks_smpx(smp)
-            p = smp_proc_mapx(smp,i)
-            column_count(p) = 0
-         enddo
-!
-!  For each chunk, determine number of columns in each
-!  process within the dynamics.
+!  Determine number of chunk columns assigned to each process in
+!  the dynamics decomposition (excepting processes that have already been
+!  assigned their quota of chunks). Also build a list of these processes.
+         ndyn_task = 0
          do i=1,chunks(cid)%ncols
             curgcol = chunks(cid)%gcol(i)
             block_cnt = get_gcol_block_cnt_d(curgcol)
             call get_gcol_block_d(curgcol,block_cnt,blockids,bcids)
             do jb=1,block_cnt
                p = get_block_owner_d(blockids(jb)) 
-               column_count(p) = column_count(p) + 1
+               if (column_count(p) > -1) then
+                  column_count(p) = column_count(p) + 1
+                  if (column_count(p) == 1) then
+                     ndyn_task = ndyn_task + 1
+                     dyn_task(ndyn_task) = p
+                  endif
+               endif
             enddo
          enddo
-!
-!  Eliminate processes that already have their quota of chunks
-         do i=1,ntsks_smpx(smp)
-            p = smp_proc_mapx(smp,i)
-            if (cur_npchunks(p) == npchunks(p)) then
-               column_count(p) = -1
-            endif
-         enddo
-!
-!  Assign chunk to process with most
-!  columns from chunk, from among those still available
+!                              
+!  Identify process with most chunk columns in dynamics decomposition,
+!  from among those that do not already have their assigned chunk quota 
          ntmp1 = -1
          ntmp2 = -1
-         do i=1,ntsks_smpx(smp)
-            p = smp_proc_mapx(smp,i)
+         do i=1,ndyn_task
+            p = dyn_task(i)
             if (column_count(p) > ntmp1) then
                ntmp1 = column_count(p)
                ntmp2 = p
             endif
          enddo
-         cur_npchunks(ntmp2) = cur_npchunks(ntmp2) + 1
+!
+!  If no processes found that qualify, identify some other process that can
+!  accept a new chunk
+         if (ntmp1 == -1) then
+            do i=first_nonfull,ntsks_smpx(smp)
+               p = smp_proc_mapx(i,smp)
+               if (column_count(p) /= -1) then
+                  ntmp2 = p
+                  exit
+               endif
+            enddo
+         endif
+!
+!  Assign chunk to indicated process, and check whether process now
+!  has its quota of chunks
          chunks(cid)%owner   = ntmp2
-
+         cur_npchunks(ntmp2) = cur_npchunks(ntmp2) + 1
+         if (cur_npchunks(ntmp2) == npchunks(ntmp2)) then
+            column_count(ntmp2) = -1
+         endif
+!
 !  Update total number of columns assigned to this process
          gs_col_num(ntmp2)   = gs_col_num(ntmp2) + chunks(cid)%ncols
+!
+!  Zero out per process chunk columns counts, but retain -1 value
+!  (indicating that process cannot accept any more chunks)
+         do i=1,ndyn_task
+            p = dyn_task(i)
+            if (column_count(p) > 0) then
+               column_count(p) = 0
+            endif
+         enddo
+!
+!  Update pointer to first nonfull process
+         do i=first_nonfull,ntsks_smpx(smp)
+            p = smp_proc_mapx(i,smp)
+            if (column_count(p) /= -1) then
+               first_nonfull = i
+               exit
+            endif
+         enddo
 !
       enddo
 !

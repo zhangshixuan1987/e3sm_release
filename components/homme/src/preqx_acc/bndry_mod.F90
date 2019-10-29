@@ -7,7 +7,6 @@ module bndry_mod
   use bndry_mod_base, only: bndry_exchangeV, ghost_exchangeVfull, compute_ghost_corner_orientation, bndry_exchangeS, bndry_exchangeS_start, bndry_exchangeS_finish, sort_neighbor_buffer_mapping
   use parallel_mod, only : syncmp,parallel_t,abortmp,iam
   use edgetype_mod, only : Ghostbuffer3D_t,Edgebuffer_t,LongEdgebuffer_t
-  use thread_mod, only : omp_in_parallel, omp_get_thread_num, omp_get_num_threads
   use kinds, only: real_kind
   implicit none
   private
@@ -99,9 +98,9 @@ contains
       enddo    ! icycle
 
       !Copy internal data to receive buffer
-      do ithr = 1 , hybrid%NThreads
-        iptr   = buffer%moveptr(ithr)
-        length = buffer%moveLength(ithr)
+      do ithr = 1 , hybrid%hthreads
+        iptr   = nlyr*buffer%moveptr0(ithr) + 1   
+        length = nlyr*buffer%moveLength(ithr)
         if(length>0) call copy_ondev_async(buffer%receive(iptr),buffer%buf(iptr),length,maxCycles*2+ithr)
       enddo
 
@@ -230,9 +229,9 @@ contains
 
       !Copy internal data to receive buffer
       call t_startf('bndry_timing_internal_on_dev_copy')
-      do ithr = 1 , hybrid%NThreads
-        iptr   = buffer%moveptr(ithr)
-        length = buffer%moveLength(ithr)
+      do ithr = 1 , hybrid%hthreads
+        iptr   = nlyr*buffer%moveptr0(ithr) + 1
+        length = nlyr*buffer%moveLength(ithr)
         if(length>0) call copy_ondev_async(buffer%receive(iptr),buffer%buf(iptr),length,1)
       enddo
       !$acc wait(1)
@@ -338,9 +337,9 @@ contains
       enddo    ! icycle
 
       !Copy internal data to receive buffer
-      do ithr = 1 , hybrid%NThreads
-        iptr   = buffer%moveptr(ithr)
-        length = buffer%moveLength(ithr)
+      do ithr = 1 , hybrid%hthreads
+        iptr   = nlyr*buffer%moveptr0(ithr) + 1
+        length = nlyr*buffer%moveLength(ithr)
         if(length>0) call copy_ondev_async(buffer%receive(iptr),buffer%buf(iptr),length,maxCycles*2+ithr)
       enddo
 

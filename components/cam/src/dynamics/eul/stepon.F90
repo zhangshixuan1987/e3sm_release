@@ -15,9 +15,10 @@ module stepon
   use camsrfexch,       only: cam_out_t     
   use ppgrid,           only: begchunk, endchunk
   use physics_types,    only: physics_state, physics_tend
-  use time_manager,     only: is_first_step, get_step_size
-  use iop,              only: setiopupdate, readiopdata
-  use scamMod,          only: use_iop,doiopupdate,use_pert_frc,wfld,wfldh,single_column
+  use time_manager,     only: is_first_step, is_last_step, get_step_size
+  use scamMod,          only: setiopupdate, readiopdata, &   
+                              use_iop, doiopupdate, use_pert_frc, &
+			      wfld, wfldh, single_column
   use perf_mod
 
   implicit none
@@ -54,6 +55,8 @@ module stepon
   type(advection_state) :: adv_state    ! Advection state data
 
   real(r8) :: etamid(plev)              ! vertical coords at midpoints or pmid if single_column
+
+  logical :: iop_update_surface         ! update surface properties in IOP forcing
 
 !======================================================================= 
 contains
@@ -166,7 +169,7 @@ subroutine stepon_run1( ztodt, phys_state, phys_tend , pbuf2d, dyn_in, dyn_out)
   use dyn_comp,       only: dyn_import_t, dyn_export_t
   use time_manager,   only: get_nstep
   use prognostics,    only: pdeld
-  
+  use hycoef,         only: hyam, hybm  
   use dp_coupling,    only: d_p_coupling
   use eul_control_mod,only: eul_nsplit
   use physics_buffer, only : physics_buffer_desc
@@ -195,6 +198,18 @@ subroutine stepon_run1( ztodt, phys_state, phys_tend , pbuf2d, dyn_in, dyn_out)
   call diag_dynvar_ic (phis, ps(:,beglat:endlat,n3m1), t3(:,:,beglat:endlat,n3m1), u3(:,:,beglat:endlat,n3m1), &
                        v3(:,:,beglat:endlat,n3m1), q3(:,:,:,beglat:endlat,n3m1) )
   call t_stopf ('diag_dynvar_ic')
+
+  ! Determine whether it is time for an IOP update;
+  ! doiopupdate set to true if model time step > next available IOP 
+  if (use_iop .and. .not. is_last_step()) then
+    call setiopupdate
+  end if
+  
+  if (single_column) then
+    iop_update_surface = .true. 
+    if (doiopupdate) call readiopdata( iop_update_surface,hyam,hybm )
+  endif
+  
   !
   !----------------------------------------------------------
   ! Couple from dynamics to physics
@@ -243,6 +258,8 @@ subroutine stepon_run3( ztodt, cam_out, phys_state, dyn_in, dyn_out )
 !----------------------------------------------------------------------- 
   use dyn_comp,       only: dyn_import_t, dyn_export_t
   use eul_control_mod,only: eul_nsplit
+  use eul_single_column_mod, only: scm_setinitial, scm_setfields
+  use hycoef,         only: hyam, hybm
   real(r8), intent(in) :: ztodt            ! twice time step unless nstep=0
   type(cam_out_t), intent(inout) :: cam_out(begchunk:endchunk)
   type(physics_state), intent(in):: phys_state(begchunk:endchunk)
@@ -252,15 +269,15 @@ subroutine stepon_run3( ztodt, cam_out, phys_state, dyn_in, dyn_out )
   integer :: stage
   if (single_column) then
      
-     ! Determine whether it is time for an IOP update;
-     ! doiopupdate set to true if model time step > next available IOP
-     if (use_iop) then
-        call setiopupdate
-     end if
-     
      ! Update IOP properties e.g. omega, divT, divQ
      
-     if (doiopupdate) call readiopdata()
+     iop_update_surface = .false.
+     if (doiopupdate) then
+       call scm_setinitial()
+       call readiopdata( iop_update_surface,hyam,hybm )
+       call scm_setfields()
+     endif
+     
      
   endif
 

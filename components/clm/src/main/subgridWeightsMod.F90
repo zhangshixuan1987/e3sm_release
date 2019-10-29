@@ -95,10 +95,11 @@ module subgridWeightsMod
   use clm_varctl   , only : iulog, all_active
   use clm_varcon   , only : nameg, namel, namec, namep
   use decompMod    , only : bounds_type
-  use GridcellType , only : grc                
-  use LandunitType , only : lun                
-  use ColumnType   , only : col                
-  use PatchType    , only : pft                
+  use GridcellType , only : grc_pp
+  use TopounitType , only : top_pp  
+  use LandunitType , only : lun_pp                
+  use ColumnType   , only : col_pp                
+  use VegetationType    , only : veg_pp                
   !
   ! PUBLIC TYPES:
   implicit none
@@ -113,7 +114,7 @@ module subgridWeightsMod
   public :: check_weights                 ! check subgrid weights
   public :: get_landunit_weight           ! get the weight of a given landunit on a single grid cell
   public :: set_landunit_weight           ! set the weight of a given landunit on a single grid cell
-  public :: is_gcell_all_ltypeX           ! determine whether a grid cell is 100% covered by the given landunit type
+  public :: is_topo_all_ltypeX            ! determine whether a topounit is 100% covered by the given landunit type
   public :: set_subgrid_diagnostic_fields ! set all subgrid weights diagnostic fields
   !
   ! !REVISION HISTORY:
@@ -214,8 +215,11 @@ contains
   subroutine compute_higher_order_weights(bounds)
     !
     ! !DESCRIPTION:
-    ! Assuming pft%wtcol, col%wtlunit and lun%wtgcell have already been computed, compute
-    ! the "higher-order" weights: pft%wtlunit, pft%wtgcell and col%wtgcell, for all p and c
+    ! Assuming veg_pp%wtcol, col_pp%wtlunit and lun_pp%wttopounit have already been computed, compute
+    ! the "higher-order" weights: 
+    ! veg_pp%wtlunit, veg_pp%wttopounit, veg_pp%wtgcell,
+    ! col_pp%wttopounit, col_pp%wtgcell, and
+    ! lun_pp%wtgcell, for all p, c, and l
     !
     ! !USES:
     !
@@ -224,18 +228,25 @@ contains
     type(bounds_type), intent(in) :: bounds  ! clump bounds
     !
     ! !LOCAL VARIABLES:
-    integer :: p, c, l      ! indices for pft, col & landunit
+    integer :: p, c, l, t      ! indices for pft, col, landunit, and topounit
     !------------------------------------------------------------------------
 
+    do l = bounds%begl, bounds%endl
+       t = lun_pp%topounit(l)
+       lun_pp%wtgcell(l)    = lun_pp%wttopounit(l) * top_pp%wtgcell(t)
+    end do
+
     do c = bounds%begc, bounds%endc
-       l = col%landunit(c)
-       col%wtgcell(c) = col%wtlunit(c) * lun%wtgcell(l)
+       l = col_pp%landunit(c)
+       col_pp%wttopounit(c) = col_pp%wtlunit(c) * lun_pp%wttopounit(l)
+       col_pp%wtgcell(c)    = col_pp%wtlunit(c) * lun_pp%wtgcell(l)
     end do
 
     do p = bounds%begp, bounds%endp
-       c = pft%column(p)
-       pft%wtlunit(p) = pft%wtcol(p) * col%wtlunit(c)
-       pft%wtgcell(p) = pft%wtcol(p) * col%wtgcell(c)
+       c = veg_pp%column(p)
+       veg_pp%wtlunit(p)    = veg_pp%wtcol(p) * col_pp%wtlunit(c)
+       veg_pp%wttopounit(p) = veg_pp%wtcol(p) * col_pp%wttopounit(c)
+       veg_pp%wtgcell(p)    = veg_pp%wtcol(p) * col_pp%wtgcell(c)
     end do
   end subroutine compute_higher_order_weights
 
@@ -265,13 +276,13 @@ contains
     !------------------------------------------------------------------------
 
     do l = bounds%begl,bounds%endl
-       lun%active(l) = is_active_l(l)
+       lun_pp%active(l) = is_active_l(l)
     end do
 
     do c = bounds%begc,bounds%endc
-       l = col%landunit(c)
-       col%active(c) = is_active_c(c)
-       if (col%active(c) .and. .not. lun%active(l)) then
+       l = col_pp%landunit(c)
+       col_pp%active(c) = is_active_c(c)
+       if (col_pp%active(c) .and. .not. lun_pp%active(l)) then
           write(iulog,*) trim(subname),' ERROR: active column found on inactive landunit', &
                          'at c = ', c, ', l = ', l
           call endrun(decomp_index=c, clmlevel=namec, msg=errMsg(__FILE__, __LINE__))
@@ -279,9 +290,9 @@ contains
     end do
 
     do p = bounds%begp,bounds%endp
-       c = pft%column(p)
-       pft%active(p) = is_active_p(p)
-       if (pft%active(p) .and. .not. col%active(c)) then
+       c = veg_pp%column(p)
+       veg_pp%active(p) = is_active_p(p)
+       if (veg_pp%active(p) .and. .not. col_pp%active(c)) then
           write(iulog,*) trim(subname),' ERROR: active pft found on inactive column', &
                          'at p = ', p, ', c = ', c
           call endrun(decomp_index=p, clmlevel=namep, msg=errMsg(__FILE__, __LINE__))
@@ -306,13 +317,15 @@ contains
     !
     ! !LOCAL VARIABLES:
     integer :: g  ! grid cell index
+    integer :: t  ! topounit index
     !------------------------------------------------------------------------
 
     if (all_active) then
        is_active_l = .true.
 
     else
-       g =lun%gridcell(l)
+       g = lun_pp%gridcell(l)
+       t = lun_pp%topounit(l)
 
        is_active_l = .false.
 
@@ -320,10 +333,10 @@ contains
        ! General conditions under which is_active_l NEEDS to be true in order to satisfy
        ! the requirements laid out at the top of this module:
        ! ------------------------------------------------------------------------
-       if (lun%wtgcell(l) > 0) is_active_l = .true.
+       if (lun_pp%wttopounit(l) > 0) is_active_l = .true.
 
        ! ------------------------------------------------------------------------
-       ! Conditions under which is_active_p is set to true because we want extra virtual landunits:
+       ! Conditions under which is_active_l is set to true because we want extra virtual landunits:
        ! ------------------------------------------------------------------------
 
        ! Always run over ice_mec landunits within the glcmask, because this is where glc
@@ -333,26 +346,28 @@ contains
        ! glcmask, we make it easy to add virtual columns, simply by changing the fglcmask
        ! file. Since icemask is a subset of glcmask, the only downside of using glcmask
        ! rather than icemask is a (typically small) performance cost.
-       if (lun%itype(l) == istice_mec .and. ldomain%glcmask(g) == 1) is_active_l = .true.
+       ! PET: 4/25/2018: By keeping the glcmask reference at the gridcell level, this forces
+       ! is_active_l = .true. for istice_mec landunits on all topounits for the gridcell.
+       if (lun_pp%itype(l) == istice_mec .and. ldomain%glcmask(g) == 1) is_active_l = .true.
 
        ! In general, include a virtual natural vegetation landunit. This aids
        ! initialization of a new landunit; and for runs that are coupled to CISM, this
        ! provides bare land SMB forcing even if there is no vegetated area.
        !
-       ! However, we do NOT include a virtual vegetated column in grid cells that are 100%
+       ! However, we do NOT include a virtual vegetated column in topounits that are 100%
        ! standard (non-mec) glacier. This is for performance reasons: for FV 0.9x1.25,
        ! excluding these virtual vegetated columns (mostly over Antarctica) leads to a ~
        ! 6% performance improvement (the performance improvement is much less for ne30,
-       ! though). In such grid cells, we do not need the forcing to CISM (because if we
+       ! though). In such topounits, we do not need the forcing to CISM (because if we
        ! needed forcing to CISM, we'd be using an istice_mec point rather than plain
        ! istice). Furthermore, standard glacier landunits cannot retreat (only istice_mec
        ! points can retreat, due to coupling with CISM), so we don't need to worry about
-       ! the glacier retreating in this grid cell, exposing new natural veg area. The
+       ! the glacier retreating in this topounit, exposing new natural veg area. The
        ! only thing that could happen is the growth of some special landunit - e.g., crop
-       ! - in this grid cell, due to dynamic landunits. We'll live with the fact that
+       ! - in this topounit, due to dynamic landunits. We'll live with the fact that
        ! initialization of the new crop landunit will be initialized in an un-ideal way
        ! in this rare situation.
-       if (lun%itype(l) == istsoil .and. .not. is_gcell_all_ltypeX(g, istice)) then
+       if (lun_pp%itype(l) == istsoil .and. .not. is_topo_all_ltypeX(t, istice)) then
           is_active_l = .true.
        end if
 
@@ -383,8 +398,8 @@ contains
        is_active_c = .true.
 
     else
-       l =col%landunit(c)
-       g =col%gridcell(c)
+       l =col_pp%landunit(c)
+       g =col_pp%gridcell(c)
 
        is_active_c = .false.
 
@@ -392,7 +407,7 @@ contains
        ! General conditions under which is_active_c NEEDS to be true in order to satisfy
        ! the requirements laid out at the top of this module:
        ! ------------------------------------------------------------------------
-       if (lun%active(l) .and. col%wtlunit(c) > 0._r8) is_active_c = .true.
+       if (lun_pp%active(l) .and. col_pp%wtlunit(c) > 0._r8) is_active_c = .true.
 
        ! ------------------------------------------------------------------------
        ! Conditions under which is_active_c is set to true because we want extra virtual columns:
@@ -403,15 +418,15 @@ contains
        !
        ! Note that we use glcmask rather than icemask here; see comment in is_active_l
        ! for the rationale.
-       if (lun%itype(l) == istice_mec .and. ldomain%glcmask(g) == 1) is_active_c = .true.
+       if (lun_pp%itype(l) == istice_mec .and. ldomain%glcmask(g) == 1) is_active_c = .true.
 
        ! We don't really need to run over 0-weight urban columns. But because of some
        ! messiness in the urban code (many loops are over the landunit filter, then drill
-       ! down to columns - so we would need to add 'col%active(c)' conditionals in many
+       ! down to columns - so we would need to add 'col_pp%active(c)' conditionals in many
        ! places) it keeps the code cleaner to run over 0-weight urban columns. This generally
        ! shouldn't add much computation time, since in most places, all urban columns are
        ! non-zero weight if the landunit is non-zero weight.
-       if (lun%active(l) .and. (lun%itype(l) >= isturb_MIN .and. lun%itype(l) <= isturb_MAX)) then
+       if (lun_pp%active(l) .and. (lun_pp%itype(l) >= isturb_MIN .and. lun_pp%itype(l) <= isturb_MAX)) then
           is_active_c = .true.
        end if
     end if
@@ -438,7 +453,7 @@ contains
        is_active_p = .true.
 
     else
-       c =pft%column(p)
+       c =veg_pp%column(p)
     
        is_active_p = .false.
 
@@ -446,24 +461,24 @@ contains
        ! General conditions under which is_active_p NEEDS to be true in order to satisfy
        ! the requirements laid out at the top of this module:
        ! ------------------------------------------------------------------------
-       if (col%active(c) .and. pft%wtcol(p) > 0._r8) is_active_p = .true.
+       if (col_pp%active(c) .and. veg_pp%wtcol(p) > 0._r8) is_active_p = .true.
 
     end if
 
   end function is_active_p
 
   !-----------------------------------------------------------------------
-  function get_landunit_weight(g, ltype) result(weight)
+  function get_landunit_weight(t, ltype) result(weight)
     !
     ! !DESCRIPTION:
-    ! Get the subgrid weight of a given landunit type on a single grid cell
+    ! Get the subgrid weight of a given landunit type on a single topographic unit
     !
     ! !USES:
     use clm_varcon, only : ispval
     !
     ! !ARGUMENTS:
     real(r8) :: weight  ! function result
-    integer , intent(in) :: g     ! grid cell index
+    integer , intent(in) :: t     ! topounit index
     integer , intent(in) :: ltype ! landunit type of interest
     !
     ! !LOCAL VARIABLES:
@@ -472,26 +487,26 @@ contains
     character(len=*), parameter :: subname = 'get_landunit_weight'
     !-----------------------------------------------------------------------
     
-    l = grc%landunit_indices(ltype, g)
+    l = top_pp%landunit_indices(ltype, t)
     if (l == ispval) then
        weight = 0._r8
     else
-       weight = lun%wtgcell(l)
+       weight = lun_pp%wttopounit(l)
     end if
 
   end function get_landunit_weight
 
   !-----------------------------------------------------------------------
-  subroutine set_landunit_weight(g, ltype, weight)
+  subroutine set_landunit_weight(t, ltype, weight)
     !
     ! !DESCRIPTION:
-    ! Set the subgrid weight of a given landunit type on a single grid cell
+    ! Set the subgrid weight of a given landunit type on a single topographic unit
     !
     ! !USES:
     use clm_varcon, only : ispval
     !
     ! !ARGUMENTS:
-    integer , intent(in) :: g      ! grid cell index
+    integer , intent(in) :: t      ! topounit index
     integer , intent(in) :: ltype  ! landunit type of interest
     real(r8), intent(in) :: weight ! new weight of this landunit
     !
@@ -501,12 +516,12 @@ contains
     character(len=*), parameter :: subname = 'set_landunit_weight'
     !-----------------------------------------------------------------------
 
-    l = grc%landunit_indices(ltype, g)
+    l = top_pp%landunit_indices(ltype, t)
     if (l /= ispval) then
-       lun%wtgcell(l) = weight
+       lun_pp%wttopounit(l) = weight
     else if (weight > 0._r8) then
        write(iulog,*) subname//' ERROR: Attempt to assign non-zero weight to a non-existent landunit'
-       write(iulog,*) 'g, l, ltype, weight = ', g, l, ltype, weight
+       write(iulog,*) 'g, t, l, ltype, weight = ', top_pp%gridcell(t), t, l, ltype, weight
        call endrun(decomp_index=l, clmlevel=namel, msg=errMsg(__FILE__, __LINE__))
     end if
     
@@ -514,34 +529,34 @@ contains
 
 
   !-----------------------------------------------------------------------
-  function is_gcell_all_ltypeX(g, ltype) result(all_ltypeX)
+  function is_topo_all_ltypeX(t, ltype) result(all_ltypeX)
     !
     ! !DESCRIPTION:
-    ! Determine if the given grid cell is 100% covered by the landunit type given by ltype
+    ! Determine if the given topounit is 100% covered by the landunit type given by ltype
     !
     ! !USES:
     !
     ! !ARGUMENTS:
     implicit none
     logical :: all_ltypeX        ! function result
-    integer, intent(in) :: g     ! grid cell index
+    integer, intent(in) :: t     ! topounit index
     integer, intent(in) :: ltype ! landunit type of interest
     !
     ! !LOCAL VARIABLES:
     real(r8) :: wt_lunit ! subgrid weight of the given landunit
 
     real(r8), parameter :: tolerance = 1.e-13_r8  ! tolerance for checking whether landunit's weight is 1
-    character(len=*), parameter :: subname = 'is_gcell_all_ltypeX'
+    character(len=*), parameter :: subname = 'is_topo_all_ltypeX'
     !------------------------------------------------------------------------------
 
-    wt_lunit = get_landunit_weight(g, ltype)
+    wt_lunit = get_landunit_weight(t, ltype)
     if (wt_lunit >= (1._r8 - tolerance)) then
        all_ltypeX = .true.
     else
        all_ltypeX = .false.
     end if
 
-  end function is_gcell_all_ltypeX
+  end function is_topo_all_ltypeX
 
   !------------------------------------------------------------------------------
   subroutine check_weights (bounds, active_only)
@@ -583,19 +598,19 @@ contains
     sumwtgcell(bounds%begg : bounds%endg) = 0._r8
 
     do p = bounds%begp,bounds%endp
-       c = pft%column(p)
-       l = pft%landunit(p)
-       g = pft%gridcell(p)
+       c = veg_pp%column(p)
+       l = veg_pp%landunit(p)
+       g = veg_pp%gridcell(p)
 
-       if ((active_only .and. pft%active(p)) .or. .not. active_only) then 
-          sumwtcol(c) = sumwtcol(c) + pft%wtcol(p)
-          sumwtlunit(l) = sumwtlunit(l) + pft%wtlunit(p)
-          sumwtgcell(g) = sumwtgcell(g) + pft%wtgcell(p)
+       if ((active_only .and. veg_pp%active(p)) .or. .not. active_only) then 
+          sumwtcol(c) = sumwtcol(c) + veg_pp%wtcol(p)
+          sumwtlunit(l) = sumwtlunit(l) + veg_pp%wtlunit(p)
+          sumwtgcell(g) = sumwtgcell(g) + veg_pp%wtgcell(p)
        end if
     end do
 
     do c = bounds%begc,bounds%endc
-       if (.not. weights_okay(sumwtcol(c), active_only, col%active(c))) then
+       if (.not. weights_okay(sumwtcol(c), active_only, col_pp%active(c))) then
           write(iulog,*) trim(subname),' ERROR: at c = ',c,'total PFT weight is ',sumwtcol(c), &
                          'active_only = ', active_only
           error_found = .true.
@@ -603,7 +618,7 @@ contains
     end do
 
     do l = bounds%begl,bounds%endl
-       if (.not. weights_okay(sumwtlunit(l), active_only, lun%active(l))) then
+       if (.not. weights_okay(sumwtlunit(l), active_only, lun_pp%active(l))) then
           write(iulog,*) trim(subname),' ERROR: at l = ',l,'total PFT weight is ',sumwtlunit(l), &
                          'active_only = ', active_only
           error_found = .true.
@@ -623,17 +638,17 @@ contains
     sumwtgcell(bounds%begg : bounds%endg) = 0._r8
 
     do c = bounds%begc,bounds%endc
-       l = col%landunit(c)
-       g = col%gridcell(c)
+       l = col_pp%landunit(c)
+       g = col_pp%gridcell(c)
 
-       if ((active_only .and. col%active(c)) .or. .not. active_only) then
-          sumwtlunit(l) = sumwtlunit(l) + col%wtlunit(c)
-          sumwtgcell(g) = sumwtgcell(g) + col%wtgcell(c)
+       if ((active_only .and. col_pp%active(c)) .or. .not. active_only) then
+          sumwtlunit(l) = sumwtlunit(l) + col_pp%wtlunit(c)
+          sumwtgcell(g) = sumwtgcell(g) + col_pp%wtgcell(c)
        end if
     end do
 
     do l = bounds%begl,bounds%endl
-       if (.not. weights_okay(sumwtlunit(l), active_only, lun%active(l))) then
+       if (.not. weights_okay(sumwtlunit(l), active_only, lun_pp%active(l))) then
           write(iulog,*) trim(subname),' ERROR: at l = ',l,'total col weight is ',sumwtlunit(l), &
                          'active_only = ', active_only
           error_found = .true.
@@ -652,9 +667,9 @@ contains
     sumwtgcell(bounds%begg : bounds%endg) = 0._r8
 
     do l = bounds%begl,bounds%endl
-       g = lun%gridcell(l)
-       if ((active_only .and. lun%active(l)) .or. .not. active_only) then
-          sumwtgcell(g) = sumwtgcell(g) + lun%wtgcell(l)
+       g = lun_pp%gridcell(l)
+       if ((active_only .and. lun_pp%active(l)) .or. .not. active_only) then
+          sumwtgcell(g) = sumwtgcell(g) + lun_pp%wtgcell(l)
        end if
     end do
 
@@ -759,9 +774,9 @@ contains
     subgrid_weights_diagnostics%pct_landunit(bounds%begg:bounds%endg, :) = 0._r8
     
     do l = bounds%begl, bounds%endl
-       g = lun%gridcell(l)
-       ltype = lun%itype(l)
-       subgrid_weights_diagnostics%pct_landunit(g, ltype) = lun%wtgcell(l) * 100._r8
+       g = lun_pp%gridcell(l)
+       ltype = lun_pp%itype(l)
+       subgrid_weights_diagnostics%pct_landunit(g, ltype) = lun_pp%wtgcell(l) * 100._r8
     end do
 
   end subroutine set_pct_landunit_diagnostics
@@ -798,11 +813,11 @@ contains
        subgrid_weights_diagnostics%pct_glc_mec(bounds%begg:bounds%endg, :) = 0._r8
     
        do c = bounds%begc, bounds%endc
-          g = col%gridcell(c)
-          l = col%landunit(c)
-          if (lun%itype(l) == istice_mec) then
-             icemec_class = col_itype_to_icemec_class(col%itype(c))
-             subgrid_weights_diagnostics%pct_glc_mec(g, icemec_class) = col%wtlunit(c) * 100._r8
+          g = col_pp%gridcell(c)
+          l = col_pp%landunit(c)
+          if (lun_pp%itype(l) == istice_mec) then
+             icemec_class = col_itype_to_icemec_class(col_pp%itype(c))
+             subgrid_weights_diagnostics%pct_glc_mec(g, icemec_class) = col_pp%wtlunit(c) * 100._r8
           end if
        end do
     end if
@@ -839,15 +854,15 @@ contains
     subgrid_weights_diagnostics%pct_cft(bounds%begg:bounds%endg, :) = 0._r8
     
     do p = bounds%begp,bounds%endp
-       g = pft%gridcell(p)
-       l = pft%landunit(p)
-       ptype = pft%itype(p)
-       if (lun%itype(l) == istsoil) then
+       g = veg_pp%gridcell(p)
+       l = veg_pp%landunit(p)
+       ptype = veg_pp%itype(p)
+       if (lun_pp%itype(l) == istsoil) then
           ptype_1indexing = ptype + (1 - natpft_lb)
-          subgrid_weights_diagnostics%pct_nat_pft(g, ptype_1indexing) = pft%wtlunit(p) * 100._r8
-       else if (lun%itype(l) == istcrop) then
+          subgrid_weights_diagnostics%pct_nat_pft(g, ptype_1indexing) = veg_pp%wtlunit(p) * 100._r8
+       else if (lun_pp%itype(l) == istcrop) then
           ptype_1indexing = ptype + (1 - cft_lb)
-          subgrid_weights_diagnostics%pct_cft(g, ptype_1indexing) = pft%wtlunit(p) * 100._r8
+          subgrid_weights_diagnostics%pct_cft(g, ptype_1indexing) = veg_pp%wtlunit(p) * 100._r8
        end if
     end do
 

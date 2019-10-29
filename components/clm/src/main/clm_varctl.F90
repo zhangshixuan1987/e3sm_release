@@ -93,12 +93,10 @@ module clm_varctl
   character(len=fname_len), public :: fatmlndfrc = ' '        ! lnd frac file on atm grid
   character(len=fname_len), public :: fatmtopo   = ' '        ! topography on atm grid
   character(len=fname_len), public :: flndtopo   = ' '        ! topography on lnd grid
-  character(len=fname_len), public :: flanduse_timeseries    = ' '        ! dynamic landuse dataset
   character(len=fname_len), public :: paramfile  = ' '        ! ASCII data file with PFT physiological constants
   character(len=fname_len), public :: nrevsn     = ' '        ! restart data file name for branch run
   character(len=fname_len), public :: fsnowoptics  = ' '      ! snow optical properties file name
   character(len=fname_len), public :: fsnowaging   = ' '      ! snow aging parameters file name
- !! X. YANG  : add soil order dependent parameter file
   character(len=fname_len), public :: fsoilordercon    = ' '  ! ASCII data file with soil order dependent  constants
 
   !----------------------------------------------------------
@@ -124,7 +122,14 @@ module clm_varctl
   !----------------------------------------------------------
 
   ! do not irrigate by default
-  logical, public :: irrigate = .false.            
+  logical, public :: irrigate = .false.
+
+  !----------------------------------------------------------
+  ! Two-way coupled irrigation with MOSART
+  !----------------------------------------------------------
+
+  ! True is 2way, false is 1way
+  logical, public :: tw_irr = .false.  
 
   !----------------------------------------------------------
   ! Landunit logic
@@ -160,7 +165,7 @@ module clm_varctl
   ! used to override an error check on reading in restart files
   logical, public :: override_bgc_restart_mismatch_dump = .false. 
 
-  ! Set in CNAllocationInit (TODO - had to move it here to avoid circular dependency)
+  ! Set in AllocationInit (TODO - had to move it here to avoid circular dependency)
   logical, private:: carbon_only      
   logical, private:: carbonnitrogen_only      
   logical, private:: carbonphosphorus_only      
@@ -178,6 +183,10 @@ module clm_varctl
   ! atmospheric CO2 molar ratio (by volume) (umol/mol)
   real(r8), public :: co2_ppmv     = 355._r8            !
 
+  ! Use constant climate during transient run (CPL_BYPASS only)
+  logical, public :: const_climate_hist  = .false.
+
+
   !----------------------------------------------------------
   ! C isotopes
   !----------------------------------------------------------
@@ -186,11 +195,21 @@ module clm_varctl
   logical, public :: use_c14 = .false.                  ! true => use C-14 model
 
   !----------------------------------------------------------
-  !  ED switches
+  !  FATES switches
   !----------------------------------------------------------
 
-  logical, public :: use_ed = .false.            ! true => use  ED
-  logical, public :: use_ed_spit_fire = .false.  ! true => use spitfire model
+  logical, public            :: use_fates = .false.              ! true => use  ED
+  logical, public            :: use_fates_spitfire = .false.  ! true => use spitfire model
+  logical, public            :: use_fates_logging = .false.            ! true => turn on logging module
+  logical, public            :: use_fates_planthydro = .false.         ! true => turn on fates hydro
+  logical, public            :: use_fates_ed_st3   = .false.           ! true => static stand structure
+  logical, public            :: use_fates_ed_prescribed_phys = .false. ! true => prescribed physiology
+  logical, public            :: use_fates_inventory_init = .false.     ! true => initialize fates from inventory
+  character(len=256), public :: fates_inventory_ctrl_filename = ''     ! filename for inventory control
+  integer, public            :: fates_parteh_mode = -9                 ! 1 => carbon only
+                                                                       ! 2 => C+N+P (not enabled yet)
+                                                                       ! no others enabled
+
 
   !----------------------------------------------------------
   !  BeTR switches
@@ -276,6 +295,11 @@ module clm_varctl
   ! moved hist_wrtch4diag from histFileMod.F90 to here - caused compiler error with intel
   ! namelist: write CH4 extra diagnostic output
   logical, public :: hist_wrtch4diag = .false.         
+  
+  !----------------------------------------------------------
+  ! ED/FATES
+  !----------------------------------------------------------
+  character(len=fname_len), public :: fates_paramfile  = ' '
 
   !----------------------------------------------------------
   ! Migration of CPP variables
@@ -289,19 +313,32 @@ module clm_varctl
   logical, public :: use_vichydro        = .false.
   logical, public :: use_century_decomp  = .false.
   logical, public :: use_cn              = .false.
-  logical, public :: use_cndv            = .false.
   logical, public :: use_crop            = .false.
   logical, public :: use_snicar_frc      = .false.
+  logical, public :: use_snicar_ad       = .false.
   logical, public :: use_vancouver       = .false.
   logical, public :: use_mexicocity      = .false.
   logical, public :: use_noio            = .false.
+  logical, public :: use_var_soil_thick  = .false.
 
   !----------------------------------------------------------
   ! VSFM switches
   !----------------------------------------------------------
   logical          , public :: use_vsfm                    = .false.
-  character(len=32), public :: vsfm_satfunc_type           = 'smooth_brooks_corey_bz3'
   logical          , public :: vsfm_use_dynamic_linesearch = .false.
+  logical          , public :: vsfm_include_seepage_bc     = .false.
+  character(len=32), public :: vsfm_satfunc_type           = 'smooth_brooks_corey_bz3'
+  character(len=32), public :: vsfm_lateral_model_type     = 'none'
+
+  !----------------------------------------------------------
+  ! PETSc-based thermal model switches
+  !----------------------------------------------------------
+  logical, public :: use_petsc_thermal_model = .false.
+
+  !----------------------------------------------------------
+  ! Stub EM switches
+  !----------------------------------------------------------
+  logical          , public :: use_em_stub = .false.
 
   !----------------------------------------------------------
   ! To retrieve namelist
@@ -309,25 +346,61 @@ module clm_varctl
   character(len=SHR_KIND_CL), public :: NLFilename_in ! Namelist filename
   !
   logical, private :: clmvarctl_isset = .false.
- !-----------------------------------------------------------------------
+  !-----------------------------------------------------------------------
  
- !-----------------------------------------------------------------------
- ! nutrient competition (nu_com), default is relative demand approach (RD)
- character(len=15), public :: nu_com = 'RD'
+  !-----------------------------------------------------------------------
+  ! nutrient competition (nu_com), default is relative demand approach (RD)
+  character(len=15), public :: nu_com = 'RD'
+ 
+  !-----------------------------------------------------------------------
+  ! forest N/P fertilization
+  logical, public :: forest_fert_exp = .false. 
+
+  !-----------------------------------------------------------------------
+  ! ECA regular spinup with P on, keep labile, secondary, occluded, parent 
+  ! material P being constant or not
+  logical, public :: ECA_Pconst_RGspin = .false.
+
+  !-----------------------------------------------------------------------
+  ! Priority of plant to get symbiotic N fixation, phosphatase
+  logical, public :: NFIX_PTASE_plant = .false.
+
+  !-----------------------------------------------------------------------
+  !CO2 and warming experiments
+  character(len=8), public :: startdate_add_temperature ='99991231'
+  character(len=8), public :: startdate_add_co2         ='99991231'
+  real(r8), public         :: add_co2 = 0d0
+  real(r8), public         :: add_temperature = 0d0
+
+  !-----------------------------------------------------------------------
+  ! Lateral grid connectivity
+  !-----------------------------------------------------------------------
+  logical, public            :: lateral_connectivity  = .false.
+  character(len=256), public :: domain_decomp_type    = 'round_robin'
+
+  !-----------------------------------------------------------------------
+  ! flux limiter for phenology flux calculation
+  logical, public :: use_pheno_flux_limiter = .false.
+
+  ! Soil erosion
+  !-----------------------------------------------------------------------
+  logical, public :: use_erosion    = .false.
+  logical, public :: ero_ccycle     = .false.
 
   !-----------------------------------------------------------------------
   ! bgc & pflotran interface
   !
-  logical, public :: use_bgc_interface  = .false.
+  logical, public :: use_clm_interface  = .false.
   logical, public :: use_clm_bgc        = .false.
   logical, public :: use_pflotran       = .false.
   logical, public :: pf_surfaceflow     = .false.
   ! the following switches will allow flexibility of coupling CLM with PFLOTRAN (which in fact runs in 3 modes individually or coupled)
+  logical, public :: pf_cmode     = .false.                 ! switch for 'C' mode coupling (will be updated in interface)
   logical, public :: pf_hmode     = .false.                 ! switch for 'H' mode coupling (will be updated in interface)
   logical, public :: pf_tmode     = .false.                 ! switch for 'T' mode coupling (will be updated in interface)
   logical, public :: pf_frzmode   = .false.                 ! switch for 'freezing' mode availablity in PF-thmode (will be updated in interface)
-  logical, public :: pf_cmode     = .false.                 ! switch for 'C' mode coupling (will be updated in interface)
   logical, public :: initth_pf2clm= .false.                 ! switch for initializing CLM TH states from pflotran
+  integer, public :: pf_clmnstep0 = 0                       ! the CLM timestep of start/restart
 
   ! cpl_bypass
    character(len=fname_len), public :: metdata_type   = ' '    ! metdata type for CPL_BYPASS mode
@@ -337,6 +410,16 @@ module clm_varctl
    character(len=fname_len), public :: aero_file      = ' '    ! aerosol deposition file for CPL_BYPASS mode
 
 
+  !----------------------------------------------------------
+  ! Budgets
+  !----------------------------------------------------------
+   logical, public :: do_budgets   = .false.
+   integer, public :: budget_inst  = 0
+   integer, public :: budget_daily = 0
+   integer, public :: budget_month = 1
+   integer, public :: budget_ann   = 1
+   integer, public :: budget_ltann = 1
+   integer, public :: budget_ltend = 0
 contains
 
   !---------------------------------------------------------------------------

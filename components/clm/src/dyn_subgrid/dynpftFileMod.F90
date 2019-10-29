@@ -16,9 +16,9 @@ module dynpftFileMod
   use abortutils          , only : endrun
   use spmdMod             , only : masterproc, mpicom
   use clm_varcon          , only : grlnd, nameg
-  use LandunitType        , only : lun                
-  use ColumnType          , only : col                
-  use PatchType           , only : pft                
+  use LandunitType        , only : lun_pp                
+  !DW  not use at all     !   use ColumnType          , only : col                
+  use VegetationType           , only : veg_pp                
   !
   ! !PUBLIC MEMBER FUNCTIONS:
   implicit none
@@ -42,7 +42,7 @@ contains
 
 
   !-----------------------------------------------------------------------
-  subroutine dynpft_init(bounds)
+  subroutine dynpft_init(bounds, dynpft_filename)
     !
     ! !DESCRIPTION:
     ! Initialize dynamic pft dataset (position it to the right time samples
@@ -51,12 +51,14 @@ contains
     ! This also calls dynpft_interp for the initial time
     !
     ! !USES:
-    use clm_varctl  , only : flanduse_timeseries
-    use clm_varpar  , only : numpft, maxpatch_pft, natpft_size
+    use clm_varpar     , only : numpft, maxpatch_pft, natpft_size
+    use dynTimeInfoMod , only : YEAR_POSITION_START_OF_TIMESTEP
+    use dynTimeInfoMod , only : YEAR_POSITION_END_OF_TIMESTEP
     use ncdio_pio
     !
     ! !ARGUMENTS:
-    type(bounds_type), intent(in) :: bounds  ! proc-level bounds
+    type(bounds_type), intent(in) :: bounds          ! proc-level bounds
+    character(len=*) , intent(in) :: dynpft_filename ! name of file containing transient pft information
     !
     ! !LOCAL VARIABLES:
     integer  :: wtpatch_shape(2)                  ! shape of the wtpatch data
@@ -77,7 +79,8 @@ contains
        write(iulog,*) 'Attempting to read pft dynamic landuse data .....'
     end if
 
-    dynpft_file = dyn_file_type(flanduse_timeseries)
+    !dynpft_file = dyn_file_type(dynpft_filename, YEAR_POSITION_START_OF_TIMESTEP)
+    dynpft_file = dyn_file_type(dynpft_filename, YEAR_POSITION_END_OF_TIMESTEP)
 
     ! Consistency checks
     call check_dim(dynpft_file, 'natpft', natpft_size)
@@ -251,7 +254,7 @@ contains
     ! Interpolate pctpft to current time step - output in pctpft_intp
     ! Map interpolated pctpft to subgrid weights
     ! assumes that maxpatch_pft = numpft + 1, that each landunit has only 1 column, 
-    ! SCAM and CNDV have not been defined, and create_croplandunit = .false.
+    ! SCAM has not been defined, and create_croplandunit = .false.
 
     SHR_ASSERT_ALL(bounds%level == BOUNDS_LEVEL_PROC, subname // ': argument must be PROC-level bounds')
 
@@ -265,18 +268,18 @@ contains
     call wtpatch%get_current_data(wtpatch_cur)
 
     do p = bounds%begp,bounds%endp
-       g = pft%gridcell(p)
-       l = pft%landunit(p)
+       g = veg_pp%gridcell(p)
+       l = veg_pp%landunit(p)
 
        ! Note that we only deal with the istsoil landunit here, NOT the istcrop landunit
        ! (if there is one)
        ! (However, currently [as of 5-9-13] the code won't let you run with transient
        ! Patches combined with create_crop_landunit anyway, so it's a moot point.)
-       if (lun%itype(l) == istsoil) then
-          m = pft%itype(p)
+       if (lun_pp%itype(l) == istsoil) then
+          m = veg_pp%itype(p)
 
           ! Note that the following assignment assumes that all Patches share a single column
-          pft%wtcol(p) = wtpatch_cur(g,m)
+          veg_pp%wtcol(p) = wtpatch_cur(g,m)
        end if
 
     end do

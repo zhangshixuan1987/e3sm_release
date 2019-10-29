@@ -54,11 +54,17 @@
 /* Zoltan partitioning library */
 #cmakedefine01 HAVE_ZOLTAN
 
-/* Enable persistent MPI comm */
-#cmakedefine MPI_PERSISTENT
+/* TRILINOS  library */
+#cmakedefine01 HAVE_TRILINOS
 
-/* Using Accelerator */
-#cmakedefine IS_ACCELERATOR
+/* ZOLTAN2 SUBPACKAGE OF TRILINOS  library */
+#cmakedefine01 TRILINOS_HAVE_ZOLTAN2
 
 /* Whether to use OpenMP4 */
 #cmakedefine OMP4
+
+/* commit sha */
+#define HOMME_SHA1 "${LAST_GIT_COMMIT_SHA}"
+
+
+

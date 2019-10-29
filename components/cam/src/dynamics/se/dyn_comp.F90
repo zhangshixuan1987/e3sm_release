@@ -4,9 +4,9 @@ Module dyn_comp
   use domain_mod, only : domain1d_t
   use element_mod, only : element_t
   use time_mod, only : TimeLevel_t, se_nsplit=>nsplit
-  use hybvcoord_mod, only : hvcoord_t
+  use hybvcoord_mod, only : hvcoord_t, set_layer_locations
   use hybrid_mod, only : hybrid_t
-  use thread_mod, only: nthreads, vthreads, omp_get_max_threads, omp_get_thread_num
+  use thread_mod, only: nthreads, hthreads, vthreads, omp_get_max_threads, omp_get_thread_num
   use perf_mod, only: t_startf, t_stopf
   use cam_logfile, only : iulog
   use time_manager, only: is_first_step
@@ -50,6 +50,8 @@ Module dyn_comp
   ! !REVISION HISTORY:
   !
   !  JPE  06.05.31:  created
+  !  Aaron Donahue 17.04.11: Fixed bug in write_grid_mapping which caused 
+  !       a segmentation fault when dyn_npes<npes
   !
   !----------------------------------------------------------------------
 
@@ -77,12 +79,13 @@ CONTAINS
   ! Initialize the dynamical core
 
     use pio,                 only: file_desc_t
-    use hycoef,              only: hycoef_init
+    use hycoef,              only: hycoef_init, hyam, hybm, hyai, hybi, ps0
     use ref_pres,            only: ref_pres_init
 
     use pmgrid,              only: dyndecomp_set
     use dyn_grid,            only: dyn_grid_init, elem, get_dyn_grid_parm,&
-                                   set_horiz_grid_cnt_d, define_cam_grids
+                                   set_horiz_grid_cnt_d, define_cam_grids,&
+                                   fv_physgrid_init, fv_nphys
     use rgrid,               only: fullgrid
     use spmd_utils,          only: mpi_integer, mpicom, mpi_logical
     use spmd_dyn,            only: spmd_readnl
@@ -108,6 +111,7 @@ CONTAINS
 
     integer :: neltmp(3)
     integer :: npes_se
+    integer :: npes_se_stride
 
     !----------------------------------------------------------------------
 
@@ -118,13 +122,13 @@ CONTAINS
             frontga_idx)
     end if
 
-    ! Initialize dynamics grid
+    ! Initialize dynamics grid variables
     call dyn_grid_init()
 
     ! Read in the number of tasks to be assigned to SE (needed by initmp)
-    call spmd_readnl(NLFileName, npes_se)
+    call spmd_readnl(NLFileName, npes_se, npes_se_stride)
     ! Initialize the SE structure that holds the MPI decomposition information
-    par=initmp(npes_se)
+    par=initmp(npes_se, npes_se_stride)
 
     ! Read the SE specific part of the namelist
     call readnl(par, NLFileName)
@@ -142,37 +146,11 @@ CONTAINS
     fullgrid=.true.
 
 #ifdef _OPENMP    
-!   Set by driver
+!   Total number of threads available to dycore, as set by driver
     nthreads = omp_get_max_threads()
-    if(par%masterproc) then
-       write(iulog,*) " "
-       write(iulog,*) "dyn_init1: number of OpenMP threads = ", nthreads
-       write(iulog,*) " "
-    endif
-#ifdef COLUMN_OPENMP
-    call omp_set_nested(.true.)
-    if (vthreads > nthreads .or. vthreads < 1) &
-         call endrun('Error: vthreads<1 or vthreads > NTHRDS_ATM')
-    nthreads = nthreads / vthreads
-    if(par%masterproc) then
-       write(iulog,*) " "
-       write(iulog,*) "dyn_init1: using OpenMP across and within elements"
-       write(iulog,*) "dyn_init1: nthreads=",nthreads,"vthreads=",vthreads
-       write(iulog,*) " "
-    endif
-#else
-    if (vthreads>1) &
-         call endrun('Error: vthreads>1 requires -DCOLUMN_OPENMP')
 #endif
-#else
-    nthreads = 1
-    if(par%masterproc) then
-       write(iulog,*) " "
-       write(iulog,*) "dyn_init1: openmp not activated"
-       write(iulog,*) " "
-    endif
-#endif
-    if(iam < par%nprocs) then
+
+    if(par%dynproc) then
        call prim_init1(elem,par,dom_mt,TimeLevel)
 
        dyn_in%elem => elem
@@ -197,13 +175,12 @@ CONTAINS
 #ifdef SPMD
        call mpibcast(neltmp, 3, mpi_integer, 0, mpicom)
 #endif
-       if (iam .ge. par%nprocs) then
+       if (.not.par%dynproc) then
           nelemdmax = neltmp(1)
           nelem     = neltmp(2)
           call set_horiz_grid_cnt_d(neltmp(3))
        endif
     endif
-
 
     !
     ! This subroutine creates mapping files using SE basis functions if requested
@@ -229,53 +206,58 @@ CONTAINS
        TimeLevel%nstep = get_nstep()*se_nsplit*qsplit*rsplit
     endif
 
+    ! Initialize FV physics grid variables
+    if (fv_nphys > 0) then
+      call fv_physgrid_init()
+    end if
+
     ! Define the CAM grids (this has to be after dycore spinup).
     ! Physics-grid will be defined later by phys_grid_init
     call define_cam_grids()
 
+    hvcoord%hyam=hyam
+    hvcoord%hyai=hyai
+    hvcoord%hybm=hybm
+    hvcoord%hybi=hybi
+    hvcoord%ps0=ps0
+        
+    call set_layer_locations(hvcoord,.false.,par%masterproc)
+        
   end subroutine dyn_init1
 
 
   subroutine dyn_init2(dyn_in)
-    use dimensions_mod,   only: nlev, nelemd
+    use dimensions_mod,   only: nlev, nelemd, np
+    use dyn_grid,         only: fv_nphys
     use prim_driver_mod,  only: prim_init2
-    use prim_si_ref_mod,  only: prim_set_mass
+    use prim_si_mod,      only: prim_set_mass
     use hybrid_mod,       only: hybrid_create
-    use hycoef,           only: hyam, hybm, hyai, hybi, ps0
+    use hycoef,           only: ps0
     use parallel_mod,     only: par
     use time_mod,         only: time_at
     use control_mod,      only: moisture, runtype
     use cam_control_mod,  only: aqua_planet, ideal_phys, adiabatic
     use comsrf,           only: landm, sgh, sgh30
-    use nctopo_util_mod,  only: nctopo_util_driver
     use cam_instance,     only: inst_index
+    use element_ops,      only: set_thermostate
 
     type (dyn_import_t), intent(inout) :: dyn_in
 
     type(element_t),    pointer :: elem(:)
 
-    integer :: ithr, nets, nete, ie, k
+    integer :: ithr, nets, nete, ie, k, tlev
     real(r8), parameter :: Tinit=300.0_r8
-    real(r8) :: dyn_ps0
     type(hybrid_t) :: hybrid
+    real(r8) :: temperature(np,np,nlev),ps(np,np)
 
     elem  => dyn_in%elem
 
-    dyn_ps0=ps0
-    hvcoord%hyam=hyam
-    hvcoord%hyai=hyai
-    hvcoord%hybm=hybm
-    hvcoord%hybi=hybi
-    hvcoord%ps0=dyn_ps0  
-    do k=1,nlev
-       hvcoord%hybd(k) = hvcoord%hybi(k+1) - hvcoord%hybi(k)
-    end do
-    if(iam < par%nprocs) then
+    if(par%dynproc) then
 
 #ifdef HORIZ_OPENMP
-       if (iam==0) write (iulog,*) "dyn_init2: nthreads=",nthreads,&
+       if (iam==0) write (iulog,*) "dyn_init2: hthreads=",hthreads,&
                                    "max_threads=",omp_get_max_threads()
-       !$OMP PARALLEL NUM_THREADS(nthreads), DEFAULT(SHARED), PRIVATE(ie,ithr,nets,nete,hybrid)
+       !$OMP PARALLEL NUM_THREADS(hthreads), DEFAULT(SHARED), PRIVATE(ie,ithr,nets,nete,hybrid)
 #endif
 #ifdef COLUMN_OPENMP
        call omp_set_num_threads(vthreads)
@@ -283,7 +265,7 @@ CONTAINS
        ithr=omp_get_thread_num()
        nets=dom_mt(ithr)%start
        nete=dom_mt(ithr)%end
-       hybrid = hybrid_create(par,ithr,NThreads)
+       hybrid = hybrid_create(par,ithr,hthreads)
 
        moisture='moist'
 
@@ -292,22 +274,24 @@ CONTAINS
           if(runtype == 0) then
              do ie=nets,nete
                 elem(ie)%state%q(:,:,:,:)=0.0_r8
-                elem(ie)%derived%fq(:,:,:,:,:)=0.0_r8
+                elem(ie)%derived%fq(:,:,:,:)=0.0_r8
              end do
           end if
        else if(ideal_phys) then
           moisture='dry'
           if(runtype == 0) then
              do ie=nets,nete
-                elem(ie)%state%ps_v(:,:,:) =dyn_ps0
+                elem(ie)%state%ps_v(:,:,:) =ps0
 
                 elem(ie)%state%phis(:,:)=0.0_r8
-
-                elem(ie)%state%T(:,:,:,:) =Tinit
 
                 elem(ie)%state%v(:,:,:,:,:) =0.0_r8
 
                 elem(ie)%state%q(:,:,:,:)=0.0_r8
+
+                temperature(:,:,:)=0.0_r8
+                ps=ps0
+                call set_thermostate(elem(ie),ps,temperature,hvcoord)
 
              end do
           end if
@@ -324,6 +308,10 @@ CONTAINS
           elem(ie)%derived%FM=0.0_r8
           elem(ie)%derived%FT=0.0_r8
           elem(ie)%derived%FQ=0.0_r8
+#ifdef MODEL_THETA_L
+          elem(ie)%derived%FPHI=0.0_r8
+          elem(ie)%derived%FVTheta=0.0_r8
+#endif
        end do
 
        ! scale PS to achieve prescribed dry mass
@@ -332,10 +320,6 @@ CONTAINS
           call prim_set_mass(elem, TimeLevel,hybrid,hvcoord,nets,nete)
        endif
        call prim_init2(elem,hybrid,nets,nete, TimeLevel, hvcoord)
-       !
-       ! This subroutine is used to create nc_topo files, if requested
-       ! 
-       call nctopo_util_driver(elem,hybrid,nets,nete)
 #ifdef HORIZ_OPENMP
        !$OMP END PARALLEL 
 #endif
@@ -355,6 +339,8 @@ CONTAINS
   subroutine dyn_run( dyn_state, rc )
 
     ! !USES:
+    use scamMod,          only: single_column, use_3dfrc
+    use se_single_column_mod, only: apply_SC_forcing
     use parallel_mod,     only : par
     use prim_driver_mod,  only: prim_run_subcycle
     use dimensions_mod,   only : nlev
@@ -374,11 +360,11 @@ CONTAINS
 
     ! !DESCRIPTION:
     !
-    if(iam < par%nprocs) then
+    if(par%dynproc) then
 #ifdef HORIZ_OPENMP
-       !if (iam==0) write (iulog,*) "dyn_run: nthreads=",nthreads,&
+       !if (iam==0) write (iulog,*) "dyn_run: hthreads=",hthreads,&
        !                            "max_threads=",omp_get_max_threads()
-       !$OMP PARALLEL NUM_THREADS(nthreads), DEFAULT(SHARED), PRIVATE(ithr,nets,nete,hybrid,n)
+       !$OMP PARALLEL NUM_THREADS(hthreads), DEFAULT(SHARED), PRIVATE(ithr,nets,nete,hybrid,n)
 #endif
 #ifdef COLUMN_OPENMP
        ! nested threads
@@ -387,16 +373,21 @@ CONTAINS
        ithr=omp_get_thread_num()
        nets=dom_mt(ithr)%start
        nete=dom_mt(ithr)%end
-       hybrid = hybrid_create(par,ithr,NThreads)
+       hybrid = hybrid_create(par,ithr,hthreads)
 
-       do n=1,se_nsplit
-          ! forward-in-time RK, with subcycling
-          call t_startf("prim_run_sybcycle")
-          call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
-               tstep, TimeLevel, hvcoord, n)
-          call t_stopf("prim_run_sybcycle")
-       end do
+       if (.not. use_3dfrc) then
+         do n=1,se_nsplit
+           ! forward-in-time RK, with subcycling
+           call t_startf("prim_run_sybcycle")
+           call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
+               tstep, single_column, TimeLevel, hvcoord, n)
+           call t_stopf("prim_run_sybcycle")
+         end do
+       endif
 
+       if (single_column) then
+         call apply_SC_forcing(dyn_state%elem,hvcoord,TimeLevel,3,.false.,nets,nete)
+       endif
 
 #ifdef HORIZ_OPENMP
        !$OMP END PARALLEL
@@ -433,38 +424,40 @@ CONTAINS
 
     ! Create a CS grid mapping file for postprocessing tools
 
-       ! write meta data for physics on GLL nodes
-       call cam_pio_createfile(nc, 'SEMapping.nc', 0)
-   
-       ierr = pio_def_dim(nc, 'ncenters', npm12*nelem, dim1)
-       ierr = pio_def_dim(nc, 'ncorners', 4, dim2)
-       ierr = pio_def_var(nc, 'element_corners', PIO_INT, (/dim1,dim2/),vid)
-    
-       ierr = pio_enddef(nc)
-       call createmetadata(par, elem, subelement_corners)
+    ! write meta data for physics on GLL nodes
+    call cam_pio_createfile(nc, 'SEMapping.nc')
 
-       jj=0
-       do cc=0,3
-          do ie=1,nelemd
-             base = ((elem(ie)%globalid-1)+cc*nelem)*npm12
-             ii=0
-             do j=1,np-1
-                do i=1,np-1
-                   ii=ii+1
-                   jj=jj+1
-                   dof(jj) = base+ii
-                end do
+    ierr = pio_def_dim(nc, 'ncenters', npm12*nelem, dim1)
+    ierr = pio_def_dim(nc, 'ncorners', 4, dim2)
+    ierr = pio_def_var(nc, 'element_corners', PIO_INT, (/dim1,dim2/),vid)
+
+    ierr = pio_enddef(nc)
+    if (par%dynproc) then
+       call createmetadata(par, elem, subelement_corners)
+    end if
+
+    jj=0
+    do cc=0,3
+       do ie=1,nelemd
+          base = ((elem(ie)%globalid-1)+cc*nelem)*npm12
+          ii=0
+          do j=1,np-1
+             do i=1,np-1
+                ii=ii+1
+                jj=jj+1
+                dof(jj) = base+ii
              end do
           end do
        end do
+    end do
 
-       call pio_initdecomp(pio_subsystem, pio_int, (/nelem*npm12,4/), dof, iodesc)
+    call pio_initdecomp(pio_subsystem, pio_int, (/nelem*npm12,4/), dof, iodesc)
 
-       call pio_write_darray(nc, vid, iodesc, reshape(subelement_corners,(/nelemd*npm12*4/)), ierr)
-       
-       call pio_freedecomp(nc, iodesc)
-       
-       call pio_closefile(nc)
+    call pio_write_darray(nc, vid, iodesc, reshape(subelement_corners,(/nelemd*npm12*4/)), ierr)
+
+    call pio_freedecomp(nc, iodesc)
+
+    call pio_closefile(nc)
 
   end subroutine write_grid_mapping
 

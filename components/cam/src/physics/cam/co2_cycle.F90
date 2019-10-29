@@ -17,13 +17,12 @@ module co2_cycle
 
 use shr_kind_mod,   only: r8 => shr_kind_r8
 use spmd_utils,     only: masterproc
-use ppgrid,         only: pver
 use physics_types,  only: physics_state, physics_ptend, physics_ptend_init
 use physconst,      only: mwdry, mwco2, gravit, cpair
 use constituents,   only: cnst_add, cnst_get_ind, cnst_name, cnst_longname, sflxnam
 use chem_surfvals,  only: chem_surfvals_get
-use co2_data_flux
-use cam_abortutils,     only: endrun
+use co2_data_flux,  only: read_interp, read_data_flux, interp_time_flux
+use cam_abortutils, only: endrun
 
 implicit none
 private
@@ -38,6 +37,7 @@ public co2_init_cnst                 ! initialize mixing ratios if not read from
 public co2_init                      ! initialize (history) variables
 public co2_time_interp_ocn           ! time interpolate co2 flux
 public co2_time_interp_fuel          ! time interpolate co2 flux
+public co2_cycle_set_cnst_type       ! set co2 tracers mixing type for local versions of cnst_type
 
 ! Public data
  
@@ -186,7 +186,7 @@ function co2_implements_cnst(name)
   end function co2_implements_cnst
 
 !===============================================================================  
-subroutine co2_init
+subroutine co2_init (state, pbuf2d )
 
 !----------------------------------------------------------------------- 
 ! 
@@ -197,8 +197,13 @@ subroutine co2_init
 !
 !-----------------------------------------------------------------------
 
-    use cam_history, only: addfld, horiz_only, add_default
- 
+    use cam_history,    only: addfld, horiz_only, add_default
+    use physics_types,  only: physics_state
+    use physics_buffer, only: physics_buffer_desc
+
+    type(physics_state), pointer       :: state(:)
+    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
+
     integer :: m, mm
       
     if (.not. co2_flag) return
@@ -221,11 +226,11 @@ subroutine co2_init
  
     ! Read flux data
     if (co2_readFlux_ocn) then
-       call read_data_flux ( co2flux_ocn_file,  data_flux_ocn )
+       call read_data_flux ( co2flux_ocn_file,  data_flux_ocn, state, pbuf2d )
     end if
  
     if (co2_readFlux_fuel) then
-       call read_data_flux ( co2flux_fuel_file, data_flux_fuel )
+       call read_data_flux ( co2flux_fuel_file, data_flux_fuel, state, pbuf2d )
     end if
  
   end subroutine co2_init
@@ -312,6 +317,32 @@ subroutine co2_init_cnst(name, q, gcid)
    end select
 
 end subroutine co2_init_cnst
+!===============================================================================
+
+subroutine co2_cycle_set_cnst_type(cnst_type_loc, cnst_type_val)
+
+!----------------------------------------------------------------------- 
+! 
+! Purpose: 
+! Set a local copy of cnst_type to be 'wet' or 'dry'       
+!
+!-----------------------------------------------------------------------
+   use constituents, only: pcnst
+
+! Arguments
+   character(len=3), intent(inout) :: cnst_type_loc(pcnst) ! a local copy of cnst_type
+   character(len=3), intent(in)    :: cnst_type_val        ! set mmr type: 'wet' or 'dry'
+   integer                         :: m                    ! loop index
+!-----------------------------------------------------------------------
+
+   if (.not. co2_flag) return
+
+   ! set cnst_type_loc for each CO2 tracer
+   do m = 1, ncnst
+      cnst_type_loc(c_i(m)) = cnst_type_val
+   end do
+
+end subroutine co2_cycle_set_cnst_type
 !===============================================================================
  
 end module co2_cycle

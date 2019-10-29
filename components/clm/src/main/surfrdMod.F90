@@ -5,17 +5,18 @@ module surfrdMod
   ! subgrid weights
   !
   ! !USES:
+#include "shr_assert.h"
   use shr_kind_mod    , only : r8 => shr_kind_r8
   use shr_log_mod     , only : errMsg => shr_log_errMsg
   use abortutils      , only : endrun
   use clm_varpar      , only : nlevsoifl, numpft, numcft
   use landunit_varcon , only : numurbl
   use clm_varcon      , only : grlnd
-  use clm_varctl      , only : iulog, scmlat, scmlon, single_column
-  use clm_varctl      , only : create_glacier_mec_landunit, use_cndv
+  use clm_varctl      , only : iulog, scmlat, scmlon, single_column, tw_irr
+  use clm_varctl      , only : create_glacier_mec_landunit
   use surfrdUtilsMod  , only : check_sums_equal_1
   use ncdio_pio       , only : file_desc_t, var_desc_t, ncd_pio_openfile, ncd_pio_closefile
-  use ncdio_pio       , only : ncd_io, check_var, ncd_inqfdims, check_dim, ncd_inqdid
+  use ncdio_pio       , only : ncd_io, check_var, ncd_inqfdims, check_dim, ncd_inqdid, ncd_inqdlen
   use pio
   use spmdMod                         
   !
@@ -28,11 +29,13 @@ module surfrdMod
   public :: surfrd_get_grid      ! Read grid/ladnfrac data into domain (after domain decomp)
   public :: surfrd_get_topo      ! Read grid topography into domain (after domain decomp)
   public :: surfrd_get_data      ! Read surface dataset and determine subgrid weights
+  public :: surfrd_get_grid_conn ! Reads grid connectivity information from domain file
   !
   ! !PRIVATE MEMBER FUNCTIONS:
-  private :: surfrd_special
-  private :: surfrd_veg_all
-  private :: surfrd_veg_dgvm
+  private :: surfrd_special             ! Read the special landunits
+  private :: surfrd_veg_all             ! Read all of the vegetated landunits
+  private :: surfrd_pftformat           ! Read crop pfts in file format where they are part of the vegetated land unit
+  private :: surfrd_cftformat           ! Read crop pfts in file format where they are on their own landunit
   !
   ! !PRIVATE DATA MEMBERS:
   ! default multiplication factor for epsilon for error checks
@@ -138,6 +141,7 @@ contains
     use clm_varcon, only : spval, re
     use domainMod , only : domain_type, domain_init, domain_clean, lon1d, lat1d
     use fileutils , only : getfil
+    use clm_varctl, only : use_pflotran
     !
     ! !ARGUMENTS:
     integer          ,intent(in)    :: begg, endg 
@@ -159,10 +163,16 @@ contains
     logical :: isgrid2d                     ! true => file is 2d lat/lon
     logical :: istype_domain                ! true => input file is of type domain
     real(r8), allocatable :: rdata2d(:,:)   ! temporary
+    real(r8), allocatable :: rdata3d(:,:,:) ! temporary  ! pflotran
     character(len=16) :: vname              ! temporary
     character(len=256):: locfn              ! local file name
     integer :: n                            ! indices
     real(r8):: eps = 1.0e-12_r8             ! lat/lon error tolerance
+
+    ! pflotran:beg-----------------------------
+    integer :: j, np, nv
+
+    ! pflotran:end-----------------------------
     character(len=32) :: subname = 'surfrd_get_grid'     ! subroutine name
 !-----------------------------------------------------------------------
 
@@ -178,6 +188,15 @@ contains
 
     ! Determine dimensions
     call ncd_inqfdims(ncid, isgrid2d, ni, nj, ns)
+    
+    ! pflotran:beg-----------------------------------------------
+    call ncd_inqdlen(ncid, dimid, nv, 'nv')
+    if (nv>0) then
+       ldomain%nv = nv
+    else
+       ldomain%nv = 0
+    endif
+    ! pflotran:end-----------------------------------------------
 
     ! Determine isgrid2d flag for domain
     call domain_init(ldomain, isgrid2d=isgrid2d, ni=ni, nj=nj, nbeg=begg, nend=endg)
@@ -205,6 +224,21 @@ contains
        call ncd_io(ncid=ncid, varname= 'yc', flag='read', data=ldomain%latc, &
             dim1name=grlnd, readvar=readvar)
        if (.not. readvar) call endrun( msg=' ERROR: yc NOT on file'//errMsg(__FILE__, __LINE__))
+
+       ! pflotran:beg-----------------------------------------------
+       ! user-defined grid-cell vertices (ususally 'nv' is 4,
+       ! but for future use, we set the following if condition of 'nv>=3' so that possible to use TIN grids
+       if (ldomain%nv>=3 .and. use_pflotran) then
+          call ncd_io(ncid=ncid, varname='xv', flag='read', data=ldomain%lonv, &
+            dim1name=grlnd, readvar=readvar)
+          if (.not. readvar) call endrun( msg=trim(subname)//' ERROR: xv  NOT on file'//errMsg(__FILE__, __LINE__))
+
+          call ncd_io(ncid=ncid, varname='yv', flag='read', data=ldomain%latv, &
+            dim1name=grlnd, readvar=readvar)
+          if (.not. readvar) call endrun( msg=trim(subname)//' ERROR: yv  NOT on file'//errMsg(__FILE__, __LINE__))
+
+       end if
+       ! pflotran:end-----------------------------------------------
     else
        call ncd_io(ncid=ncid, varname= 'AREA', flag='read', data=ldomain%area, &
             dim1name=grlnd, readvar=readvar)
@@ -217,9 +251,27 @@ contains
        call ncd_io(ncid=ncid, varname= 'LATIXY', flag='read', data=ldomain%latc, &
             dim1name=grlnd, readvar=readvar)
        if (.not. readvar) call endrun( msg=' ERROR: LATIXY NOT on file'//errMsg(__FILE__, __LINE__))
+
+       ! pflotran:beg-----------------------------------------------
+       ! user-defined grid-cell vertices (ususally 'nv' is 4,
+       ! but for future use, we set the following if condition of 'nv>=3' so that possible to use TIN grids
+       if (ldomain%nv>=3 .and. use_pflotran) then
+
+          call ncd_io(ncid=ncid, varname='LONGV', flag='read', data=ldomain%lonv, &
+            dim1name=grlnd, readvar=readvar)
+          if (.not. readvar) call endrun( msg=trim(subname)//' ERROR: LONGV  NOT on file'//errMsg(__FILE__, __LINE__))
+
+          call ncd_io(ncid=ncid, varname='LATIV', flag='read', data=ldomain%latv, &
+            dim1name=grlnd, readvar=readvar)
+          if (.not. readvar) call endrun( msg=trim(subname)//' ERROR: LATIV  NOT on file'//errMsg(__FILE__, __LINE__))
+
+       end if
+       ! pflotran:end-----------------------------------------------
     end if
 
-    if (isgrid2d) then
+    
+    ! let lat1d/lon1d data available for all grid-types, if coupled with PFLOTRAN.
+    if (isgrid2d .or. use_pflotran) then
        allocate(rdata2d(ni,nj), lon1d(ni), lat1d(nj))
        if (istype_domain) then
           vname = 'xc'
@@ -236,7 +288,81 @@ contains
        call ncd_io(ncid=ncid, varname=trim(vname), data=rdata2d, flag='read', readvar=readvar)
        lat1d(:) = rdata2d(1,:)
        deallocate(rdata2d)
-    end if
+
+       ! pflotran:beg-----------------------------------------------
+       ! find the origin of ldomain, if vertices of first grid known
+       if (use_pflotran) then
+         ldomain%lon0 = -9999._r8
+         ldomain%lat0 = -9999._r8
+         if (ldomain%nv==4 .and. ldomain%nv /= huge(1)) then
+          allocate(rdata3d(ni,nj,nv))
+          if (istype_domain) then
+             vname = 'xv'
+          else
+             vname = 'LONGV'
+          end if
+
+          call ncd_io(ncid=ncid, varname=trim(vname), data=rdata3d, flag='read', readvar=readvar)
+
+          if (readvar) then
+            ldomain%lon0 = 0._r8
+            np=0
+            do j=1,nv
+               ! may have issue if mixed longitude values (i.e. 0~360 or -180~180)
+               if ( ni>1 .and. &
+                    ( (rdata3d(1,1,j) < lon1d(1) .and. rdata3d(1,1,j) < lon1d(2)) .or. &
+                      (rdata3d(1,1,j) > lon1d(1) .and. rdata3d(1,1,j) > lon1d(2)) ) ) then
+                 np = np + 1
+                 ldomain%lon0 = ldomain%lon0+rdata3d(1,1,j)
+
+               else if (ni==1 .and. rdata3d(1,1,j)<lon1d(1)) then  !either side should be OK
+                 np = np + 1
+                 ldomain%lon0 = ldomain%lon0+rdata3d(1,1,j)
+               end if
+            end do
+            if (np>0) then
+              ldomain%lon0 = ldomain%lon0/np
+            else
+              ldomain%lon0 = -9999._r8
+            end if
+          end if
+
+          !
+          if (istype_domain) then
+             vname = 'yv'
+          else
+             vname = 'LATIV'
+          end if
+          call ncd_io(ncid=ncid, varname=trim(vname), data=rdata3d, flag='read', readvar=readvar)
+          if (readvar) then
+            ldomain%lat0 = 0._r8
+            np=0
+            do j=1,nv
+               if ( nj>1 .and. &
+                    ( (rdata3d(1,1,j) < lat1d(1) .and. rdata3d(1,1,j) < lat1d(2)) .or. &
+                      (rdata3d(1,1,j) > lat1d(1) .and. rdata3d(1,1,j) > lat1d(2)) ) ) then
+                 np = np + 1
+                 ldomain%lat0 = ldomain%lat0+rdata3d(1,1,j)
+
+               else if (nj==1 .and. rdata3d(1,1,j)<lat1d(1)) then  !either side should be OK
+                 np = np + 1
+                 ldomain%lat0 = ldomain%lat0+rdata3d(1,1,j)
+               end if
+            end do
+            if (np>0) then
+              ldomain%lat0 = ldomain%lat0/np
+            else
+              ldomain%lat0 = -9999._r8
+            end if
+          end if
+          !
+          deallocate(rdata3d)
+         end if
+       end if
+       ! pflotran:end-----------------------------------------------
+    end if  ! if (isgrid2d .or. use_pflotran)
+
+
 
     ! Check lat limited to -90,90
 
@@ -270,6 +396,19 @@ contains
           call endrun( msg=' ERROR: LANDFRAC NOT on fracdata file'//errMsg(__FILE__, __LINE__))
        end if
     end if
+
+    ! Read xCell
+    call check_var(ncid=ncid, varname='xCell', vardesc=vardesc, readvar=readvar)
+    if (readvar) then
+       call ncd_io(ncid=ncid, varname= 'xCell', flag='read', data=ldomain%xCell, &
+            dim1name=grlnd, readvar=readvar)
+    endif
+
+    call check_var(ncid=ncid, varname='yCell', vardesc=vardesc, readvar=readvar)
+    if (readvar) then
+       call ncd_io(ncid=ncid, varname= 'yCell', flag='read', data=ldomain%yCell, &
+            dim1name=grlnd, readvar=readvar)
+    endif
 
     call ncd_pio_closefile(ncid)
 
@@ -409,10 +548,11 @@ contains
     !    o real % abundance PFTs (as a percent of vegetated area)
     !
     ! !USES:
-    use clm_varctl  , only : create_crop_landunit
+    use clm_varctl  , only : create_crop_landunit, tw_irr
     use fileutils   , only : getfil
     use domainMod   , only : domain_type, domain_init, domain_clean
     use clm_varsur  , only : wt_lunit, topo_glc_mec
+
     !
     ! !ARGUMENTS:
     integer,          intent(in) :: begg, endg      
@@ -481,6 +621,7 @@ contains
     end if
 
     call ncd_inqfdims(ncid, isgrid2d, ni, nj, ns)
+    surfdata_domain%nv = 0   ! must be initialized to 0 here prior to call 'domain_init'
     call domain_init(surfdata_domain, isgrid2d, ni, nj, begg, endg, clmlevel=grlnd)
 
     call ncd_io(ncid=ncid, varname=lon_var, flag='read', data=surfdata_domain%lonc, &
@@ -512,14 +653,24 @@ contains
     ! Obtain special landunit info
 
     call surfrd_special(begg, endg, ncid, ldomain%ns)
+	
+	! Obtain firrig and surface/grnd irrigation fraction
+    if (tw_irr) then
+     call ncd_io(ncid=ncid, varname='FIRRIG', flag='read', data=ldomain%firrig, &
+          dim1name=grlnd, readvar=readvar)
+     if (.not. readvar) call endrun( trim(subname)//' ERROR: FIRRIG NOT on surfdata file' )!
 
+     call ncd_io(ncid=ncid, varname='FSURF', flag='read', data=ldomain%f_surf, &
+          dim1name=grlnd, readvar=readvar)
+     if (.not. readvar) call endrun( trim(subname)//' ERROR: FSURF NOT on surfdata file' )!
+
+     call ncd_io(ncid=ncid, varname='FGRD', flag='read', data=ldomain%f_grd, &
+          dim1name=grlnd, readvar=readvar)
+     if (.not. readvar) call endrun( trim(subname)//' ERROR: FGRD NOT on surfdata file' )
+    end if
     ! Obtain vegetated landunit info
 
     call surfrd_veg_all(begg, endg, ncid, ldomain%ns)
-
-    if (use_cndv) then
-       call surfrd_veg_dgvm(begg, endg)
-    end if
 
     call ncd_pio_closefile(ncid)
 
@@ -703,6 +854,112 @@ contains
 
   end subroutine surfrd_special
 
+!-----------------------------------------------------------------------
+  subroutine surfrd_cftformat( ncid, begg, endg, wt_cft, cftsize, natpft_size )
+    !
+    ! !DESCRIPTION:
+    !     Handle generic crop types for file format where they are on their own
+    !     crop landunit and read in as Crop Function Types.
+    ! !USES:
+    use clm_varsur      , only : fert_cft, wt_nat_patch
+    use clm_varpar      , only : cft_size, cft_lb, natpft_lb
+    ! !ARGUMENTS:
+    implicit none
+    type(file_desc_t), intent(inout) :: ncid         ! netcdf id
+    integer          , intent(in)    :: begg, endg
+    integer          , intent(in)    :: cftsize      ! CFT size
+    real(r8), pointer, intent(inout) :: wt_cft(:,:)  ! CFT weights
+    integer          , intent(in)    :: natpft_size  ! natural PFT size
+    !
+    ! !LOCAL VARIABLES:
+    logical  :: readvar                        ! is variable on dataset
+    real(r8),pointer :: array2D(:,:)              ! local array
+    character(len=32) :: subname = 'surfrd_cftformat'! subroutine name
+!-----------------------------------------------------------------------
+    SHR_ASSERT_ALL((lbound(wt_cft) == (/begg, cft_lb/)), errMsg(__FILE__, __LINE__))
+    SHR_ASSERT_ALL((ubound(wt_cft, dim=1) == (/endg/)), errMsg(__FILE__, __LINE__))
+    SHR_ASSERT_ALL((ubound(wt_cft, dim=2) >= (/cftsize+1-cft_lb/)), errMsg(__FILE__, __LINE__))
+    SHR_ASSERT_ALL((ubound(wt_nat_patch) >= (/endg,natpft_size-1+natpft_lb/)), errMsg(__FILE__, __LINE__))
+
+    call check_dim(ncid, 'cft', cftsize)
+    call check_dim(ncid, 'natpft', natpft_size)
+
+    call ncd_io(ncid=ncid, varname='PCT_CFT', flag='read', data=wt_cft, &
+            dim1name=grlnd, readvar=readvar)
+    if (.not. readvar) call endrun( msg=' ERROR: PCT_CFT NOT on surfdata file'//errMsg(__FILE__, __LINE__)) 
+
+    if ( cft_size > 0 )then
+       call ncd_io(ncid=ncid, varname='CONST_FERTNITRO_CFT', flag='read', data=fert_cft, &
+               dim1name=grlnd, readvar=readvar)
+       if (.not. readvar) then
+          if ( masterproc ) &
+                write(iulog,*) ' WARNING: CONST_FERTNITRO_CFT NOT on surfdata file zero out'
+          fert_cft = 0.0_r8
+       end if
+    else
+       fert_cft = 0.0_r8
+    end if
+
+    allocate( array2D(begg:endg,1:natpft_size) )
+    call ncd_io(ncid=ncid, varname='PCT_NAT_PFT', flag='read', data=array2D, &
+         dim1name=grlnd, readvar=readvar)
+    if (.not. readvar) call endrun( msg=' ERROR: PCT_NAT_PFT NOT on surfdata file'//errMsg(__FILE__, __LINE__))
+    wt_nat_patch(begg:,natpft_lb:natpft_size-1+natpft_lb) = array2D(begg:,:)
+    deallocate( array2D )
+
+  end subroutine surfrd_cftformat
+
+!-----------------------------------------------------------------------
+  subroutine surfrd_pftformat( begg, endg, ncid )
+    !
+    ! !DESCRIPTION:
+    !     Handle generic crop types for file format where they are part of the
+    !     natural vegetation landunit.
+    ! !USES:
+    use clm_varsur      , only : fert_cft, wt_nat_patch
+    use clm_varpar      , only : natpft_size, cft_size, natpft_lb
+    ! !ARGUMENTS:
+    implicit none
+    integer, intent(in) :: begg, endg
+    type(file_desc_t), intent(inout) :: ncid                    ! netcdf id
+    !
+    ! !LOCAL VARIABLES:
+    logical  :: cft_dim_exists                 ! does the dimension 'cft' exist on the dataset?
+    integer  :: dimid                          ! netCDF id's
+    logical  :: readvar                        ! is variable on dataset
+    character(len=32) :: subname = 'surfrd_pftformat'! subroutine name
+!-----------------------------------------------------------------------
+    SHR_ASSERT_ALL((ubound(wt_nat_patch) == (/endg, natpft_size-1+natpft_lb/)), errMsg(__FILE__, __LINE__))
+
+    call check_dim(ncid, 'natpft', natpft_size)
+    ! If cft_size == 0, then we expect to be running with a surface dataset
+    ! that does
+    ! NOT have a PCT_CFT array (or CONST_FERTNITRO_CFT array), and thus does not have a 'cft' dimension.
+    ! Make sure
+    ! that's the case.
+    call ncd_inqdid(ncid, 'cft', dimid, cft_dim_exists)
+    if (cft_dim_exists) then
+       call endrun( msg= ' ERROR: unexpectedly found cft dimension on dataset when cft_size=0'// &
+               ' (if the surface dataset has a separate crop landunit, then the code'// &
+               ' must also have a separate crop landunit, and vice versa)'//&
+               errMsg(__FILE__, __LINE__))
+    end if
+    call ncd_io(ncid=ncid, varname='CONST_FERTNITRO_CFT', flag='read', data=fert_cft, &
+            dim1name=grlnd, readvar=readvar)
+    if (readvar) then
+       call endrun( msg= ' ERROR: unexpectedly found CONST_FERTNITRO_CFT on dataset when cft_size=0'// &
+               ' (if the surface dataset has a separate crop landunit, then the code'// &
+               ' must also have a separate crop landunit, and vice versa)'//&
+               errMsg(__FILE__, __LINE__))
+    end if
+    fert_cft = 0.0_r8
+
+    call ncd_io(ncid=ncid, varname='PCT_NAT_PFT', flag='read', data=wt_nat_patch, &
+         dim1name=grlnd, readvar=readvar)
+    if (.not. readvar) call endrun( msg=' ERROR: PCT_NAT_PFT NOT on surfdata file'//errMsg(__FILE__, __LINE__))
+
+  end subroutine surfrd_pftformat
+
   !-----------------------------------------------------------------------
   subroutine surfrd_veg_all(begg, endg, ncid, ns)
     !
@@ -710,6 +967,7 @@ contains
     ! Determine weight arrays for non-dynamic landuse mode
     !
     ! !USES:
+    use clm_varctl      , only : create_crop_landunit, use_fates
     use clm_varctl      , only : irrigate
     use clm_varpar      , only : natpft_lb, natpft_ub, natpft_size, cft_lb, cft_ub, cft_size
     use clm_varpar      , only : crop_prog
@@ -718,6 +976,7 @@ contains
     use pftvarcon       , only : nc3crop, nc3irrig, npcropmin
     use pftvarcon       , only : ncorn, ncornirrig, nsoybean, nsoybeanirrig
     use pftvarcon       , only : nscereal, nscerealirrig, nwcereal, nwcerealirrig
+    use surfrdUtilsMod  , only : convert_cft_to_pft
     !
     ! !ARGUMENTS:
     integer, intent(in) :: begg, endg
@@ -728,29 +987,15 @@ contains
     integer  :: nl                             ! index
     integer  :: dimid,varid                    ! netCDF id's
     integer  :: ier                            ! error status	
+    integer  :: cftsize                        ! size of CFT's
     logical  :: readvar                        ! is variable on dataset
     logical  :: cft_dim_exists                 ! does the dimension 'cft' exist on the dataset?
     real(r8),pointer :: arrayl(:)              ! local array
+    real(r8),pointer :: array2D(:,:)                 ! local 2D array
     character(len=32) :: subname = 'surfrd_veg_all'  ! subroutine name
 !-----------------------------------------------------------------------
 
     call check_dim(ncid, 'lsmpft', numpft+1)
-    call check_dim(ncid, 'natpft', natpft_size)
-
-    if (cft_size > 0) then
-       call check_dim(ncid, 'cft', cft_size)
-    else
-       ! If cft_size == 0, then we expect to be running with a surface dataset that does
-       ! NOT have a PCT_CFT array, and thus does not have a 'cft' dimension. Make sure
-       ! that's the case.
-       call ncd_inqdid(ncid, 'cft', dimid, cft_dim_exists)
-       if (cft_dim_exists) then
-          call endrun( msg= ' ERROR: unexpectedly found cft dimension on dataset when cft_size=0'// &
-               ' (if the surface dataset has a separate crop landunit, then the code'// &
-               ' must also have a separate crop landunit, and vice versa)'//&
-               errMsg(__FILE__, __LINE__))
-       end if
-    end if
 
     ! This temporary array is needed because ncd_io expects a pointer, so we can't
     ! directly pass wt_lunit(begg:endg,istsoil)
@@ -759,39 +1004,64 @@ contains
     call ncd_io(ncid=ncid, varname='PCT_NATVEG', flag='read', data=arrayl, &
          dim1name=grlnd, readvar=readvar)
     if (.not. readvar) call endrun( msg=' ERROR: PCT_NATVEG NOT on surfdata file'//errMsg(__FILE__, __LINE__))
-    wt_lunit(begg:endg,istsoil) = arrayl(begg:endg) / 100._r8
+    wt_lunit(begg:endg,istsoil) = arrayl(begg:endg)
 
     call ncd_io(ncid=ncid, varname='PCT_CROP', flag='read', data=arrayl, &
          dim1name=grlnd, readvar=readvar)
     if (.not. readvar) call endrun( msg=' ERROR: PCT_CROP NOT on surfdata file'//errMsg(__FILE__, __LINE__))
-    wt_lunit(begg:endg,istcrop) = arrayl(begg:endg) / 100._r8
+    wt_lunit(begg:endg,istcrop) = arrayl(begg:endg)
 
     deallocate(arrayl)
-
-    call ncd_io(ncid=ncid, varname='PCT_NAT_PFT', flag='read', data=wt_nat_patch, &
-         dim1name=grlnd, readvar=readvar)
-    if (.not. readvar) call endrun( msg=' ERROR: PCT_NAT_PFT NOT on surfdata file'//errMsg(__FILE__, __LINE__))
-    wt_nat_patch(begg:endg,:) = wt_nat_patch(begg:endg,:) / 100._r8
-    call check_sums_equal_1(wt_nat_patch, begg, 'wt_nat_patch', subname)
     
-    if (cft_size > 0) then
-       call ncd_io(ncid=ncid, varname='PCT_CFT', flag='read', data=wt_cft, &
-            dim1name=grlnd, readvar=readvar)
-       if (.not. readvar) call endrun( msg=' ERROR: PCT_CFT NOT on surfdata file'//errMsg(__FILE__, __LINE__)) 
-       wt_cft(begg:endg,:) = wt_cft(begg:endg,:) / 100._r8
-       call check_sums_equal_1(wt_cft, begg, 'wt_cft', subname)
+    ! Check the file format for CFT's and handle accordingly
+    call ncd_inqdid(ncid, 'cft', dimid, cft_dim_exists)
+    if ( cft_dim_exists .and. create_crop_landunit ) then
 
-    else
-       ! If cft_size == 0, and thus we aren't reading PCT_CFT, then make sure PCT_CROP is
-       ! 0 everywhere (PCT_CROP > 0 anywhere requires that we have a PCT_CFT array)
-       if (any(wt_lunit(begg:endg,istcrop) > 0._r8)) then
-          call endrun( msg=' ERROR: if PCT_CROP > 0 anywhere, then cft_size must be > 0'// &
-               ' (if the surface dataset has a separate crop landunit, then the code'// &
-               ' must also have a separate crop landunit, and vice versa)'//&
-               errMsg(__FILE__, __LINE__))
+       ! Format where CFT's is read in a seperate landunit
+       call surfrd_cftformat( ncid, begg, endg, wt_cft, cft_size, natpft_size )
+
+    else if ( (.not. cft_dim_exists) .and. (.not. create_crop_landunit) )then
+
+       ! Format where crop is part of the natural veg. landunit
+       if ( masterproc ) write(iulog,*) "WARNING: The PFT format is an unsupported format that will be removed in th future!"
+       call surfrd_pftformat( begg, endg, ncid )
+
+    else if ( cft_dim_exists .and. .not. create_crop_landunit )then
+       if ( masterproc ) write(iulog,*) "WARNING: New CFT-based format surface datasets should be run with create_crop_landunit=T"
+       if ( use_fates ) then
+          if ( masterproc ) write(iulog,*) "WARNING: When fates is on we allow new CFT based surface datasets ", &
+                                           "to be used with create_crop_land FALSE"
+          cftsize = 2
+          allocate(array2D(begg:endg,cft_lb:cftsize-1+cft_lb))
+          call surfrd_cftformat( ncid, begg, endg, array2D, cftsize, natpft_size-cftsize ) ! Read crops in as CFT's
+          call convert_cft_to_pft( begg, endg, cftsize, array2D )                          ! Convert from CFT to natural veg. landunit
+          deallocate(array2D)
+       else
+          call endrun( msg=' ERROR: New format surface datasets require create_crop_landunit TRUE'//errMsg(__FILE__, __LINE__))
        end if
     end if
 
+    ! Do some checking
+
+    if ( (cft_size) == 0 .and. any(wt_lunit(begg:endg,istcrop) > 0._r8)) then
+       ! If cft_size == 0, and thus we aren't reading PCT_CFT, then make sure PCT_CROP is
+       ! 0 everywhere (PCT_CROP > 0 anywhere requires that we have a PCT_CFT array)
+       call endrun( msg=' ERROR: if PCT_CROP > 0 anywhere, then cft_size must be > 0'// &
+            ' (if the surface dataset has a separate crop landunit, then the code'// &
+            ' must also have a separate crop landunit, and vice versa)'//&
+            errMsg(__FILE__, __LINE__))
+    end if
+
+    ! Convert from percent to fraction, check sums of nat vegetation add to 1
+
+    if (cft_size > 0) then
+       wt_cft(begg:endg,:) = wt_cft(begg:endg,:) / 100._r8
+       call check_sums_equal_1(wt_cft, begg, 'wt_cft', subname)
+    end if
+    wt_lunit(begg:endg,istsoil) = wt_lunit(begg:endg,istsoil) / 100._r8
+    wt_lunit(begg:endg,istcrop) = wt_lunit(begg:endg,istcrop) / 100._r8
+    wt_nat_patch(begg:endg,:)   = wt_nat_patch(begg:endg,:) / 100._r8
+    call check_sums_equal_1(wt_nat_patch, begg, 'wt_nat_patch', subname)
 
     ! If no irrigation, merge irrigated CFTs with rainfed
     
@@ -824,28 +1094,175 @@ contains
   end subroutine surfrd_veg_all
 
   !-----------------------------------------------------------------------
-  subroutine surfrd_veg_dgvm(begg, endg)
+  subroutine surfrd_get_grid_conn(filename, cellsOnCell, edgesOnCell, &
+       nEdgesOnCell, areaCell, dcEdge, dvEdge, &
+       nCells_loc, nEdges_loc, maxEdges)
     !
     ! !DESCRIPTION:
-    ! Determine weights for CNDV mode.
+    ! Read grid connectivity information.
+    ! NO DOMAIN DECOMPOSITION  HAS BEEN SET YET
     !
     ! !USES:
-    use pftvarcon , only : noveg
-    use clm_varsur, only : wt_nat_patch
+    use fileutils , only : getfil
     !
     ! !ARGUMENTS:
-    integer, intent(in) :: begg, endg  
+    character(len=*), intent(in)  :: filename                        ! filename
+    integer         , pointer     :: cellsOnCell(:,:)                ! cells-to-cell connection
+    integer         , pointer     :: edgesOnCell(:,:)                ! index to determine distance between neighbors from dcEdge
+    integer         , pointer     :: nEdgesOnCell(:)                 ! number of edges
+    real(r8)        , pointer     :: dcEdge(:)                       ! distance between centroids of grid cells
+    real(r8)        , pointer     :: dvEdge(:)                       ! distance between vertices
+    real(r8)        , pointer     :: areaCell(:)                     ! area of grid cells [m^2]
+    integer         , intent(out) :: nCells_loc                      ! number of local cell-to-cell connections
+    integer         , intent(out) :: maxEdges                        ! max number of edges/neighbors
+    integer         , intent(out) :: nEdges_loc                      ! number of edge length saved locally
     !
     ! !LOCAL VARIABLES:
-    character(len=*), parameter :: subname = 'surfrd_veg_dgvm'
+    integer                      :: dimid,varid                      ! netCDF id's
+    integer                      :: i                                ! index
+    integer                      :: ier                              ! error status
+    integer                      :: nCells                           ! global number of cell-to-cell connections
+    integer                      :: nEdges                           ! global number of edges
+    integer                      :: ibeg_c, iend_c                   ! beginning/ending index of data
+    integer                      :: ibeg_e, iend_e                   ! beginning/ending index of data
+    integer                      :: remainder                        ! temporary variable
+    type(file_desc_t)            :: ncid                             ! netcdf id
+    character(len=256)           :: varname                          ! variable name
+    character(len=256)           :: locfn                            ! local file name
+    logical                      :: readvar                          ! read variable in or not
+    logical                      :: readdim                          ! read dimension present or not
+    integer , allocatable        :: idata2d(:,:)                     ! temporary data
+    integer , allocatable        :: idata1d(:)                       ! temporary data
+    real(r8), allocatable        :: rdata1d(:)                       ! temporary data
+    character(len=32)            :: subname = 'surfrd_get_grid_conn' ! subroutine name
+
     !-----------------------------------------------------------------------
 
-    ! Bare ground gets 100% weight; all other natural PFTs are zeroed out
-    wt_nat_patch(begg:endg, :)     = 0._r8
-    wt_nat_patch(begg:endg, noveg) = 1._r8
+    if (masterproc) then
+       if (filename == ' ') then
+          call endrun( msg=' ERROR: filename is empty)'//&
+               errMsg(__FILE__, __LINE__))
+       end if
+    end if
 
-    call check_sums_equal_1(wt_nat_patch, begg, 'wt_nat_patch', subname)
+    call getfil( filename, locfn, 0 )
+    call ncd_pio_openfile (ncid, trim(locfn), 0)
 
-  end subroutine surfrd_veg_dgvm
+    ! Check if the dimensions are present
+
+    call ncd_inqdid(ncid,'nCells',dimid, readdim)
+
+    if ( .not.readdim ) then
+       call endrun( msg=' ERROR: Dimension nCells missing in '//filename// &
+            errMsg(__FILE__, __LINE__))
+    end if
+    ier = pio_inq_dimlen(ncid, dimid, nCells)
+
+    call ncd_inqdid(ncid,'maxEdges',dimid,readdim)
+
+    if ( .not.readdim ) then
+       call endrun( msg=' ERROR: Dimension maxEdges missing in '//filename// &
+            errMsg(__FILE__, __LINE__))
+    end if
+    ier = pio_inq_dimlen(ncid, dimid, maxEdges)
+
+    call ncd_inqdid(ncid,'nEdges',dimid,readdim)
+    if ( .not.readdim ) then
+       call endrun( msg=' ERROR: Dimension nEdges missing in '//filename// &
+            errMsg(__FILE__, __LINE__))
+    end if
+    ier = pio_inq_dimlen(ncid, dimid, nEdges)
+
+    ! Determine the size of local array that needs to be saved.
+    nCells_loc = nCells/npes
+    remainder  = nCells - nCells_loc*npes
+    if (iam < remainder) nCells_loc = nCells_loc + 1
+
+    nEdges_loc = nEdges/npes
+    remainder  = nEdges - nEdges_loc*npes
+    if (iam < remainder) nEdges_loc = nEdges_loc + 1
+
+    ! Determine the beginning and ending index of the data to
+    ! be saved
+    ibeg_c = 0
+    iend_c = 0
+    call MPI_Scan(nCells_loc, ibeg_c, 1, MPI_INTEGER, MPI_SUM, mpicom, ier)
+    call MPI_Scan(  nCells_loc, iend_c, 1, MPI_INTEGER, MPI_SUM, mpicom, ier)
+    ibeg_c = ibeg_c + 1 - nCells_loc
+
+    ibeg_e = 0
+    iend_e = 0
+    call MPI_Scan(nEdges_loc, ibeg_e, 1, MPI_INTEGER, MPI_SUM, mpicom, ier)
+    call MPI_Scan(  nEdges_loc, iend_e, 1, MPI_INTEGER, MPI_SUM, mpicom, ier)
+    ibeg_e = ibeg_e + 1 - nEdges_loc
+
+    ! Allocate memory
+    allocate(cellsOnCell   (maxEdges, nCells_loc))
+    allocate(edgesOnCell   (maxEdges, nCells_loc))
+    allocate(nEdgesOnCell  (nCells_loc          ))
+    allocate(areaCell      (nCells_loc          ))
+    allocate(dcEdge        (nEdges_loc          ))
+    allocate(dvEdge        (nEdges_loc          ))
+
+    ! Read the data independently (i.e. each MPI-proc reads in the entire
+    ! dataset)
+
+    allocate(idata2d(maxEdges, nCells))
+
+    ! Read cellsOnCell
+    call ncd_io(ncid=ncid, varname='cellsOnCell', data=idata2d, flag='read', readvar=readvar)
+    if (.not. readvar) then
+       call endrun(msg=' ERROR: cellsOnCell not found in the file'//errMsg(__FILE__, __LINE__))
+    end if
+    cellsOnCell(:,:) = idata2d(:,ibeg_c:iend_c)
+
+    ! Read edgesOnCell
+    call ncd_io(ncid=ncid, varname='edgesOnCell', data=idata2d, flag='read', readvar=readvar)
+    if (.not. readvar) then
+       call endrun(msg=' ERROR: edgesOnCell not found in the file'//errMsg(__FILE__, __LINE__))
+    end if
+    edgesOnCell(:,:) = idata2d(:,ibeg_c:iend_c)
+
+    deallocate(idata2d)
+
+    ! Read nEdgesOnCell
+    allocate(idata1d(nCells))
+    call ncd_io(ncid=ncid, varname='nEdgesOnCell', data=idata1d, flag='read', readvar=readvar)
+    if (.not. readvar) then
+       call endrun(msg=' ERROR: areaCell not found in the file'//errMsg(__FILE__, __LINE__))
+    end if
+    nEdgesOnCell(:) = idata1d(ibeg_c:iend_c)
+    deallocate(idata1d)
+
+    ! Read areaCell
+    allocate(rdata1d(nCells))
+    call ncd_io(ncid=ncid, varname='areaCell', data=rdata1d, flag='read', readvar=readvar)
+    if (.not. readvar) then
+       call endrun(msg=' ERROR: areaCell not found in the file'//errMsg(__FILE__, __LINE__))
+    end if
+    areaCell(:) = rdata1d(ibeg_c:iend_c)
+    deallocate(rdata1d)
+
+    ! Read dcEdge
+    allocate(rdata1d(nEdges))
+    call ncd_io(ncid=ncid, varname='dcEdge', data=rdata1d, flag='read', readvar=readvar)
+    if (.not. readvar) then
+       call endrun(msg=' ERROR: dcEdge not found in the file'//errMsg(__FILE__, __LINE__))
+    end if
+    dcEdge(:) = rdata1d(ibeg_e:iend_e)
+
+    ! Read dvEdge
+    call ncd_io(ncid=ncid, varname='dvEdge', data=rdata1d, flag='read', readvar=readvar)
+    if (.not. readvar) then
+       call endrun(msg=' ERROR: dvEdge not found in the file'//errMsg(__FILE__, __LINE__))
+    end if
+    dvEdge(:) = rdata1d(ibeg_e:iend_e)
+
+    deallocate(rdata1d)
+
+    ! Perform cleanup
+    call ncd_pio_closefile(ncid)
+
+  end subroutine surfrd_get_grid_conn
 
 end module surfrdMod

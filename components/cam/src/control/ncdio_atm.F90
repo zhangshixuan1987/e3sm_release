@@ -167,7 +167,7 @@ contains
       !
       ! Get array dimension id's and sizes
       !
-      ierr = PIO_inq_dimid(ncid, dimname1, arraydimid)
+      if (index(dimname1,'_d')==0) ierr = PIO_inq_dimid(ncid, dimname1, arraydimid)
       arraydimsize(1) = (dim1e - dim1b + 1)
       arraydimsize(2) = (dim2e - dim2b + 1)
       do j = 1, 2
@@ -198,11 +198,17 @@ contains
         end if
       end if
 
-      ! NB: strt and cnt were initialized to 1
-      if (single_column) then	
-        !!XXgoldyXX: Clearly, this will not work for an unstructured dycore
-        call endrun(trim(subname)//': SCAM not supported in this configuration')
+      if (single_column .and. dim1e == 1) then
+        ! Specifically, this condition is for when the single column model 
+        !  is run in the Spectral Element dycore
+        cnt(1) = 1 
+        call shr_scam_getCloseLatLon(ncid,scmlat,scmlon,closelat,closelon,latidx,lonidx)
+        strt(1) = lonidx
+        ierr = pio_get_var(ncid, varid, strt, cnt, field)
+
       else
+
+      ! NB: strt and cnt were initialized to 1
         ! All distributed array processing
         call cam_grid_get_decomp(grid_map, arraydimsize, dimlens(1:ndims),    &
              pio_double, iodesc)
@@ -387,7 +393,7 @@ contains
           strt(1) = dim1b
           strt(2) = dim2b
           cnt = arraydimsize
-          call shr_scam_getCloseLatLon(ncid%fh,scmlat,scmlon,closelat,closelon,latidx,lonidx)
+          call shr_scam_getCloseLatLon(ncid,scmlat,scmlon,closelat,closelon,latidx,lonidx)
           if (trim(field_dnames(1)) == 'lon') then
             strt(1) = lonidx ! First dim always lon for Eulerian dycore
           else
@@ -563,8 +569,9 @@ contains
       !
       ! Get array dimension id's and sizes
       !
-      ierr = PIO_inq_dimid(ncid, dimname1, arraydimids(1))
-      ierr = PIO_inq_dimid(ncid, dimname2, arraydimids(2))
+      ! Only do this check if the dimension name does not include '_d'
+      if (index(dimname1,'_d')==0) ierr = PIO_inq_dimid(ncid, dimname1, arraydimids(1))
+      if (index(dimname2,'_d')==0) ierr = PIO_inq_dimid(ncid, dimname2, arraydimids(2))
       arraydimsize(1) = (dim1e - dim1b + 1)
       arraydimsize(2) = (dim2e - dim2b + 1)
       arraydimsize(3) = (dim3e - dim3b + 1)
@@ -599,17 +606,9 @@ contains
       field_dnames(1) = dimname1
       field_dnames(2) = dimname2
       ! NB: strt and cnt were initialized to 1
-      if (single_column) then	
-        !!XXgoldyXX: Clearly, this will not work for an unstructured dycore
-        ! Check for permuted dimensions ('out of order' array)
-!       call calc_permutation(dimids(1:2), arraydimids, permutation, ispermuted)
-        call endrun(trim(subname)//': SCAM not supported in this configuration')
-      else
-        ! All distributed array processing
-        call cam_grid_get_decomp(grid_map, arraydimsize, dimlens(1:2),        &
+      call cam_grid_get_decomp(grid_map, arraydimsize, dimlens(1:2),        &
              pio_double, iodesc, field_dnames=field_dnames)
-        call pio_read_darray(ncid, varid, iodesc, field, ierr)
-      end if
+      call pio_read_darray(ncid, varid, iodesc, field, ierr)
     end if  ! end of readvar_tmp
 
     readvar = readvar_tmp
@@ -809,7 +808,7 @@ contains
           strt(2) = dim2b
           strt(3) = dim3b
           cnt = arraydimsize
-          call shr_scam_getCloseLatLon(ncid%fh,scmlat,scmlon,closelat,closelon,latidx,lonidx)
+          call shr_scam_getCloseLatLon(ncid,scmlat,scmlon,closelat,closelon,latidx,lonidx)
           if (trim(field_dnames(1)) == 'lon') then
             strt(1) = lonidx ! First dim always lon for Eulerian dycore
           else

@@ -75,9 +75,9 @@ use phys_control,   only: phys_getopts, use_hetfrz_classnuc
 
 use physics_types,  only: physics_state, physics_ptend, &
                           physics_ptend_init, physics_state_copy, &
-                          physics_update, physics_state_dealloc, &
+                          physics_state_dealloc, &
                           physics_ptend_sum, physics_ptend_scale
-
+use physics_update_mod, only: physics_update
 use physics_buffer, only: physics_buffer_desc, pbuf_add_field, dyn_time_lvls, &
                           pbuf_old_tim_idx, pbuf_get_index, dtype_r8, dtype_i4, &
                           pbuf_get_field, pbuf_set_field, col_type_subcol, &
@@ -125,6 +125,8 @@ logical :: micro_mg_dcs_tdep  = .false.! if set to true, use temperature depende
 
 
 character(len=16) :: micro_mg_precip_frac_method = 'max_overlap' ! type of precipitation fraction method
+real(r8) :: micro_mg_mass_gradient_alpha = -1._r8                ! Parameters used in mass_gradient method.
+real(r8) :: micro_mg_mass_gradient_beta = -1._r8
 
 real(r8)          :: micro_mg_berg_eff_factor    = 1.0_r8        ! berg efficiency factor
 
@@ -346,7 +348,20 @@ subroutine micro_mg_cam_readnl(nlfile)
      end select
 
      if (micro_mg_dcs < 0._r8) call endrun( "micro_mg_cam_readnl: &
-              &micro_mg_dcs has not been set to a valid value.")
+          &micro_mg_dcs has not been set to a valid value.")
+
+     if (trim(micro_mg_precip_frac_method) == 'mass_gradient') then
+        if (micro_mg_version < 2) call endrun("micro_mg_cam_readnl: &
+             &mass_gradient precipitation fraction not available in MG1.")
+
+        ! Alpha must be positive, while beta should be non-negative.
+        if (micro_mg_mass_gradient_alpha <= 0._r8 .or. &
+             micro_mg_mass_gradient_beta < 0._r8) then
+           call endrun("micro_mg_cam_readnl: mass_gradient precipitation &
+                &fraction method requires alpha and beta to be set &
+                &to valid values")
+        end if
+     end if
   end if
 
 #ifdef SPMD
@@ -367,6 +382,8 @@ subroutine micro_mg_cam_readnl(nlfile)
   call mpibcast(nicons,                      1, mpir8,  0, mpicom)
   call mpibcast(micro_mg_precip_frac_method, 16, mpichar,0, mpicom)
   call mpibcast(do_icesuper,                 1, mpilog, 0, mpicom)
+  call mpibcast(micro_mg_mass_gradient_alpha, 1, mpir8, 0, mpicom)
+  call mpibcast(micro_mg_mass_gradient_beta, 1, mpir8,  0, mpicom)
 
 #endif
 
@@ -646,6 +663,7 @@ subroutine micro_mg_cam_init(pbuf2d)
 
    integer :: m, mm
    logical :: history_amwg         ! output the variables used by the AMWG diag package
+   logical :: history_verbose      ! produce verbose history output
    logical :: history_budget       ! Output tendencies and state variables for CAM4
                                    ! temperature, water vapor, cloud ice and cloud
                                    ! liquid budgets.
@@ -727,7 +745,9 @@ subroutine micro_mg_cam_init(pbuf2d)
 	      do_nccons, do_nicons, nccons, nicons, &
               micro_mg_precip_frac_method, micro_mg_berg_eff_factor, &
               allow_sed_supersat, ice_sed_ai, prc_coef1_in,prc_exp_in, &
-              prc_exp1_in, cld_sed_in, mg_prc_coeff_fix_in, errstring)
+              prc_exp1_in, cld_sed_in, mg_prc_coeff_fix_in, &
+              micro_mg_mass_gradient_alpha, micro_mg_mass_gradient_beta, &
+              errstring)
       end select
    end select
 
@@ -934,6 +954,7 @@ subroutine micro_mg_cam_init(pbuf2d)
 
    ! determine the add_default fields
    call phys_getopts(history_amwg_out           = history_amwg         , &
+                     history_verbose_out        = history_verbose      , &
                      history_budget_out         = history_budget       , &
                      history_budget_histfile_num_out = budget_histfile)
 
@@ -943,8 +964,10 @@ subroutine micro_mg_cam_init(pbuf2d)
       call add_default ('AQSNOW   ', 1, ' ')
       call add_default ('ANRAIN   ', 1, ' ')
       call add_default ('ANSNOW   ', 1, ' ')
-      call add_default ('ADRAIN   ', 1, ' ')
-      call add_default ('ADSNOW   ', 1, ' ')
+      if (history_verbose) then
+         call add_default ('ADRAIN   ', 1, ' ')
+         call add_default ('ADSNOW   ', 1, ' ')
+      endif
       call add_default ('AREI     ', 1, ' ')
       call add_default ('AREL     ', 1, ' ')
       call add_default ('AWNC     ', 1, ' ')
@@ -1132,6 +1155,9 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    use physics_buffer,  only: pbuf_col_type_index
    use subcol,          only: subcol_field_avg
    use glb_verif_smry,  only: tp_stat_smry
+
+   use output_aerocom_aie, only: do_aerocom_ind3
+
 
    type(physics_state),         intent(in)    :: state
    type(physics_ptend),         intent(out)   :: ptend
@@ -1638,6 +1664,9 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
 
    real(r8), pointer :: pckdptr(:,:)
 
+   integer :: autocl_idx, accretl_idx  ! Aerocom IND3
+   integer :: cldliqbf_idx, cldicebf_idx, numliqbf_idx, numicebf_idx
+
    !-------------------------------------------------------------------------------
 
    call t_startf('micro_mg_cam_tend_init')
@@ -1825,6 +1854,19 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    alst_mic => ast
    aist_mic => ast
 
+   if(do_aerocom_ind3) then  
+     cldliqbf_idx    = pbuf_get_index('cldliqbf')
+     cldicebf_idx    = pbuf_get_index('cldicebf')
+     numliqbf_idx    = pbuf_get_index('numliqbf')
+     numicebf_idx    = pbuf_get_index('numicebf')
+
+     call pbuf_set_field(pbuf, cldliqbf_idx, state%q(:, :, ixcldliq))
+     call pbuf_set_field(pbuf, cldicebf_idx, state%q(:, :, ixcldice))
+     call pbuf_set_field(pbuf, numliqbf_idx, state%q(:, :, ixnumliq))
+     call pbuf_set_field(pbuf, numicebf_idx, state%q(:, :, ixnumice))
+   end if
+
+
    ! Output initial in-cloud LWP (before microphysics)
 
    iclwpi = 0._r8
@@ -1862,7 +1904,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
 
    ! the name 'cldwat' triggers special tests on cldliq
    ! and cldice in physics_update
-   call physics_ptend_init(ptend, psetcols, "cldwat", ls=.true., lq=lq)
+   call physics_ptend_init(ptend, psetcols, "cldwat_mic", ls=.true., lq=lq)
 
    select case (micro_mg_version)
    case (1)
@@ -2334,7 +2376,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
       call physics_ptend_sum(ptend_loc, ptend, ncol)
 
       ! Update local state
-      call physics_update(state_loc, ptend_loc, dtime/num_steps, chunk_smry=chunk_smry)
+      call physics_update(state_loc, ptend_loc, dtime/num_steps) !, chunk_smry=chunk_smry)
 
       ! Sum all outputs for averaging.
       call post_proc%accumulate()
@@ -2421,8 +2463,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    !! hard-coded as average of hard-coded values used for deep/shallow convective detrainment (near line 1502/1505)
    ! this needs to be replaced by clubb_liq_deep and clubb_ice+deep accordingly
 
-   cvreffliq(:ncol,top_lev:pver) = 9.0_r8
-   cvreffice(:ncol,top_lev:pver) = 37.0_r8
+   cvreffliq(:ncol,:pver) = 9.0_r8
+   cvreffice(:ncol,:pver) = 37.0_r8
 
    ! Reassign rate1 if modal aerosols
    if (rate1_cw2pr_st_idx > 0) then
@@ -2882,8 +2924,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
       end do
    end do
 
-   mgreffrain_grid(:ngrdcol,top_lev:pver) = reff_rain_grid(:ngrdcol,top_lev:pver)
-   mgreffsnow_grid(:ngrdcol,top_lev:pver) = reff_snow_grid(:ngrdcol,top_lev:pver)
+   mgreffrain_grid(:ngrdcol,:pver) = reff_rain_grid(:ngrdcol,:pver)
+   mgreffsnow_grid(:ngrdcol,:pver) = reff_snow_grid(:ngrdcol,:pver)
 
    ! ------------------------------------- !
    ! Precipitation efficiency Calculation  !
@@ -2986,6 +3028,18 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    end where
 
    racau_grid = min(racau_grid, 1.e10_r8)
+
+   if(do_aerocom_ind3) then
+     autocl_idx = pbuf_get_index('autocl')
+     accretl_idx = pbuf_get_index('accretl')
+!     call pbuf_set_field(pbuf, autocl_idx, prao)
+!     call pbuf_set_field(pbuf, accretl_idx, prco)
+! VPRAO and VPRCO are incorreclty defined in CAM5.3
+! Here prco is autoconverion, and prao is accrection. 
+     call pbuf_set_field(pbuf, autocl_idx, prco_grid)
+     call pbuf_set_field(pbuf, accretl_idx, prao_grid)
+   end if
+
 
    ! --------------------- !
    ! History Output Fields !

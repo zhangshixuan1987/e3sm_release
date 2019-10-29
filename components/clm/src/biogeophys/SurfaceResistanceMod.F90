@@ -8,11 +8,12 @@ module SurfaceResistanceMod
   ! transported with BeTR. The surface here refers to water and soil, not including canopy
   !
   ! !USES:
-  use shr_kind_mod  , only: r8 => shr_kind_r8
-  use shr_const_mod , only: SHR_CONST_TKFRZ
-  use clm_varctl    , only: iulog
-  use SoilStateType , only: soilstate_type
-  use WaterStateType, only: waterstate_type 
+  use shr_kind_mod  , only : r8 => shr_kind_r8
+  use shr_const_mod , only : SHR_CONST_TKFRZ
+  use clm_varctl    , only : iulog
+  use SoilStateType , only : soilstate_type
+  use WaterStateType, only : waterstate_type
+  use ColumnDataType, only : col_ws  
   
   implicit none
   save
@@ -54,8 +55,8 @@ contains
      use shr_kind_mod  , only : r8 => shr_kind_r8     
      use shr_const_mod , only : SHR_CONST_PI  
      use decompMod     , only : bounds_type
-     use ColumnType    , only : col
-     use LandunitType  , only : lun
+     use ColumnType    , only : col_pp
+     use LandunitType  , only : lun_pp
      use abortutils    , only : endrun      
      !
      ! !ARGUMENTS:
@@ -103,8 +104,8 @@ contains
      use landunit_varcon , only : istice, istice_mec, istwet, istsoil, istcrop
      use column_varcon   , only : icol_roof, icol_sunwall, icol_shadewall
      use column_varcon   , only : icol_road_imperv, icol_road_perv
-     use ColumnType      , only : col
-     use LandunitType    , only : lun
+     use ColumnType      , only : col_pp
+     use LandunitType    , only : lun_pp
      use clm_varctl      , only : use_vsfm
      !
      implicit none
@@ -126,21 +127,21 @@ contains
           watfc       =>    soilstate_vars%watfc_col       , & ! Input:  [real(r8) (:,:)] volumetric soil water at field capacity
           watmin      =>    soilstate_vars%watmin_col      , & ! Input:  [real(r8) (:,:)] min volumetric soil water
           sucmin      =>    soilstate_vars%sucmin_col      , & ! Input:  [real(r8) (:,:)] min volumetric soil water
-          soilp_col   =>    waterstate_vars%soilp_col      , & ! Input:  [real(r8) (:,:)] soil water pressure (Pa)
+          soilp_col   =>    col_ws%soilp      , & ! Input:  [real(r8) (:,:)] soil water pressure (Pa)
           
-          h2osoi_ice  =>    waterstate_vars%h2osoi_ice_col , & ! Input:  [real(r8) (:,:)] ice lens (kg/m2)                       
-          h2osoi_liq  =>    waterstate_vars%h2osoi_liq_col , & ! Input:  [real(r8) (:,:)] liquid water (kg/m2)                   
-          frac_sno    =>    waterstate_vars%frac_sno_col   , & ! Input:  [real(r8) (:)] fraction of ground covered by snow (0 to 1)
-          frac_h2osfc =>    waterstate_vars%frac_h2osfc_col  & ! Input:  [real(r8) (:)]  fraction of ground covered by surface water (0 to 1)
+          h2osoi_ice  =>    col_ws%h2osoi_ice , & ! Input:  [real(r8) (:,:)] ice lens (kg/m2)                       
+          h2osoi_liq  =>    col_ws%h2osoi_liq , & ! Input:  [real(r8) (:,:)] liquid water (kg/m2)                   
+          frac_sno    =>    col_ws%frac_sno   , & ! Input:  [real(r8) (:)] fraction of ground covered by snow (0 to 1)
+          frac_h2osfc =>    col_ws%frac_h2osfc  & ! Input:  [real(r8) (:)]  fraction of ground covered by surface water (0 to 1)
           )
 
        do fc = 1,num_nolakec
           c = filter_nolakec(fc)
-          l = col%landunit(c)   
-          if (lun%itype(l)/=istwet .AND. lun%itype(l)/=istice  &
-               .AND. lun%itype(l)/=istice_mec) then
-             if (lun%itype(l) == istsoil .or. lun%itype(l) == istcrop) then
-                wx   = (h2osoi_liq(c,1)/denh2o+h2osoi_ice(c,1)/denice)/col%dz(c,1)
+          l = col_pp%landunit(c)   
+          if (lun_pp%itype(l)/=istwet .AND. lun_pp%itype(l)/=istice  &
+               .AND. lun_pp%itype(l)/=istice_mec) then
+             if (lun_pp%itype(l) == istsoil .or. lun_pp%itype(l) == istcrop) then
+                wx   = (h2osoi_liq(c,1)/denh2o+h2osoi_ice(c,1)/denice)/col_pp%dz(c,1)
                 fac  = min(1._r8, wx/watsat(c,1))
                 fac  = max( fac, 0.01_r8 )
                 !! Lee and Pielke 1992 beta, added by K.Sakaguchi
@@ -154,15 +155,16 @@ contains
                 else   !when water content of ths top layer is more than that at F.C.
                    soilbeta(c) = 1._r8
                 end if
-                if ( use_vsfm .and. &
-                     ((wx < watmin(c,1)) .or. (soilp_col(c,1) < sucmin(c,1)))) then
-                   soilbeta(c) = 0._r8
+                if ( use_vsfm ) then 
+                   if ((wx < watmin(c,1)) .or. (soilp_col(c,1) < sucmin(c,1))) then
+                      soilbeta(c) = 0._r8
+                   end if
                 end if
-             else if (col%itype(c) == icol_road_perv) then
+             else if (col_pp%itype(c) == icol_road_perv) then
                 if (.not. use_vsfm) then
                    soilbeta(c) = 0._r8
                 else
-                   wx   = (h2osoi_liq(c,1)/denh2o+h2osoi_ice(c,1)/denice)/col%dz(c,1)
+                   wx   = (h2osoi_liq(c,1)/denh2o+h2osoi_ice(c,1)/denice)/col_pp%dz(c,1)
                    fac  = min(1._r8, wx/watsat(c,1))
                    fac  = max( fac, 0.01_r8 )
                    if (wx < watfc(c,1) ) then  !when water content of ths top layer is less than that at F.C.
@@ -180,9 +182,9 @@ contains
                       soilbeta(c) = 1._r8
                    end if
                 endif
-             else if (col%itype(c) == icol_sunwall .or. col%itype(c) == icol_shadewall) then
+             else if (col_pp%itype(c) == icol_sunwall .or. col_pp%itype(c) == icol_shadewall) then
                 soilbeta(c) = 0._r8          
-             else if (col%itype(c) == icol_roof .or. col%itype(c) == icol_road_imperv) then
+             else if (col_pp%itype(c) == icol_roof .or. col_pp%itype(c) == icol_road_imperv) then
                 soilbeta(c) = 0._r8
              endif
           else

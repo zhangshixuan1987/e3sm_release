@@ -173,6 +173,11 @@ contains
     character(len=*),parameter :: subname='ncd_pio_openfile' ! subroutine name
     !-----------------------------------------------------------------------
 
+    if (masterproc) then
+       write(iulog,*) trim(subname),' opening ', trim(fname), file%fh
+       call shr_sys_flush(iulog)
+    endif
+
     ierr = pio_openfile(pio_subsystem, file, io_type, fname, mode)
 
     if(ierr/= PIO_NOERR) then
@@ -723,8 +728,8 @@ contains
        lxtype = xtype
     end if
     if (masterproc .and. debug > 1) then
-       write(iulog,*) 'Error in defining variable = ', trim(varname)
-       write(iulog,*) subname//' ',trim(varname),lxtype,ndims,ldimid(1:ndims)
+       write(iulog,*) trim(subname),' Defining variable = ', trim(varname)
+       write(iulog,*) trim(subname),' ',trim(varname),lxtype,ndims,ldimid(1:ndims)
     endif
 
     if (ndims >  0) then 
@@ -1087,6 +1092,8 @@ contains
 
     elseif (flag == 'write') then
 
+       start = 0
+       count = 0
        if (present(nt))      then
           start(1) = 1
           count(1) = size(data)
@@ -1095,8 +1102,6 @@ contains
        else
           start(1) = 1
           count(1) = size(data)
-          start(2) = 1
-          count(2) = 1
        end if
        call ncd_inqvid  (ncid, varname, varid, vardesc)
        status = pio_put_var(ncid, varid, start, count, data)
@@ -1148,6 +1153,8 @@ contains
 
     elseif (flag == 'write') then
 
+       start = 0
+       count = 0
        if (present(nt))      then
           start(1) = 1
           count(1) = size(data)
@@ -1156,8 +1163,6 @@ contains
        else
           start(1) = 1
           count(1) = size(data)
-          start(2) = 1
-          count(2) = 1
        end if
        call ncd_inqvid  (ncid, varname, varid, vardesc)
        allocate( idata(size(data)) ) 
@@ -1209,6 +1214,8 @@ contains
 
     elseif (flag == 'write') then
 
+       start = 0
+       count = 0
        if (present(nt))      then
           start(1) = 1
           start(2) = nt
@@ -1216,9 +1223,7 @@ contains
           count(2) = 1
        else
           start(1) = 1
-          start(2) = 1
           count(1) = size(data)
-          count(2) = 1
        end if
        call ncd_inqvid  (ncid, varname, varid, vardesc)
        status = pio_put_var(ncid, varid, start, count, data)
@@ -1325,6 +1330,8 @@ contains
 
     elseif (flag == 'write') then
 
+       start = 0
+       count = 0
        if (present(nt))      then
           start(1) = 1
           start(2) = 1
@@ -1335,10 +1342,8 @@ contains
        else
           start(1) = 1
           start(2) = 1
-          start(3) = 1
           count(1) = size(data, dim=1)
           count(2) = size(data, dim=2)
-          count(3) = 1
        end if
        call ncd_inqvid(ncid, varname, varid, vardesc)
        status = pio_put_var(ncid, varid, start, count, data)
@@ -1384,6 +1389,8 @@ contains
 
     elseif (flag == 'write') then
 
+       start = 0
+       count = 0
        if (present(nt))      then
           start(1) = 1
           start(2) = 1
@@ -1394,10 +1401,8 @@ contains
        else
           start(1) = 1
           start(2) = 1
-          start(3) = 1
           count(1) = size(data, dim=1)
           count(2) = size(data, dim=2)
-          count(3) = 1
        end if
        call ncd_inqvid  (ncid, varname, varid, vardesc)
        status = pio_put_var(ncid, varid, start, count, data)

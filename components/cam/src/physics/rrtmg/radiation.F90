@@ -15,7 +15,7 @@ module radiation
 !---------------------------------------------------------------------------------
 
 use shr_kind_mod,    only: r8=>shr_kind_r8
-use spmd_utils,      only: masterproc
+use spmd_utils,      only: masterproc, iam, npes
 use ppgrid,          only: pcols, pver, pverp, begchunk, endchunk
 use physics_types,   only: physics_state, physics_ptend
 use physconst,       only: cappa
@@ -38,17 +38,17 @@ save
 
 public :: &
    radiation_register,    &! registers radiation physics buffer fields
-   radiation_defaultopts, &! set default values of namelist variables in runtime_opts
-   radiation_setopts,     &! set namelist values from runtime_opts
-   radiation_printopts,   &! print namelist values to log
-   radiation_get,         &! provide read access to private module data
    radiation_nextsw_cday, &! calendar day of next radiation calculation
    radiation_do,          &! query which radiation calcs are done this timestep
    radiation_init,        &! calls radini
+   radiation_readnl,      &! read radiation namelist
    radiation_tend          ! moved from radctl.F90
 
 integer,public, allocatable :: cosp_cnt(:)       ! counter for cosp
 integer,public              :: cosp_cnt_init = 0 !initial value for cosp counter
+
+integer, public, parameter   :: kiss_seed_num = 4
+integer, public, allocatable :: rad_randn_seedrst(:,:,:), tot_chnk_till_this_prc(:) !total number of chunks till this processor
 
 ! Private module data
 integer :: qrs_idx      = 0 
@@ -84,10 +84,83 @@ logical :: dohirs = .false. ! diagnostic  brightness temperatures at the top of 
                             ! channels (1,2,3,4).
 integer :: ihirsfq = 1      ! frequency (timesteps) of brightness temperature calcs
 
+integer, allocatable :: clm_rand_seed(:,:,:)
+
 real(r8) :: dt_avg=0.0_r8  ! time step to use for the shr_orb_cosz calculation, if use_rad_dt_cosz set to true !BSINGH - Added for solar insolation calc.
+
+logical :: pergro_mods = .false. ! for activating pergro mods
+integer :: firstblock, lastblock      ! global block indices
+
 !===============================================================================
 contains
 !===============================================================================
+
+subroutine radiation_readnl(nlfile, dtime_in)
+!-------------------------------------------------------------------------------
+! Purpose: Read radiation_nl namelist group.
+!-------------------------------------------------------------------------------
+
+   use namelist_utils,  only: find_group_name
+   use units,           only: getunit, freeunit
+   use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_integer, mpi_logical, &
+                              mpi_character, masterproc
+   use time_manager,    only: get_step_size
+
+   ! File containing namelist input
+   character(len=*), intent(in) :: nlfile
+   integer, intent(in), optional :: dtime_in
+
+   ! Local variables
+   integer :: unitn, ierr
+   integer :: dtime  ! timestep size
+   character(len=*), parameter :: subroutine_name = 'radiation_readnl'
+
+   ! Variables defined in namelist
+   namelist /radiation_nl/ iradsw, iradlw, irad_always, &
+                           use_rad_dt_cosz, spectralflux
+
+   ! Read the namelist, only if called from master process
+   ! TODO: better documentation and cleaner logic here?
+   if (masterproc) then
+      unitn = getunit()
+      open(unitn, file=trim(nlfile), status='old')
+      call find_group_name(unitn, 'radiation_nl', status=ierr)
+      if (ierr == 0) then
+         read(unitn, radiation_nl, iostat=ierr)
+         if (ierr /= 0) then
+            call endrun(subroutine_name // ':: ERROR reading namelist')
+         end if
+      end if
+      close(unitn)
+      call freeunit(unitn)
+   end if
+
+#ifdef SPMD
+   ! Broadcast namelist variables
+   call mpibcast(iradsw, 1, mpi_integer, mstrid, mpicom, ierr)
+   call mpibcast(iradlw, 1, mpi_integer, mstrid, mpicom, ierr)
+   call mpibcast(irad_always, 1, mpi_integer, mstrid, mpicom, ierr)
+   call mpibcast(use_rad_dt_cosz, 1, mpi_logical, mstrid, mpicom, ierr)
+   call mpibcast(spectralflux, 1, mpi_logical, mstrid, mpicom, ierr)
+#endif
+
+   ! Convert iradsw, iradlw and irad_always from hours to timesteps if necessary
+   if (present(dtime_in)) then
+      dtime = dtime_in
+   else
+      dtime  = get_step_size()
+   end if
+   if (iradsw      < 0) iradsw      = nint((-iradsw     *3600._r8)/dtime)
+   if (iradlw      < 0) iradlw      = nint((-iradlw     *3600._r8)/dtime)
+   if (irad_always < 0) irad_always = nint((-irad_always*3600._r8)/dtime)
+
+   ! Print runtime options to log.
+   if (masterproc) then
+      call radiation_printopts()
+   end if
+
+end subroutine radiation_readnl
+
 
   subroutine radiation_register
 !-----------------------------------------------------------------------
@@ -303,13 +376,14 @@ end function radiation_nextsw_cday
 
 !================================================================================================
 
-  subroutine radiation_init()
+  subroutine radiation_init(phys_state)
 !-----------------------------------------------------------------------
 !
 ! Initialize the radiation parameterization, add fields to the history buffer
 ! 
 !-----------------------------------------------------------------------
     use physics_buffer, only: pbuf_get_index
+    use phys_grid,      only: npchunks, get_ncols_p, chunks, knuhcs, ngcols, dyn_to_latlon_gcol_map
     use cam_history,    only: addfld, horiz_only, add_default
     use constituents,   only: cnst_get_ind
     use physconst,      only: gravit, stebol, &
@@ -325,7 +399,12 @@ end function radiation_nextsw_cday
     use modal_aer_opt, only: modal_aer_opt_init
     use rrtmg_state,   only: rrtmg_state_init
     use time_manager,   only: get_step_size
+    use dyn_grid,       only: get_block_bounds_d
+#ifdef SPMD
+    use mpishorthand,   only: mpi_integer, mpicom, mpi_comm_world
+#endif
 
+    type(physics_state), intent(in) :: phys_state(begchunk:endchunk)
 
     integer :: icall, nmodes
     logical :: active_calls(0:N_DIAG)
@@ -339,6 +418,13 @@ end function radiation_nextsw_cday
     integer :: err
 
     integer :: dtime
+
+    !variables for pergro_mods
+    character (len=250) :: errstr
+    integer, allocatable, dimension(:,:,:) :: clm_id_mstr
+    integer, allocatable, dimension(:,:) :: clm_id
+    integer :: id, lchnk, ncol, ilchnk, astat, iseed, ipes, ipes_tmp
+    integer :: igcol, chunkid, icol, iown, tot_cols, ierr, max_chnks_in_blk 
     !-----------------------------------------------------------------------
     
     call rrtmg_state_init()
@@ -358,7 +444,8 @@ end function radiation_nextsw_cday
     call phys_getopts(history_amwg_out   = history_amwg,    &
                       history_vdiag_out  = history_vdiag,   &
                       history_budget_out = history_budget,  &
-                      history_budget_histfile_num_out = history_budget_histfile_num)
+                      history_budget_histfile_num_out = history_budget_histfile_num, &
+                      pergro_mods_out    = pergro_mods)
 
     ! Determine whether modal aerosols are affecting the climate, and if so
     ! then initialize the modal aerosol optics module
@@ -381,10 +468,118 @@ end function radiation_nextsw_cday
 
     
     allocate(cosp_cnt(begchunk:endchunk))
+
+    !Modification needed by pergro_mods for generating random numbers
+    if (pergro_mods) then
+       max_chnks_in_blk = maxval(npchunks(:))  !maximum of the number for chunks in each procs
+       allocate(clm_rand_seed(pcols,kiss_seed_num,max_chnks_in_blk), stat=astat)
+       if( astat /= 0 ) then
+          write(iulog,*) 'radiation.F90(rrtmg)-radiation_init: failed to allocate clm_rand_seed; error = ',astat
+          call endrun
+       end if
+
+       allocate(tot_chnk_till_this_prc(0:npes-1), stat=astat )
+       if( astat /= 0 ) then
+          write(errstr,*) 'radiation.F90(rrtmg)-radiation_init: failed to allocate tot_chnk_till_this_prc variable; error = ',astat
+          call endrun (errstr)
+       end if
+       
+       !BSINGH - Build lat lon relationship to chunk and column
+       !Compute maximum number of chunks each processor have
+       if(masterproc) then
+          tot_chnk_till_this_prc(0:npes-1) = huge(1)
+          do ipes = 0, npes - 1
+             tot_chnk_till_this_prc(ipes) = 0
+             do ipes_tmp = 0, ipes-1
+                tot_chnk_till_this_prc(ipes) = tot_chnk_till_this_prc(ipes) + npchunks(ipes_tmp)
+             enddo
+          enddo
+       endif
+#ifdef SPMD
+       !BSINGH - Ideally we should use mpi_scatter but we are using this variable
+       !in "if(masterproc)" below in phys_run1, so broadcast is iused here
+       call mpibcast(tot_chnk_till_this_prc,npes, mpi_integer, 0, mpicom)
+#endif
+       call get_block_bounds_d(firstblock,lastblock)
+       
+       allocate(clm_id(pcols,max_chnks_in_blk), stat=astat)
+       if( astat /= 0 ) then
+          write(errstr,*) 'radiation.F90(rrtmg)-radiation_init: failed to allocate clm_id; error = ',astat
+          call endrun(errstr)
+       end if
+       
+       allocate(clm_id_mstr(pcols,max_chnks_in_blk,npes), stat=astat)
+       if( astat /= 0 ) then
+          write(errstr,*) 'radiation.F90(rrtmg)-radiation_init: failed to allocate clm_id_mstr; error = ',astat
+          call endrun(errstr)
+       end if
+       !compute all clm ids on masterproc and then scatter it ....
+       if(masterproc) then
+          do igcol = 1, ngcols
+             if (dyn_to_latlon_gcol_map(igcol) .ne. -1) then                
+                chunkid  = knuhcs(igcol)%chunkid
+                icol = knuhcs(igcol)%col
+                iown  = chunks(chunkid)%owner
+                ilchnk = (chunks(chunkid)%lcid - lastblock) - tot_chnk_till_this_prc(iown)
+                clm_id_mstr(icol,ilchnk,iown+1) = igcol
+             endif
+          enddo
+       endif
+       
+#ifdef SPMD
+       !Scatter
+       tot_cols = pcols*max_chnks_in_blk
+       call MPI_Scatter( clm_id_mstr, tot_cols,  mpi_integer, &
+            clm_id,    tot_cols,  mpi_integer, 0,             &
+            mpicom,ierr)
+#else
+       !BSINGH - Haven't tested it.....               
+       call endrun('radiation.F90(rrtmg)-radiation_init: non-mpi compiles are not tested yet for pergro test...')
+#endif       
+    endif
+       
     if (is_first_restart_step()) then
-      cosp_cnt(begchunk:endchunk)=cosp_cnt_init
+       cosp_cnt(begchunk:endchunk)=cosp_cnt_init
+       if (pergro_mods) then
+          !--------------------------------------
+          !Read seeds from restart file
+          !--------------------------------------
+          !For restart runs, rad_randn_seedrst array  will already be allocated in the restart_physics.F90
+          
+          do ilchnk = 1, max_chnks_in_blk
+             lchnk = begchunk + (ilchnk -1)
+             ncol = phys_state(lchnk)%ncol
+             do iseed = 1, kiss_seed_num
+                do icol = 1, ncol                
+                   clm_rand_seed(icol,iseed,ilchnk) = rad_randn_seedrst(icol,iseed,lchnk)
+                enddo
+             enddo
+          enddo
+       endif
     else
-      cosp_cnt(begchunk:endchunk)=0     
+       cosp_cnt(begchunk:endchunk)=0           
+       if (pergro_mods) then
+          !---------------------------------------
+          !create seeds based off of column ids
+          !---------------------------------------
+          !allocate array rad_randn_seedrst for initial run for  maintaining exact restarts
+          !For restart runs, it will already be allocated in the restart_physics.F90
+          allocate(rad_randn_seedrst(pcols,kiss_seed_num,begchunk:endchunk), stat=astat)
+          if( astat /= 0 ) then
+             write(iulog,*) 'radiation.F90(rrtmg)-radiation_init: failed to allocate rad_randn_seedrst; error = ',astat
+             call endrun
+          end if
+          do ilchnk = 1, max_chnks_in_blk
+             lchnk = begchunk + (ilchnk -1)
+             ncol = phys_state(lchnk)%ncol
+             do iseed = 1, kiss_seed_num
+                do icol = 1, ncol
+                   id = clm_id(icol,ilchnk)
+                   clm_rand_seed(icol,iseed,ilchnk) = id + (iseed -1)
+                enddo
+             enddo
+          enddo
+       endif
     end if
 
 
@@ -428,6 +623,8 @@ end function radiation_nextsw_cday
                                                                                  sampling_seq='rad_lwsw')
           call addfld('FSNTOAC'//diag(icall),  horiz_only,     'A', 'W/m2', 'Clearsky net solar flux at top of atmosphere', &
                                                                                  sampling_seq='rad_lwsw')
+          call addfld('FSUTOAC'//diag(icall),  horiz_only,     'A',  'W/m2', 'Clearsky upwelling solar flux at top of atmosphere', &
+                                                                                 sampling_seq='rad_lwsw')
           call addfld('FSN200'//diag(icall),  horiz_only,     'A',  'W/m2', 'Net shortwave flux at 200 mb', &
                                                                                  sampling_seq='rad_lwsw')
           call addfld('FSN200C'//diag(icall),  horiz_only,     'A', 'W/m2', 'Clearsky net shortwave flux at 200 mb', &
@@ -460,6 +657,7 @@ end function radiation_nextsw_cday
              call add_default('FSNTOA'//diag(icall),  1, ' ')
              call add_default('FSUTOA'//diag(icall),  1, ' ')
              call add_default('FSNTOAC'//diag(icall), 1, ' ')
+             call add_default('FSUTOAC'//diag(icall), 1, ' ')
              call add_default('FSNTC'//diag(icall),   1, ' ')
              call add_default('FSNSC'//diag(icall),   1, ' ')
              call add_default('FSDSC'//diag(icall),   1, ' ')
@@ -595,7 +793,7 @@ end function radiation_nextsw_cday
        cam_out, cam_in, &
        landfrac,landm,icefrac,snowh, &
        fsns,    fsnt, flns,    flnt,  &
-       fsds, net_flx)
+       fsds, net_flx, is_cmip6_volc)
 
     !----------------------------------------------------------------------- 
     ! 
@@ -616,7 +814,7 @@ end function radiation_nextsw_cday
     !-----------------------------------------------------------------------
 
 
-    use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
+    use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx, pbuf_get_index, pbuf_set_field
     
     use phys_grid,       only: get_rlat_all_p, get_rlon_all_p
     use physics_types,   only: physics_state, physics_ptend
@@ -648,8 +846,10 @@ end function radiation_nextsw_cday
     use radiation_data,   only: output_rad_data
     use rrtmg_state, only: rrtmg_state_create, rrtmg_state_update, rrtmg_state_destroy, rrtmg_state_t, num_rrtmg_levs
     use orbit,            only: zenith
+    use output_aerocom_aie , only: do_aerocom_ind3
 
     ! Arguments
+    logical,  intent(in)    :: is_cmip6_volc    ! true if cmip6 style volcanic file is read otherwise false 
     real(r8), intent(in)    :: landfrac(pcols)  ! land fraction
     real(r8), intent(in)    :: landm(pcols)     ! land fraction ramp
     real(r8), intent(in)    :: icefrac(pcols)   ! land fraction
@@ -755,12 +955,14 @@ end function radiation_nextsw_cday
     logical  :: conserve_energy = .true.       ! flag to carry (QRS,QRL)*dp across time steps
 
     ! Local variables from radctl
-    integer i, k                  ! index
+    integer :: i, k, iseed, ilchnk                  ! index
     integer :: istat
+    integer :: clm_seed (pcols,kiss_seed_num)
     real(r8) solin(pcols)         ! Solar incident flux
     real(r8) fsntoa(pcols)        ! Net solar flux at TOA
     real(r8) fsutoa(pcols)        ! Upwelling solar flux at TOA
     real(r8) fsntoac(pcols)       ! Clear sky net solar flux at TOA
+    real(r8) fsutoac(pcols)       ! Clear sky upwelling solar flux at TOA
     real(r8) fsnirt(pcols)        ! Near-IR flux absorbed at toa
     real(r8) fsnrtc(pcols)        ! Clear sky near-IR flux absorbed at toa
     real(r8) fsnirtsq(pcols)      ! Near-IR flux absorbed at toa >= 0.7 microns
@@ -821,6 +1023,14 @@ end function radiation_nextsw_cday
 
     type(rrtmg_state_t), pointer :: r_state ! contains the atm concentratiosn in layers needed for RRTMG
 
+! AeroCOM IND3 output +++mhwang
+    real(r8) ::  aod400(pcols)        ! AOD at 400 nm 
+    real(r8) ::  aod700(pcols)        ! AOD at 700 nm
+    real(r8) ::  angstrm(pcols)       ! Angstrom coefficient
+    real(r8) ::  aerindex(pcols)      ! Aerosol index
+    integer aod400_idx, aod700_idx, cld_tau_idx
+
+
     character(*), parameter :: name = 'radiation_tend'
 !----------------------------------------------------------------------
 
@@ -828,6 +1038,14 @@ end function radiation_nextsw_cday
 
     lchnk = state%lchnk
     ncol = state%ncol
+    
+    if(pergro_mods) then
+       ilchnk = (lchnk - lastblock) - tot_chnk_till_this_prc(iam)
+       clm_seed(1:pcols,1:kiss_seed_num) = clm_rand_seed (1:pcols,1:kiss_seed_num,ilchnk)       
+    else
+       !for default simulation, clm_seed should never be used, assign it a value which breaks the simulation if used.
+       clm_seed(1:pcols,1:kiss_seed_num) = huge(1)
+    endif
 
     calday = get_curr_calday()
 
@@ -848,7 +1066,11 @@ end function radiation_nextsw_cday
       call pbuf_get_field(pbuf, lu_idx, lu)
       call pbuf_get_field(pbuf, ld_idx, ld)
     end if
-    
+ 
+    if (do_aerocom_ind3) then
+      cld_tau_idx = pbuf_get_index('cld_tau')
+    end if
+   
 !  For CRM, make cloud equal to input observations:
     if (single_column.and.scm_crm_mode.and.have_cld) then
        do k = 1,pver
@@ -962,6 +1184,11 @@ end function radiation_nextsw_cday
              c_cld_tau_w_g(1:nbndsw,1:ncol,:)= cld_tau_w_g(:,1:ncol,:)
              c_cld_tau_w_f(1:nbndsw,1:ncol,:)= cld_tau_w_f(:,1:ncol,:)
           endif
+
+          if(do_aerocom_ind3) then
+             call pbuf_set_field(pbuf,cld_tau_idx,cld_tau(rrtmg_sw_cloudsim_band, :, :))                   
+          end if
+
        endif
 
        if (dolw) then
@@ -1049,7 +1276,7 @@ end function radiation_nextsw_cday
                   ! update the concentrations in the RRTMG state object
                   call  rrtmg_state_update( state, pbuf, icall, r_state )
 
-                  call aer_rad_props_sw( icall, state, pbuf, nnite, idxnite, &
+                  call aer_rad_props_sw( icall, state, pbuf, nnite, idxnite, is_cmip6_volc, &
                                          aer_tau, aer_tau_w, aer_tau_w_g, aer_tau_w_f)
 
                   call t_startf ('rad_rrtmg_sw')
@@ -1063,7 +1290,7 @@ end function radiation_nextsw_cday
                        fsntoac,      fsnirt,       fsnrtc,       fsnirtsq,     fsns,           &
                        fsnsc,        fsdsc,        fsds,         cam_out%sols, cam_out%soll,   &
                        cam_out%solsd,cam_out%solld,fns,          fcns,                         &
-                       Nday,         Nnite,        IdxDay,       IdxNite,                      &
+                       Nday,         Nnite,        IdxDay,       IdxNite,      clm_seed,       &
                        su,           sd,                                                       &
                        E_cld_tau=c_cld_tau, E_cld_tau_w=c_cld_tau_w, E_cld_tau_w_g=c_cld_tau_w_g, E_cld_tau_w_f=c_cld_tau_w_f, &
                        old_convert = .false.)
@@ -1075,7 +1302,43 @@ end function radiation_nextsw_cday
 
                   do i=1,ncol
                      swcf(i)=fsntoa(i) - fsntoac(i)
+                     fsutoac(i) = solin(i) - fsntoac(i)
                   end do
+
+                  if(do_aerocom_ind3) then
+                    aerindex = 0.0
+                    angstrm = 0.0
+                    aod400 = 0.0
+                    aod700 = 0.0
+                    do i=1, ncol
+                       aod400(i) = sum(aer_tau(i, :, idx_sw_diag+1))
+                       aod700(i) = sum(aer_tau(i, :, idx_sw_diag-1))
+                       if(aod400(i).lt.1.0e4 .and. aod700(i).lt.1.e4  .and. &
+                          aod400(i).gt.1.0e-10 .and. aod700(i).gt.1.0e-10) then
+                          angstrm(i) = (log (aod400(i))-log(aod700(i)))/(log(0.700)-log(0.400))                               
+                       else
+                          angstrm(i) = fillvalue
+                       end if
+                       if(angstrm(i).ne.fillvalue) then 
+                          aerindex(i) = angstrm(i)*sum(aer_tau(i,:,idx_sw_diag))
+                       else 
+                          aerindex(i) = fillvalue
+                       end if
+                    end do 
+                    do i = 1, nnite
+                       angstrm(idxnite(i)) = fillvalue
+                       aod400(idxnite(i)) = fillvalue
+                       aod700(idxnite(i)) = fillvalue
+                       aerindex(idxnite(i)) = fillvalue
+                    end do
+                    if(icall.eq.0) then ! only for climatology run
+                       call outfld('angstrm', angstrm, pcols, lchnk)
+                       call outfld('aod400', aod400, pcols, lchnk)
+                       call outfld('aod700', aod700, pcols, lchnk)
+                       call outfld('aerindex', aerindex, pcols, lchnk)
+                    end if
+                  end if
+
                   ! Dump shortwave radiation information to history tape buffer (diagnostics)
                   ftem(:ncol,:pver) = qrs(:ncol,:pver)/cpair
                   call outfld('QRS'//diag(icall),ftem  ,pcols,lchnk)
@@ -1094,6 +1357,7 @@ end function radiation_nextsw_cday
                   call outfld('FSNTOA'//diag(icall),fsntoa,pcols,lchnk)
                   call outfld('FSUTOA'//diag(icall),fsutoa,pcols,lchnk)
                   call outfld('FSNTOAC'//diag(icall),fsntoac,pcols,lchnk)
+                  call outfld('FSUTOAC'//diag(icall),fsutoac,pcols,lchnk)
                   call outfld('SOLS'//diag(icall),cam_out%sols  ,pcols,lchnk)
                   call outfld('SOLL'//diag(icall),cam_out%soll  ,pcols,lchnk)
                   call outfld('SOLSD'//diag(icall),cam_out%solsd ,pcols,lchnk)
@@ -1165,7 +1429,7 @@ end function radiation_nextsw_cday
                   ! update the conctrations in the RRTMG state object
                   call  rrtmg_state_update( state, pbuf, icall, r_state)
 
-                  call aer_rad_props_lw(icall, state, pbuf,  aer_lw_abs)
+                  call aer_rad_props_lw(is_cmip6_volc, icall, state, pbuf,  aer_lw_abs)
                   
                   call t_startf ('rad_rrtmg_lw')
                   call rad_rrtmg_lw( &
@@ -1173,8 +1437,8 @@ end function radiation_nextsw_cday
                        state%pmid,   aer_lw_abs,   cldfprime,       c_cld_lw_abs,                &
                        qrl,          qrlc,                                                       &
                        flns,         flnt,         flnsc,           flntc,        cam_out%flwds, &
-                       flut,         flutc,        fnl,             fcnl,         fldsc, &
-                       lu,           ld)
+                       flut,         flutc,        fnl,             fcnl,         fldsc,         &
+                       clm_seed,     lu,           ld                                            )
                   call t_stopf ('rad_rrtmg_lw')
 
                   if (lwrad_off) then
@@ -1361,6 +1625,14 @@ end function radiation_nextsw_cday
     end if
  
     cam_out%netsw(:ncol) = fsns(:ncol)
+    if (pergro_mods) then
+       !write kissvec seeds for random numbers
+       do iseed = 1, kiss_seed_num    
+          do i = 1, ncol          
+             rad_randn_seedrst(i,iseed,lchnk) = clm_seed(i,iseed)
+          enddo
+       enddo
+    endif
 
  end subroutine radiation_tend
 

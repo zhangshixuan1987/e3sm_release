@@ -32,7 +32,7 @@ module interpolate_mod
 #endif
   use cube_mod,               only : convert_gbl_index, dmap, ref2sphere
   use mesh_mod,               only : MeshUseMeshFile
-  use control_mod,            only : cubed_sphere_map
+  use control_mod,            only : cubed_sphere_map, interp_lon0
 
   implicit none
   private
@@ -1052,13 +1052,14 @@ contains
     type (cartesian2D_t), intent(out)     :: cart
     integer             , intent(out)     :: number
 
-    integer               :: ii
+    integer               :: ii, globalid, maxglobalid
     Logical               :: found
     type (cartesian3D_t)       :: sphere_xyz
     type (cartesian2D_t)  :: cube
     sphere_xyz=spherical_to_cart(sphere)
 
     number=-1
+    maxglobalid = number
 !    print *,'WARNING: using GC map'
     do ii = 1,nelemd
        ! for equiangular gnomonic map:
@@ -1071,10 +1072,15 @@ contains
        endif
 
        if (found) then
-          number = ii
-          cart = parametric_coordinates(sphere, elem(ii)%corners3D,&
-               cubed_sphere_map,elem(ii)%corners,elem(ii)%cartp,elem(ii)%facenum)
-          exit
+          !get current global id
+          globalid = elem(ii)%vertex%number
+          !if current global id > the previous one, re-assign
+          if ( globalid > maxglobalid ) then
+             maxglobalid = globalid
+             number = ii
+             cart = parametric_coordinates(sphere, elem(ii)%corners3D,&
+                  cubed_sphere_map,elem(ii)%corners,elem(ii)%cartp,elem(ii)%facenum)
+          endif
        end if
     end do
   end subroutine cube_facepoint_unstructured
@@ -1155,7 +1161,7 @@ contains
     call interp_init()
     gweight=0
     do i=1,nlon
-       lon(i)=2*dd_pi*(i-1)/nlon
+       lon(i)= dd_pi*interp_lon0/180 + 2*dd_pi*(i-1)/nlon
     enddo
     if (gridtype==1) then
        do j=1,nlat
@@ -1679,21 +1685,6 @@ end subroutine interpolate_ce
        call abortmp("Error in interpolate_vector3d(): wrong interpolation type")
     endif
 
-
-    do i=1,interpdata%n_interp
-       ! compute D(:,:) at the point elem%interp_cube(i)
-       call dmap(D,interpdata%interp_xy(i)%x,interpdata%interp_xy(i)%y,&
-            elem%corners3D,cubed_sphere_map,elem%cartp,elem%facenum)
-       do k=1,nlev
-          ! convert fld from contra->latlon
-          v1 = fld(i,k,1)
-          v2 = fld(i,k,2)
-
-          fld(i,k,1)=D(1,1)*v1 + D(1,2)*v2
-          fld(i,k,2)=D(2,1)*v1 + D(2,2)*v2
-       end do
-    end do
-    
     do i=1,interpdata%n_interp
        ! convert from cart to lonlat: we need to recover matrix K, for that we
        ! need lon,lat at the interp. point.

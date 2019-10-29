@@ -8,9 +8,9 @@ contains
   subroutine init(elem, edge1,edge2,edge3,red,par, dom_mt)
     use kinds, only : real_kind, longdouble_kind
     ! --------------------------------
-    use thread_mod, only : nthreads, omp_set_num_threads
+    use thread_mod, only : nthreads, hthreads, omp_set_num_threads
     ! --------------------------------
-    use control_mod, only : restartfreq, topology, partmethod
+    use control_mod, only : restartfreq, topology, partmethod, cubed_sphere_map
     ! --------------------------------
     use namelist_mod, only : readnl
     ! --------------------------------
@@ -34,10 +34,10 @@ contains
                            MeshCubeEdgeCount
     ! --------------------------------
     use cube_mod, only : cube_init_atomic, set_corner_coordinates, &
-         assign_node_numbers_to_elem
+        set_area_correction_map2
 
     ! --------------------------------
-    use edge_mod, only : initedgebuffer
+    use edge_mod, only : initedgebuffer, edge_g
     use edgetype_mod, only : EdgeDescriptor_t, edgebuffer_t
     ! --------------------------------
     use reduction_mod, only : reductionbuffer_ordered_1d_t, red_min, red_flops, red_timer, &
@@ -72,12 +72,17 @@ contains
     ! --------------------------------
     use params_mod, only : SFCURVE
     ! ---------------------------------
-    use thread_mod, only : nThreadsHoriz, omp_get_num_threads
-    ! ---------------------------------
     use domain_mod, only: domain1d_t, decompose 
     ! ---------------------------------
     use perf_mod, only : t_startf, t_stopf ! _EXTERNAL
     ! --------------------------------
+    use repro_sum_mod, only: repro_sum, repro_sum_defaultopts, repro_sum_setopts
+    ! --------------------------------
+    use physical_constants, only : dd_pi
+    ! -------------------------------
+    use coordinate_systems_mod, only : sphere_tri_area
+    ! --------------------------------
+
 
     implicit none
 #ifdef _MPI
@@ -109,7 +114,6 @@ contains
     integer :: nlyr
     integer :: iMv
     integer :: nxyp, istartP
-    integer :: n_domains
     real(kind=real_kind) :: et,st
 
     real(kind=real_kind), allocatable       :: mass(:,:,:)
@@ -121,8 +125,9 @@ contains
     real(kind=real_kind) :: approx_elements_per_task, xtmp
     type (quadrature_t)   :: gp                     ! element GLL points
 
+    logical :: repro_sum_use_ddpdd, repro_sum_recompute
+    real(kind=real_kind) :: repro_sum_rel_diff_max
 
-    ! =====================================
     ! Read in model control information
     ! =====================================
     call t_startf('init')
@@ -251,6 +256,18 @@ contains
     deallocate(TailPartition)
     deallocate(HeadPartition)
 
+    call repro_sum_defaultopts(                           &
+         repro_sum_use_ddpdd_out=repro_sum_use_ddpdd,       &
+         repro_sum_rel_diff_max_out=repro_sum_rel_diff_max, &
+         repro_sum_recompute_out=repro_sum_recompute        )
+    call repro_sum_setopts(                              &
+         repro_sum_use_ddpdd_in=repro_sum_use_ddpdd,       &
+         repro_sum_rel_diff_max_in=repro_sum_rel_diff_max, &
+         repro_sum_recompute_in=repro_sum_recompute,       &
+         repro_sum_master=par%masterproc,                      &
+         repro_sum_logunit=6                           )
+    if(par%masterproc) print *, "Initialized repro_sum"
+
     ! initial 1D grids used to form tensor product element grids:
     gp=gausslobatto(np)
     if (topology=="cube") then
@@ -265,7 +282,7 @@ contains
           do ie=1,nelemd
              call set_corner_coordinates(elem(ie))
           enddo
-          call assign_node_numbers_to_elem(elem, GridVertex)
+          !call assign_node_numbers_to_elem(elem, GridVertex)
        endif
 
        do ie=1,nelemd
@@ -273,12 +290,20 @@ contains
        enddo
        if(par%masterproc) write(6,*)"...done."
     end if
+
+    ! This routine does not check whether gp is init-ed.
+    if(( cubed_sphere_map == 2 ).AND.( np > 2 )) then
+       call set_area_correction_map2(elem, nelemd, par, gp)
+    endif
+
+    deallocate(gp%points)
+    deallocate(gp%weights)
+
     ! =================================================================
     ! Run the checksum to verify communication schedule
     ! =================================================================
-    call testchecksum(elem,par,GridEdge)
 
-    
+    !call testchecksum(elem,par,GridEdge)  ! broken
 
     ! =================================================================
     ! Initialize mass_matrix
@@ -304,24 +329,23 @@ contains
     !JMD call PrintDofV(elem)
     !JMD call PrintDofP(elem)
 
-    n_domains = min(Nthreads,nelemd)
-    call omp_set_num_threads(n_domains)
-    allocate(dom_mt(0:n_domains-1))
-    do ithr=0,NThreads-1
-       dom_mt(ithr)=decompose(1,nelemd,NThreads,ithr)
+    hthreads = min(nthreads,nelemd)
+    allocate(dom_mt(0:hthreads-1))
+    do ithr=0,hthreads-1
+       dom_mt(ithr)=decompose(1,nelemd,hthreads,ithr)
     end do
-    nThreadsHoriz = NThreads
 
     ! =================================================================
     ! Initialize shared boundary_exchange and reduction buffers
     ! =================================================================
+    call initEdgeBuffer(par,edge_g,elem,max(2,nlev))
     call initEdgeBuffer(par,edge1,elem,nlev)
     call initEdgeBuffer(par,edge2,elem,2*nlev)
     call initEdgeBuffer(par,edge3,elem,11*nlev)
 
     allocate(global_shared_buf(nelemd,nrepro_vars))
 
-    call InitReductionBuffer(red,3*nlev,nthreads)
+    call InitReductionBuffer(red,3*nlev,hthreads)
     call InitReductionBuffer(red_sum,1)
     call InitReductionBuffer(red_sum_int,1)
     call InitReductionBuffer(red_max,1)

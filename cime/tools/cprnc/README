@@ -4,6 +4,10 @@ cprnc README
 cprnc is a generic tool for analyzing a netcdf file or comparing
 two netcdf files.
 
+If you are trying to debug an installed cprnc tool make sure that you
+are looking at the correct one by comparing the path to the one in
+your case directory.
+
 
 Quick Start Guide:
 ------------------
@@ -11,7 +15,7 @@ Quick Start Guide:
 On cime supported systems you can generate a Macros file using the following
 (assuming you are running the command from the directory cime/tools/cprnc):
 
-CIMEROOT=../.. ../configure --macros-format=Makefile
+CIMEROOT=../.. ../configure --macros-format=Makefile --mpilib=mpi-serial
 
 To change the compiler or MPI library used, or to enable debugging options,
 set the COMPILER, MPILIB, or DEBUG environment variables prior to running
@@ -19,12 +23,19 @@ configure.
 
 Next, run make to build cprnc. For instance, using sh/bash as a login shell:
 
-CIMEROOT=../.. source .env_mach_specific.sh && make
+CIMEROOT=../.. source ./.env_mach_specific.sh && make
 
 Finally, put the resulting executable in CCSM_CPRNC as defined in
 config_machines.xml.
 
-You can also build cprnc using cmake.
+You can also build cprnc using cmake:
+export CIMEROOT=../..
+MPILIB=mpi-serial source ./.env_mach_specific.sh
+../configure --macros-format=CMake --mpilib=mpi-serial
+
+Next run cmake . to build the Makefile and then
+make to build cprnc.
+
 
  Usage: cprnc  [-v] [-d dimname:start[:count]] file1 [file2]
  -m: Compare each time sample. Default is false, i.e. match "time"
@@ -125,8 +136,12 @@ SUMMARY of cprnc:
  A total number of    119 fields were compared
           of which     83 had non-zero differences
                and     17 had differences in fill patterns
+               and      2 had differences in dimension sizes
  A total number of     10 fields could not be analyzed
- A total number of      0 fields on file 1 were not found on file2
+ A total number of      0 time-varying fields on file 1 were not found on file 2.
+ A total number of      0 time-constant fields on file 1 were not found on file 2.
+ A total number of      0 time-varying fields on file 2 were not found on file 1.
+ A total number of      0 time-constant fields on file 2 were not found on file 1.
   diff_test: the two files seem to be DIFFERENT
 
 
@@ -135,12 +150,26 @@ This summarizes:
 - the number of fields that differed (not counting fields that differed
   only in the fill pattern)
 - the number of fields with differences in fill patterns
+- the number of fields with differences in dimension sizes
 - the number of fields that could not be analyzed
-- the number of fields that could not be found on the second file
-- whether the files are IDENTICAL or DIFFERENT
-  Files are considered DIFFERENT if there are differences either in the
-  values or in the fill patterns of any variable.
-
+- the number of fields on one file but not the other
+  - for files with an unlimited (time) dimension, these counts are
+    broken down into time-varying fields (i.e., fields with an unlimited
+    dimension) and time-constant fields (i.e., fields without an
+    unlimited dimension)
+- whether the files are IDENTICAL, DIFFERENT, or DIFFER only in their field lists
+  - Files are considered DIFFERENT if there are differences in the values, fill
+    patterns or dimension sizes of any variable
+  - Files are considered to "DIFFER only in their field lists" if matching
+    variables are all identical, but there are either fields on file1 that are
+    not on file2, or fields on file2 that are not on file1
+    - However, if the only difference in field lists is in the presence
+      or absence of time-constant fields on a file that has an unlimited
+      (time) dimension, the files are considered to be IDENTICAL, with
+      an extra message appended that notes this fact. (While not ideal,
+      this exception is needed so that exact restart tests pass despite
+      some time-constant fields being on the output files from one case
+      but not the other.)
 
 Developers Guide:
 -----------------

@@ -26,6 +26,7 @@ subroutine qneg4 (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
    use cam_logfile,  only: iulog
    use glb_verif_smry,only: tp_stat_smry, get_chunk_smry, current_number_of_smry_fields
    use perf_mod,      only: t_startf, t_stopf
+   use phys_control, only: print_fixer_message
 
    implicit none
 
@@ -89,8 +90,11 @@ subroutine qneg4 (subnam  ,lchnk   ,ncol    ,ztodt   ,        &
 
 !-------------------------------------------
 ! 2. Write out worst value if any excess <0 
+! Zhun
+! if (nptsexc.gt.0 .and. l_old_qneg4_messages) then
+! Write out worst value if excess
 !
-   if (nptsexc.gt.0 .and. l_old_qneg4_messages) then
+   if (nptsexc.gt.0 .and. print_fixer_message) then
       worst = 0._r8
       do ii=1,nptsexc
          i = indxexc(ii)

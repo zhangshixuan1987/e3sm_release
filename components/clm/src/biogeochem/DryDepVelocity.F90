@@ -61,9 +61,11 @@ Module DryDepVelocity
   use FrictionVelocityType , only : frictionvel_type
   use PhotosynthesisType   , only : photosyns_type
   use WaterstateType       , only : waterstate_type
-  use GridcellType         , only : grc                
-  use LandunitType         , only : lun                
-  use PatchType            , only : pft                
+  use GridcellType         , only : grc_pp
+  use TopounitDataType     , only : top_as, top_af ! atmospheric state and flux variables  
+  use LandunitType         , only : lun_pp
+  use ColumnDataType       , only : col_ws  
+  use VegetationType       , only : veg_pp                
   !
   implicit none 
   save 
@@ -154,7 +156,7 @@ CONTAINS
     ! !LOCAL VARIABLES:
     integer  :: c
     real(r8) :: soilw, var_soilw, fact_h2, dv_soil_h2
-    integer  :: pi,g, l
+    integer  :: pi,g,t,l
     integer  :: ispec 
     integer  :: length 
     integer  :: wesveg       !wesely vegegation index  
@@ -214,15 +216,15 @@ CONTAINS
     if ( n_drydep == 0 .or. drydep_method /= DD_XLND ) return
 
     associate(                                                    & 
-         forc_solai =>    atm2lnd_vars%forc_solai_grc           , & ! Input:  [real(r8) (:,:) ] direct beam radiation (visible only)             
-         forc_solad =>    atm2lnd_vars%forc_solad_grc           , & ! Input:  [real(r8) (:,:) ] direct beam radiation (visible only)             
-         forc_t     =>    atm2lnd_vars%forc_t_downscaled_col    , & ! Input:  [real(r8) (:)   ] downscaled atmospheric temperature (Kelvin)                   
-         forc_q     =>    atm2lnd_vars%forc_q_downscaled_col    , & ! Input:  [real(r8) (:)   ] downscaled atmospheric specific humidity (kg/kg)              
-         forc_psrf  =>    atm2lnd_vars%forc_pbot_downscaled_col , & ! Input:  [real(r8) (:)   ] downscaled surface pressure (Pa)                              
-         forc_rain  =>    atm2lnd_vars%forc_rain_downscaled_col , & ! Input:  [real(r8) (:)   ] downscaled rain rate [mm/s]                                   
+         forc_solai =>    top_af%solai                          , & ! Input:  [real(r8) (:,:) ] direct beam radiation (W/m**2)          
+         forc_solad =>    top_af%solad                          , & ! Input:  [real(r8) (:,:) ] diffuse beam radiation (W/m**2)             
+         forc_t     =>    top_as%tbot                           , & ! Input:  [real(r8) (:)   ] atmospheric temperature (Kelvin)                   
+         forc_q     =>    top_as%qbot                           , & ! Input:  [real(r8) (:)   ] atmospheric specific humidity (kg/kg)              
+         forc_psrf  =>    top_as%pbot                           , & ! Input:  [real(r8) (:)   ] surface pressure (Pa)                              
+         forc_rain  =>    top_af%rain                           , & ! Input:  [real(r8) (:)   ] rain rate (kg H2O/m**2/s, or mm liquid H2O/s)                                   
 
-         h2osoi_vol =>    waterstate_vars%h2osoi_vol_col        , & ! Input:  [real(r8) (:,:) ] volumetric soil water (0<=h2osoi_vol<=watsat)   
-         snow_depth =>    waterstate_vars%snow_depth_col        , & ! Input:  [real(r8) (:)   ] snow height (m)                                   
+         h2osoi_vol =>    col_ws%h2osoi_vol        , & ! Input:  [real(r8) (:,:) ] volumetric soil water (0<=h2osoi_vol<=watsat)   
+         snow_depth =>    col_ws%snow_depth        , & ! Input:  [real(r8) (:)   ] snow height (m)                                   
 
          ram1       =>    frictionvel_vars%ram1_patch           , & ! Input:  [real(r8) (:)   ] aerodynamical resistance                           
          rb1        =>    frictionvel_vars%rb1_patch            , & ! Input:  [real(r8) (:)   ] leaf boundary layer resistance [s/m]               
@@ -243,22 +245,23 @@ CONTAINS
       ! Begin loop through patches
 
       pft_loop: do pi = bounds%begp,bounds%endp
-         l = pft%landunit(pi)
+         l = veg_pp%landunit(pi)
 
-         active: if (pft%active(pi)) then
+         active: if (veg_pp%active(pi)) then
 
-            c = pft%column(pi)
-            g = pft%gridcell(pi)
+            c = veg_pp%column(pi)
+            t = veg_pp%topounit(pi)
+            g = veg_pp%gridcell(pi)
             !solar_flux = forc_lwrad  !rename CLM variables to fit with Dry Dep variables 
 
-            pg         = forc_psrf(c)  
-            spec_hum   = forc_q(c)
-            rain       = forc_rain(c) 
-            sfc_temp   = forc_t(c) 
-            solar_flux = forc_solad(g,1) 
-            lat        = grc%latdeg(g) 
-            lon        = grc%londeg(g) 
-            clmveg     = pft%itype(pi) 
+            pg         = forc_psrf(t)  
+            spec_hum   = forc_q(t)
+            rain       = forc_rain(t) 
+            sfc_temp   = forc_t(t) 
+            solar_flux = forc_solad(t,1) 
+            lat        = grc_pp%latdeg(g) 
+            lon        = grc_pp%londeg(g) 
+            clmveg     = veg_pp%itype(pi) 
             soilw      = h2osoi_vol(c,1)
 
             !map CLM veg type into Wesely veg type  
@@ -282,7 +285,7 @@ CONTAINS
             if (clmveg == nc3irrig                            ) wesveg = 2 
             if (clmveg >= npcropmin .and. clmveg <= npcropmax ) wesveg = 2 
             if (wesveg == wveg_unset )then
-               write(iulog,*) 'clmveg = ', clmveg, 'lun%itype = ', lun%itype(l)
+               write(iulog,*) 'clmveg = ', clmveg, 'lun_pp%itype = ', lun_pp%itype(l)
                call endrun(decomp_index=pi, clmlevel=namep, &
                     msg='ERROR: Not able to determine Wesley vegetation type'//&
                     errMsg(__FILE__, __LINE__))
@@ -312,17 +315,17 @@ CONTAINS
 
             index_season = -1
 
-            if ( lun%itype(l) /= istsoil )then
-               if ( lun%itype(l) == istice .or. lun%itype(l) == istice_mec ) then
+            if ( lun_pp%itype(l) /= istsoil )then
+               if ( lun_pp%itype(l) == istice .or. lun_pp%itype(l) == istice_mec ) then
                   wesveg       = 8
                   index_season = 4
-               elseif ( lun%itype(l) == istdlak ) then
+               elseif ( lun_pp%itype(l) == istdlak ) then
                   wesveg       = 7
                   index_season = 4
-               elseif ( lun%itype(l) == istwet ) then
+               elseif ( lun_pp%itype(l) == istwet ) then
                   wesveg       = 9
                   index_season = 2
-               elseif ( lun%urbpoi(l) ) then
+               elseif ( lun_pp%urbpoi(l) ) then
                   wesveg       = 1
                   index_season = 2
                end if

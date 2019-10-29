@@ -4,8 +4,9 @@
 #endif
 
 module viscosity_mod
-  use viscosity_mod_base, only: biharmonic_wk, compute_zeta_C0, compute_div_C0, compute_zeta_C0_contra, compute_div_C0_contra, make_c0, make_c0_vector
-  use viscosity_mod_base, only: biharmonic_wk_scalar,neighbor_minmax, neighbor_minmax_start,neighbor_minmax_finish, biharmonic_wk_dp3d
+  use viscosity_base, only: compute_zeta_C0, compute_div_C0, compute_zeta_C0_contra, compute_div_C0_contra, make_c0, make_c0_vector
+  use viscosity_base, only: biharmonic_wk_scalar,neighbor_minmax, neighbor_minmax_start,neighbor_minmax_finish, smooth_phis
+  use viscosity_preqx_base, only: biharmonic_wk_dp3d
   use thread_mod, only : omp_get_num_threads
   use kinds, only : real_kind, iulog
   use dimensions_mod, only : np, nlev,qsize,nelemd
@@ -19,11 +20,11 @@ module viscosity_mod
   implicit none
   private
 
-  public :: biharmonic_wk, compute_zeta_C0, compute_div_C0, compute_zeta_C0_contra, compute_div_C0_contra, make_c0, make_c0_vector
+  public :: compute_zeta_C0, compute_div_C0, compute_zeta_C0_contra, compute_div_C0_contra, make_c0, make_c0_vector
   public :: biharmonic_wk_scalar, neighbor_minmax, neighbor_minmax_start,neighbor_minmax_finish, biharmonic_wk_dp3d
   public :: biharmonic_wk_scalar_openacc
   public :: neighbor_minmax_openacc
-
+  public :: smooth_phis
 
 
 contains
@@ -62,7 +63,7 @@ contains
     !$omp master
     call laplace_sphere_wk_openacc(qtens,grads,deriv,elem,var_coef1,qtens,nlev*qsize,nets,nete,1,1)
     call t_startf('biwksc_PEU')
-    call edgeVpack_openacc(edgeq,qtens,qsize*nlev,0,elem(:),nets,nete,1,1)
+    call edgeVpack_openacc(edgeq,qtens,qsize*nlev,0,qsize*nlev,nets,nete,1,1)
     !$omp end master
     !$omp barrier
 
@@ -72,7 +73,7 @@ contains
     
     !$omp barrier
     !$omp master
-    call edgeVunpack_openacc(edgeq,qtens,qsize*nlev,0,elem(:),nets,nete,1,1)
+    call edgeVunpack_openacc(edgeq,qtens,qsize*nlev,0,qsize*nlev,nets,nete,1,1)
     call t_stopf('biwksc_PEU')
     !$acc parallel loop gang vector collapse(5) present(qtens,elem(:))
     do ie = nets , nete
@@ -113,8 +114,8 @@ contains
     !$omp barrier
     !$omp master
     call t_startf('nmm_PEU')
-    call edgeSpack_openacc(edgeMinMax,min_neigh,nlev*qsize,0         ,elem(:),nets,nete,1,1)
-    call edgeSpack_openacc(edgeMinMax,max_neigh,nlev*qsize,nlev*qsize,elem(:),nets,nete,1,1)
+    call edgeSpack_openacc(edgeMinMax,min_neigh,nlev*qsize,0         ,2*nlev*qsize,elem(:),nets,nete,1,1)
+    call edgeSpack_openacc(edgeMinMax,max_neigh,nlev*qsize,nlev*qsize,2*nlev*qsize,elem(:),nets,nete,1,1)
     !$omp end master
     !$omp barrier
 
@@ -124,8 +125,8 @@ contains
        
     !$omp barrier
     !$omp master
-    call edgeSunpackMin_openacc(edgeMinMax,min_neigh,nlev*qsize,0         ,elem(:),nets,nete,1,1)
-    call edgeSunpackMax_openacc(edgeMinMax,max_neigh,nlev*qsize,nlev*qsize,elem(:),nets,nete,1,1)
+    call edgeSunpackMin_openacc(edgeMinMax,min_neigh,nlev*qsize,0         ,2*nlev*qsize,elem(:),nets,nete,1,1)
+    call edgeSunpackMax_openacc(edgeMinMax,max_neigh,nlev*qsize,nlev*qsize,2*nlev*qsize,elem(:),nets,nete,1,1)
     call t_stopf('nmm_PEU')
     !$omp end master
     !$omp barrier

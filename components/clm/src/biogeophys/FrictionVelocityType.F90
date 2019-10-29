@@ -12,8 +12,8 @@ module FrictionVelocityType
   use decompMod      , only : bounds_type
   use abortutils     , only : endrun
   use spmdMod        , only : masterproc
-  use LandunitType   , only : lun                
-  use ColumnType     , only : col                
+  use LandunitType   , only : lun_pp                
+  use ColumnType     , only : col_pp                
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -218,7 +218,7 @@ contains
     !-----------------------------------------------------------------------
 
     ! Added 5/4/04, PET: initialize forc_hgt_u (gridcell-level),
-    ! since this is not initialized before first call to CNVegStructUpdate,
+    ! since this is not initialized before first call to VegStructUpdate,
     ! and it is required to set the upper bound for canopy top height.
     ! Changed 3/21/08, KO: still needed but don't have sufficient information 
     ! to set this properly (e.g., patch-level displacement height and roughness 
@@ -231,8 +231,8 @@ contains
     end if
 
     do c = bounds%begc, bounds%endc
-       l = col%landunit(c)
-       if (lun%lakpoi(l)) then !lake
+       l = col_pp%landunit(c)
+       if (lun_pp%lakpoi(l)) then !lake
           this%z0mg_col(c) = 0.0004_r8
        end if
     end do

@@ -30,7 +30,7 @@ module restart_io_mod
    use element_mod, only: element_t
    use element_state, only: elem_state_t
    !------------------
-   use control_mod, only : restartdir, restartfile, columnpackage
+   use control_mod, only : restartdir, restartfile
    !------------------
    use schedtype_mod, only : Schedule
    !------------------
@@ -71,29 +71,8 @@ module restart_io_mod
    integer, parameter :: RESTART_HDR_CNT = 12 
 
 
-   ! MT 2010:  note: when using COLLECTIVE IO, the code we have now, 
-   ! the offset between elements in 
-   ! RestartBuffer must match the offset used in the restart file.
-   ! This means for non-Emanual physics restarts, puffer cannot be 
-   ! included in the RestartBuffer_t struct below.  
-   !
-   ! I tried to include the pelem() data in the restart file for all
-   ! cases, including non-Emanual physics like Held-Suarez run, 
-   ! but the code was crashing when creating the first MPI type, maybe because
-   ! pelem() has not been initialized. 
-   !
-   ! best solution would be to modify the code to allow a larger offset
-   ! between elements in RestartBuffer than in the file
-   ! for now, disable restart when running Emanual physics.  
-   ! 
-   ! Emanual restart can be re-enabled by turning of COLLECTIVE IO 
-   ! and adding the puffer struct back in below (change PRIMXXX back to PRIM)
-   !
    type, public :: RestartBuffer_t
       type (elem_state_t)        :: buffer
-#ifdef _PRIMXXX
-      type (physics_state_t)     :: puffer
-#endif
    end type
 
 
@@ -220,7 +199,11 @@ endif
 
      amode = IOR(MPI_MODE_WRONLY,MPI_MODE_CREATE)
      info  = MPI_INFO_NULL
+     !call mpi_info_create(info,ierr)
+     !call mpi_info_set(info,'romio_ds_read','disable',ierr)
+     !call mpi_info_set(info,'romio_ds_write','disable',ierr)
      call MPI_file_open(File%par%comm,File%fname,amode,info,File%fh,ierr)
+     !call mpi_info_free(info,ierr)
 
      if(ierr .ne. MPI_SUCCESS) then
         errorcode=ierr
@@ -631,21 +614,18 @@ endif
 !$OMP BARRIER
 !$OMP MASTER
     write(charnum,'(i9.9)') tl%nstep
-    if(iam .eq. 1) then 
-       if(Debug) print *,'WriteRestart: restnum is: ',charnum
-    endif
 
+    if(iam .eq. 1) print *,'writing restart header, restnum=',charnum
     fname = TRIM(ADJUSTL(restartdir))//"/R"//TRIM(ADJUSTL(charnum))
-
     RestFile%fname=fname
-
     call CreateRestartHeader(RestartHeader,tl)
     call WriteRestartHeader(RestFile,RestartHeader)
 
+    if(iam .eq. 1) print *,'writing restart data, collectives=',COLLECTIVE_IO_WRITE
     call WriteState(RestFile,RestartBuffer,RestartHeader%ElemRecLength)
+    if(iam .eq. 1) print *,'restart complete.'
 !$OMP END MASTER
 
-!DBG    print *,'WriteRestart: point #10'
     end subroutine WriteRestart
 
  

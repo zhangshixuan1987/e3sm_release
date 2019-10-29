@@ -22,13 +22,12 @@ nu_q                         = 5e16
 nu_p                         = 5e16
 nu_div                       = -1
 limiter_option               = 8
-energy_fixer                 = -1
 hypervis_order               = 2
 hypervis_subcycle            = 4
 u_perturb                    = 1
 vert_remap_q_alg = 1
 ! disable_diagnostics          = .true.
-moisture = 'notdry'
+moisture = 'wet'
 /
 
 

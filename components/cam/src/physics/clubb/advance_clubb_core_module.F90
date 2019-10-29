@@ -323,7 +323,6 @@ module advance_clubb_core_module
 
     use advance_xm_wpxp_module, only: &
         advance_xm_wpxp          ! Compute mean/flux terms
-
     use advance_xp2_xpyp_module, only: &
         advance_xp2_xpyp     ! Computes variance terms
 
@@ -491,8 +490,10 @@ module advance_clubb_core_module
       rtpthlp_forcing, & ! <r_t'th_l'> covariance forcing (momentum levels) [K*(kg/kg)/s]
       wm_zm,           & ! vertical mean wind component on momentum levels  [m/s]
       wm_zt,           & ! vertical mean wind component on thermo. levels   [m/s]
+      p_in_Pa,         & ! Air pressure (thermodynamic levels)       [Pa]
       rho_zm,          & ! Air density on momentum levels            [kg/m^3]
       rho,             & ! Air density on thermodynamic levels       [kg/m^3]
+      exner,           & ! Exner function
       rho_ds_zm,       & ! Dry, static density on momentum levels    [kg/m^3]
       rho_ds_zt,       & ! Dry, static density on thermo. levels     [kg/m^3]
       invrs_rho_ds_zm, & ! Inverse dry, static density on momentum levs. [m^3/kg]
@@ -573,10 +574,6 @@ module advance_clubb_core_module
       sclrpthlp    ! sclr'thl' (momentum levels)          [{units vary} K]
 
     real( kind = core_rknd ), intent(inout), dimension(gr%nz) ::  &
-      p_in_Pa, & ! Air pressure (thermodynamic levels)       [Pa]
-      exner      ! Exner function (thermodynamic levels)     [-]
-
-    real( kind = core_rknd ), intent(inout), dimension(gr%nz) ::  &
       rcm,        & ! cloud water mixing ratio, r_c (thermo. levels) [kg/kg]
       cloud_frac, & ! cloud fraction (thermodynamic levels)          [-]
       wpthvp,     & ! < w' th_v' > (momentum levels)                 [kg/kg K]
@@ -638,7 +635,6 @@ module advance_clubb_core_module
     logical, intent(in)                 ::  do_liquid_only_in_clubb
 ! <--- h1g, 2012-06-14
 #endif
-
     ! Local Variables
     integer :: i, k
 
@@ -1168,7 +1164,7 @@ module advance_clubb_core_module
             rtm_pert_neg_rt = pdf_params_frz%rt_2 &
                        - Lscale_pert_coef * sqrt( max( pdf_params_frz%varnce_rt_2, rt_tol**2 ) )
             !Lscale_weight = pdf_params%mixt_frac
-          else where
+          elsewhere
             rtm_pert_pos_rt = pdf_params_frz%rt_2 &
                        + Lscale_pert_coef * sqrt( max( pdf_params_frz%varnce_rt_2, rt_tol**2 ) )
             thlm_pert_pos_rt = pdf_params_frz%thl_2 + ( sign_rtpthlp * Lscale_pert_coef &
@@ -1190,7 +1186,7 @@ module advance_clubb_core_module
             rtm_pert_neg_rt = pdf_params%rt_2 &
                        - Lscale_pert_coef * sqrt( max( pdf_params%varnce_rt_2, rt_tol**2 ) )
             !Lscale_weight = pdf_params%mixt_frac
-          else where
+          elsewhere
             rtm_pert_pos_rt = pdf_params%rt_2 &
                        + Lscale_pert_coef * sqrt( max( pdf_params%varnce_rt_2, rt_tol**2 ) )
             thlm_pert_pos_rt = pdf_params%thl_2 + ( sign_rtpthlp * Lscale_pert_coef &
@@ -1768,8 +1764,9 @@ module advance_clubb_core_module
 
     ! Update pressure and exner based on the new values of the thermodynamic
     ! predictive fields.
-    call update_pressure( thlm, rtm, rcm, rho_ds_zt, thv_ds_zt, &
-                          p_in_Pa, exner, p_in_Pa_zm, exner_zm )
+    ! Zhun not sure keep or not?
+!    call update_pressure( thlm, rtm, rcm, rho_ds_zt, thv_ds_zt, &
+!                          p_in_Pa, exner, p_in_Pa_zm, exner_zm )
 
     if ( ipdf_call_placement == ipdf_post_advance_fields &
          .or. ipdf_call_placement == ipdf_pre_post_advance_fields ) then

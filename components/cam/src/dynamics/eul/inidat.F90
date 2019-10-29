@@ -21,7 +21,7 @@ module inidat
    use spmd_utils,          only: masterproc, mpicom, mpir8
    use cam_control_mod,     only: ideal_phys, aqua_planet, moist_physics, adiabatic
    use cam_initfiles,       only: initial_file_get_id, topo_file_get_id
-   use scamMod,             only: single_column, use_camiop, have_u, have_v, &
+   use scamMod,             only: single_column, use_replay, have_u, have_v, &
                                   have_cldliq, have_cldice,loniop,latiop,scmlat,scmlon
    use cam_logfile,         only: iulog
    use pio,                 only: file_desc_t, pio_noerr, pio_inq_varid, pio_get_att, &
@@ -72,10 +72,12 @@ contains
     
     use constituents,     only: pcnst, cnst_name, cnst_read_iv, cnst_get_ind
     use commap,           only: clat,clon
-    use iop,              only: setiopupdate,readiopdata
+    use scamMod,          only: readiopdata, setiopupdate
     use dyn_comp ,        only: dyn_import_t
     use physconst,        only: pi
     use cam_pio_utils,    only: cam_pio_get_var
+    use hycoef,           only: hyam, hybm
+    use eul_single_column_mod, only: scm_setinitial
     
 !
 ! Arguments
@@ -103,6 +105,7 @@ contains
     real(r8) :: clat2d(plon,plat),clon2d(plon,plat)
     integer :: ierr
 
+    logical :: iop_update_surface
     integer londimid,dimlon,latdimid,dimlat,latvarid,lonvarid
     integer strt(3),cnt(3)
     character(len=3), parameter :: arraydims3(3) = (/ 'lon', 'lev', 'lat' /)
@@ -230,7 +233,7 @@ contains
     deallocate ( phis_tmp )
 
     if (single_column) then
-       if ( use_camiop ) then
+       if ( use_replay ) then
           fieldname = 'CLAT1'
           call infld(fieldname, fh_ini, 'lon', 'lat', 1, pcols, begchunk, endchunk, &
                clat2d, readvar, gridname='physgrid')
@@ -283,7 +286,11 @@ contains
           loniop(1)=(mod(scmlon-2.0_r8+360.0_r8,360.0_r8))*pi/180.0_r8
           loniop(2)=(mod(scmlon+2.0_r8+360.0_r8,360.0_r8))*pi/180.0_r8
           call setiopupdate()
-          call readiopdata()
+          ! No need to initialize surface properties here
+          !  at this point
+          iop_update_surface = .false.
+          call readiopdata( iop_update_surface, hyam, hybm )
+	  call scm_setinitial()
           ps(:,:,1)     = ps(:,:,n3)
           if (have_u) u3(:,:,:,1)   = u3(:,:,:,n3)
           if (have_v) v3(:,:,:,1)   = v3(:,:,:,n3)

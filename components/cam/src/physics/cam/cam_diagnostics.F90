@@ -22,7 +22,6 @@ use phys_control,  only: phys_getopts
 use wv_saturation, only: qsat, qsat_water, svp_ice
 use time_manager,  only: is_first_step
 
-use scamMod,       only: single_column, wfld
 use cam_abortutils,    only: endrun
 
 implicit none
@@ -66,6 +65,7 @@ character(len=8) :: diag_cnst_conv_tend = 'q_only' ! output constituent tendenci
                                                    ! 'none', 'q_only' or 'all'
 
 logical          :: history_amwg                   ! output the variables used by the AMWG diag package
+logical          :: history_verbose                ! produce verbose history output
 logical          :: history_vdiag                  ! output the variables used by the AMWG variability diag package
 logical          :: history_eddy                   ! output the eddy variables
 logical          :: history_budget                 ! output tendencies and state variables for CAM4
@@ -263,6 +263,10 @@ subroutine diag_init()
    call addfld ('TMQ',horiz_only,    'A','kg/m2','Total (vertically integrated) precipitable water')
    call addfld ('TUQ',horiz_only,    'A','kg/m/s','Total (vertically integrated) zonal water flux')
    call addfld ('TVQ',horiz_only,    'A','kg/m/s','Total (vertically integrated) meridional water flux')
+   call addfld ('TUH',horiz_only,    'A','W/m',   'Total (vertically integrated) zonal MSE flux')
+   call addfld ('TVH',horiz_only,    'A','W/m',   'Total (vertically integrated) meridional MSE flux')
+   call addfld ('DTENDTH', horiz_only, 'A', 'W/m2',   'Dynamic Tendency of Total (vertically integrated) moist static energy')
+   call addfld ('DTENDTQ', horiz_only, 'A', 'kg/m2/s','Dynamic Tendency of Total (vertically integrated) specific humidity')
    call addfld ('RELHUM',(/ 'lev' /), 'A','percent','Relative humidity')
    call addfld ('RHW',(/ 'lev' /), 'A','percent'   ,'Relative humidity with respect to liquid')
    call addfld ('RHI',(/ 'lev' /), 'A','percent'   ,'Relative humidity with respect to ice')
@@ -310,6 +314,9 @@ subroutine diag_init()
    call addfld ('TH9251000',horiz_only,   'A','K','Theta difference 925 mb - 1000 mb')   
    call addfld ('THE9251000',horiz_only,   'A','K','ThetaE difference 925 mb - 1000 mb') 
 
+   call addfld ('U90M',horiz_only,    'A','m/s','Zonal wind at turbine hub height (90m above surface)')
+   call addfld ('V90M',horiz_only,    'A','m/s','Meridional wind at turbine hub height (90m above surface)')
+
    ! This field is added by radiation when full physics is used
    if ( ideal_phys )then
       call addfld('QRS', (/ 'lev' /), 'A', 'K/s', 'Solar heating rate')
@@ -319,6 +326,7 @@ subroutine diag_init()
    ! determine default variables
    ! ----------------------------
    call phys_getopts(history_amwg_out   = history_amwg    , &
+                     history_verbose_out  = history_verbose  , &
                      history_vdiag_out  = history_vdiag   , &
                      history_eddy_out   = history_eddy    , &
                      history_budget_out = history_budget  , &
@@ -338,7 +346,7 @@ subroutine diag_init()
       call add_default ('VV      ', 1, ' ')
       call add_default ('VQ      ', 1, ' ')
 
-      if(prog_modal_aero) then !Only for prognostic aerosols
+      if(prog_modal_aero .and. history_verbose) then !Only for prognostic aerosols
          call add_default ('Vbc_a1  ', 1, ' ')
          call add_default ('Vdst_a1 ', 1, ' ')
          call add_default ('Vdst_a3 ', 1, ' ')
@@ -354,7 +362,7 @@ subroutine diag_init()
       endif
       call add_default ('UU      ', 1, ' ')
       call add_default ('OMEGAT  ', 1, ' ')
-      if(prog_modal_aero) then !Only for prognostic aerosols
+      if(prog_modal_aero .and. history_verbose) then !Only for prognostic aerosols
          call add_default ('bc_a1_2 ', 1, ' ')
          call add_default ('dst_a1_2', 1, ' ')
          call add_default ('dst_a3_2', 1, ' ')
@@ -373,6 +381,14 @@ subroutine diag_init()
       if (moist_physics) then
          call add_default ('RELHUM  ', 1, ' ')
       end if
+
+      ! For Tier 1b global water cycle diagostics
+      call add_default ('TUQ      ', 1, ' ')
+      call add_default ('TVQ      ', 1, ' ')
+      call add_default ('TUH      ', 1, ' ')
+      call add_default ('TVH      ', 1, ' ')
+      call add_default ('DTENDTQ', 1, ' ')
+      call add_default ('DTENDTH', 1, ' ')
    end if
    
    if (history_vdiag) then
@@ -552,6 +568,9 @@ subroutine diag_init()
        call add_default ('SNOWHLND', 1, ' ')
        call add_default ('SNOWHICE', 1, ' ')
     endif
+
+    call add_default ('OMEGA500', 1, ' ')
+    call add_default ('TH7001000', 1, ' ')
 
     if (history_vdiag) then
         call add_default ('PRECT   ', 2, ' ')
@@ -823,7 +842,7 @@ end subroutine diag_conv_tend_ini
 !-----------------------------------------------------------------------
     use physconst,          only: gravit, rga, rair, cpair, latvap, rearth, pi, cappa
     use time_manager,       only: get_nstep
-    use interpolate_data,   only: vertinterp
+    use interpolate_data,   only: vertinterp, vertinterpz
     use constituent_burden, only: constituent_burden_comp
     use cam_control_mod,    only: moist_physics
     use co2_cycle,          only: c_i, co2_transport
@@ -895,7 +914,7 @@ end subroutine diag_conv_tend_ini
 
 
 
-#if (defined BFB_CAM_SCAM_IOP )
+#if (defined E3SM_SCM_REPLAY )
     call outfld('phis    ',state%phis,    pcols,   lchnk     )
 #endif
 
@@ -1051,13 +1070,9 @@ end subroutine diag_conv_tend_ini
 
 ! Vertical velocity and advection
 
-    if (single_column) then
-       call outfld('OMEGA   ',wfld,    pcols,   lchnk     )
-    else
-       call outfld('OMEGA   ',state%omega,    pcols,   lchnk     )
-    endif
+    call outfld('OMEGA   ',state%omega,    pcols,   lchnk     )
 
-#if (defined BFB_CAM_SCAM_IOP )
+#if (defined E3SM_SCM_REPLAY )
     call outfld('omega   ',state%omega,    pcols,   lchnk     )
 #endif
 
@@ -1106,6 +1121,21 @@ end subroutine diag_conv_tend_ini
        ftem(:ncol,1) = ftem(:ncol,1) + ftem(:ncol,k)
     end do
     call outfld ('TVQ     ',ftem, pcols   ,lchnk     )
+
+!
+! Mass of vertically integrated MSE flux
+!
+    ftem(:ncol,:) = state%u(:ncol,:)*(state%s(:ncol,:)+latvap*state%q(:ncol,:,1))*state%pdel(:ncol,:)*rga
+    do k=2,pver
+       ftem(:ncol,1) = ftem(:ncol,1) + ftem(:ncol,k)
+    end do
+    call outfld ('TUH     ',ftem, pcols   ,lchnk     )
+
+    ftem(:ncol,:) = state%v(:ncol,:)*(state%s(:ncol,:)+latvap*state%q(:ncol,:,1))*state%pdel(:ncol,:)*rga
+    do k=2,pver
+       ftem(:ncol,1) = ftem(:ncol,1) + ftem(:ncol,k)
+    end do
+    call outfld ('TVH     ',ftem, pcols   ,lchnk     )
 
     if (moist_physics) then
 
@@ -1217,6 +1247,14 @@ end subroutine diag_conv_tend_ini
     if (hist_fld_active('V200')) then
        call vertinterp(ncol, pcols, pver, state%pmid, 20000._r8, state%v, p_surf)
        call outfld('V200    ', p_surf, pcols, lchnk )
+    end if
+    if (hist_fld_active('U90M')) then
+       call vertinterpz(ncol, pcols, pver, state%zm, 90._r8, state%u, p_surf)
+       call outfld('U90M    ', p_surf, pcols, lchnk )
+    end if
+    if (hist_fld_active('V90M')) then
+       call vertinterpz(ncol, pcols, pver, state%zm, 90._r8, state%v, p_surf)
+       call outfld('V90M    ', p_surf, pcols, lchnk )
     end if
 
     ftem(:ncol,:) = state%t(:ncol,:)*state%t(:ncol,:)
@@ -1459,7 +1497,7 @@ subroutine diag_conv(state, ztodt, pbuf)
    call outfld('PRECLav ', precl, pcols, lchnk )
    call outfld('PRECCav ', precc, pcols, lchnk )
 
-#if ( defined BFB_CAM_SCAM_IOP )
+#if ( defined E3SM_SCM_REPLAY )
    call outfld('Prec   ' , prect, pcols, lchnk )
 #endif
 
@@ -1552,10 +1590,12 @@ subroutine diag_surf (cam_in, cam_out, ps, trefmxav, trefmnav )
     call outfld('RHREFHT',   ftem,      pcols, lchnk)
 
 
-#if (defined BFB_CAM_SCAM_IOP )
+#if (defined E3SM_SCM_REPLAY )
     call outfld('shflx   ',cam_in%shf,   pcols,   lchnk)
     call outfld('lhflx   ',cam_in%lhf,   pcols,   lchnk)
     call outfld('trefht  ',cam_in%tref,  pcols,   lchnk)
+    call outfld('Tg', cam_in%ts, pcols, lchnk)
+    call outfld('Tsair',cam_in%ts, pcols, lchnk)
 #endif
 !
 ! Ouput ocn and ice fractions

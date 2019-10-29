@@ -24,7 +24,7 @@ module ncdio_pio
   use decompMod      , only : get_clmlevel_gsize,get_clmlevel_gsmap
   use perf_mod       , only : t_startf, t_stopf
   use fileutils      , only : getavu, relavu
-  use mct_mod        , only : mct_gsMap, mct_gsMap_lsize, mct_gsMap_gsize, mct_gsMap_OP
+  use mct_mod        , only : mct_gsMap, mct_gsMap_lsize, mct_gsMap_gsize, mct_gsMap_orderedPoints
   use pio            , only : file_desc_t, io_desc_t, iosystem_desc_t, pio_64bit_offset
   use pio            , only : pio_bcast_error, pio_char, pio_clobber, pio_closefile, pio_createfile, pio_def_dim
   use pio            , only : pio_def_var, pio_double, pio_enddef, pio_get_att, pio_get_var, pio_global, pio_initdecomp
@@ -62,6 +62,7 @@ module ncdio_pio
   public :: ncd_inqvdims       ! inquire variable ndims
   public :: ncd_inqvdids       ! inquire variable dimids
   public :: ncd_inqvdlen       ! inquire variable dimension size
+  public :: ncd_inqvdname      ! inquire variable dimension name
   public :: ncd_io             ! write local data
 
   integer,parameter,public :: ncd_int       = pio_int
@@ -126,6 +127,11 @@ module ncdio_pio
      module procedure ncd_inqvdlen_byDesc
      module procedure ncd_inqvdlen_byName
   end interface
+
+  interface ncd_inqvdname
+     module procedure ncd_inqvdname_byDesc
+     module procedure ncd_inqvdname_byName
+  end interface ncd_inqvdname
 
   private :: ncd_getiodesc      ! obtain iodesc
   private :: scam_field_offsets ! get offset to proper lat/lon gridcell for SCAM
@@ -494,6 +500,12 @@ contains
        ier = pio_inq_dimlen(ncid, dimid, ni)
        if (ier == PIO_NOERR) nj = 1
     end if
+    
+    ier = pio_inq_dimid (ncid, 'topounit', dimid)
+    if (ier == PIO_NOERR) then
+       ier = pio_inq_dimlen(ncid, dimid, ni)
+       if (ier == PIO_NOERR) nj = 1
+    end if       
 
     call pio_seterrorhandling(ncid, PIO_INTERNAL_ERROR)
 
@@ -656,7 +668,7 @@ contains
   end subroutine ncd_inqvdlen_byDesc
 
 
-  !-----------------------------------------------------------------------
+  !-------------------------------------------------------------------------
   subroutine ncd_inqvdlen_byName(ncid,varname,dimnum,dlen,err_code)
     !
     ! !DESCRIPTION:
@@ -693,10 +705,100 @@ contains
        err_code = error_variable_not_found
     end if
 
-  end subroutine ncd_inqvdlen_byName
+ end subroutine ncd_inqvdlen_byName
 
+
+ !-----------------------------------------------------------------------
+ subroutine ncd_inqvdname_byDesc(ncid,vardesc,dimnum,dname,err_code)
+    !
+    ! !DESCRIPTION:
+    ! Inquire name of one of a variable's dimensions, given a vardesc
+    !
+    ! If the variable has n dimensions, then dimnum should be between 1 and n; this
+    ! routine returns the name of the dimnum'th dimension.
+    !
+    ! If there is an error condition, dname will be ' ', and err_code will hold the error
+    ! code; possible error codes are:
+    ! 0: no error
+    ! 1: dimnum out of range
+    !
+    ! !ARGUMENTS:
+    class(file_desc_t),intent(inout) :: ncid      ! netcdf file id
+    type(Var_desc_t)  ,intent(inout) :: vardesc   ! variable descriptor
+    integer           ,intent(in)    :: dimnum    ! dimension number to query
+    character(len=*)  ,intent(out)   :: dname     ! name of the dimension
+    integer           ,intent(out)   :: err_code  ! error code (0 means no error)
+    !
+    ! !LOCAL VARIABLES:
+    integer              :: ndims      ! number of dimensions
+    integer, allocatable :: dimids(:)  ! dimension IDs
+
+    character(len=*), parameter :: dname_invalid = ' '
+    integer, parameter :: error_none = 0
+    integer, parameter :: error_dimnum_out_of_range = 1
+
+    character(len=*), parameter :: subname = 'ncd_inqvdname_byDesc'
+    !-----------------------------------------------------------------------
+    err_code = error_none
+
+    call ncd_inqvdims(ncid, ndims, vardesc)
+
+    if (dimnum > 0 .and. dimnum <= ndims) then
+       allocate(dimids(ndims))
+       call ncd_inqvdids(ncid, dimids, vardesc)
+       call ncd_inqdname(ncid, dimids(dimnum), dname)
+       deallocate(dimids)
+    else
+       dname = dname_invalid
+       err_code = error_dimnum_out_of_range
+    end if
+
+ end subroutine ncd_inqvdname_byDesc
+
+ !-----------------------------------------------------------------------
+
+ subroutine ncd_inqvdname_byName(ncid,varname,dimnum,dname,err_code)
+    !
+    ! !DESCRIPTION:
+    ! Inquire name of one of a variable's dimensions, given a variable name
+    !
+    ! If the variable has n dimensions, then dimnum should be between 1 and n; this
+    ! routine returns the name of the dimnum'th dimension.
+    !
+    ! If there is an error condition, dname will be ' ', and err_code will hold the error
+    ! code; possible error codes are:
+    ! 0: no error
+    ! 1: dimnum out of range
+    ! 11: variable not found
+    !
+    ! !ARGUMENTS:
+    class(file_desc_t),intent(inout) :: ncid      ! netcdf file id
+    character(len=*)  ,intent(in)    :: varname   ! variable name
+    integer           ,intent(in)    :: dimnum    ! dimension number to query
+    character(len=*)  ,intent(out)   :: dname     ! name of the dimension
+    integer           ,intent(out)   :: err_code  ! error code (0 means no error)
+    !
+    ! !LOCAL VARIABLES:
+    type(Var_desc_t) :: vardesc        ! variable descriptor
+    logical          :: readvar        ! whether the variable was found
+    character(len=*), parameter :: dname_invalid = ' '
+    integer, parameter :: error_variable_not_found = 11
+
+    character(len=*), parameter :: subname = 'ncd_inqvdname_byName'
+    !-----------------------------------------------------------------------
+
+    call check_var(ncid, varname, vardesc, readvar)
+    if (readvar) then
+       call ncd_inqvdname_byDesc(ncid, vardesc, dimnum, dname, err_code)
+    else
+       dname = dname_invalid
+       err_code = error_variable_not_found
+    end if
+
+ end subroutine ncd_inqvdname_byName
 
   !-----------------------------------------------------------------------
+
   subroutine ncd_putatt_int(ncid,varid,attrib,value,xtype)
     !
     ! !DESCRIPTION:
@@ -1178,7 +1280,6 @@ contains
     logical           :: varpresent         ! if true, variable is on tape
     logical           :: found              ! if true, found lat/lon dims on file
     character(len=32) :: vname              ! variable error checking
-    character(len=1)  :: tmpString(128)     ! temp for manipulating output string
     type(var_desc_t)  :: vardesc            ! local vardesc pointer
     {VTYPE} :: temp(1)
     character(len=*),parameter :: subname='ncd_io_{DIMS}d_{TYPE}_glob'
@@ -1222,37 +1323,34 @@ contains
 
        call ncd_inqvid  (ncid, varname, varid, vardesc)
 
-#if ({DIMS}==0) 
-       start(1) = 1  ; count(1) = 1
-       if (present(nt)) start(1) = nt ; count(1) = 1
-       temp(1) = data
-       status = pio_put_var(ncid, varid, start, count, temp)
-#elif ({DIMS}==1) 
-       start(1) = 1 ; count(1) = size(data) 
-       start(2) = 1 ; count(2) = 1
-       if (present(nt)) start(2) = nt
-       status = pio_put_var(ncid, varid, start, count, data)
-#elif ({DIMS}==2) 
-       start(1) = 1  ; count(1) = size(data, dim=1)
-       start(2) = 1  ; count(2) = size(data, dim=2)
-       start(3) = 1  ; count(3) = 1
-       if (present(nt)) start(3) = nt 
-       status = pio_put_var(ncid, varid, start, count, data)
-#elif ({DIMS}==3) 
        if (present(nt)) then
+#if ({DIMS}==0) 
+          start(1) = nt  ; count(1) = 1
+          temp(1) = data
+          status = pio_put_var(ncid, varid, start, count, temp)
+#elif ({DIMS}==1) 
+          start(1) = 1 ; count(1) = size(data) 
+          start(2) = nt ; count(2) = 1
+          status = pio_put_var(ncid, varid, start, count, data)
+#elif ({DIMS}==2) 
+          start(1) = 1  ; count(1) = size(data, dim=1)
+          start(2) = 1  ; count(2) = size(data, dim=2)
+          start(3) = nt  ; count(3) = 1
+          status = pio_put_var(ncid, varid, start, count, data)
+#elif ({DIMS}==3) 
           start(1) = 1  ; count(1) = size(data,dim=1)
           start(2) = 1  ; count(2) = size(data,dim=2)
           start(3) = 1  ; count(3) = size(data,dim=3)
           start(4) = nt ; count(4) = 1
           status = pio_put_var(ncid, varid, start, count, data)
+#endif
        else
           status = pio_put_var(ncid, varid, data)
        end if
-#endif
 
     endif
 
-  end subroutine ncd_io_{DIMS}d_{TYPE}_glob
+end subroutine ncd_io_{DIMS}d_{TYPE}_glob
 
   !------------------------------------------------------------------------
   !DIMS 0,1,2
@@ -1277,7 +1375,7 @@ contains
     integer           :: start(4), count(4) ! output bounds
     integer           :: status             ! error code
     logical           :: varpresent         ! if true, variable is on tape
-    character(len=1)  :: tmpString(128)     ! temp for manipulating output string
+    character(len=1)  :: tmpString(max_string_len)     ! temp for manipulating output string
     type(var_desc_t)  :: vardesc            ! local vardesc pointer
     character(len=*),parameter :: subname='ncd_io_{DIMS}d_{TYPE}_glob'
     !-----------------------------------------------------------------------
@@ -1402,15 +1500,12 @@ contains
           if (single_column) then
              start(:) = 1 ; count(:) = 1
              call scam_field_offsets(ncid,clmlevel,vardesc,start,count)
-             if (trim(clmlevel) == grlnd) then
-                if (present(nt)) then
-                   start(3) = nt ; count(3) = 1
-                end if
-             else
-                if (present(nt)) then
-                   start(2) = nt ; count(2) = 1
-                end if
-             end if
+             if (present(nt)) then
+               n=3
+               if (start(3) .eq. 0) n=2
+               start(n) = nt ; count(n) = 1
+             endif
+
 #if ({ITYPE}==TYPELOGICAL)
              allocate(idata(size(data))) 
              status = pio_get_var(ncid, varid, start, count, idata)
@@ -1594,17 +1689,11 @@ contains
           if (single_column) then
              start(:) = 1 ; count(:) = 1
              call scam_field_offsets(ncid, clmlevel, vardesc, start, count)
-             if (trim(clmlevel) == grlnd) then
-                count(3) = size(data,dim=2)
                 if (present(nt)) then
-                   start(4) = nt; count(4) = 1
+                   n=4
+                   if (start(4) .eq. 0) n=3
+                   start(n) = nt; count(n) = 1
                 end if
-             else
-                count(2) = size(data,dim=2)
-                if (present(nt)) then
-                   start(3) = nt ; count(3) = 1
-                end if
-             end if
              if (present(switchdim)) then
                 status = pio_get_var(ncid, vardesc, start, count, temp)
                 do j = lb2,ub2
@@ -1792,21 +1881,12 @@ contains
              start(:) = 1 
              count(:) = 1
              call scam_field_offsets(ncid, clmlevel, vardesc, start, count)
-             if (trim(clmlevel) == grlnd) then
-                count(3) = size(data,dim=2); 
-                count(4) = size(data,dim=3)
-                if (present(nt)) then
-                   start(5) = nt
-                   count(5) = 1
-                end if
-             else
-                count(2) = size(data,dim=2)
-                count(3) = size(data,dim=3)
-                if (present(nt)) then
-                   start(4) = nt
-                   count(4) = 1
-                end if
-             end if
+             if (present(nt)) then
+               n=5
+               if (start(5) .eq. 0) n=4
+               start(n) = nt ; count(n) = 1
+             endif
+             
              status = pio_get_var(ncid, vardesc, start, count, data)
           else
              status = pio_inq_varndims(ncid, vardesc, ndims)
@@ -1952,7 +2032,7 @@ contains
        if ( trim(dimname)=='nj'.or. trim(dimname)=='lat'.or. trim(dimname)=='lsmlat') then
           start(i)=latidx
           count(i)=1
-       else if ( trim(dimname)=='ni'.or. trim(dimname)=='lon'.or. trim(dimname)=='lsmlon') then
+       else if ( trim(dimname)=='ni'.or. trim(dimname)=='lon'.or. trim(dimname)=='lsmlon' .or. trim(dimname)=='gridcell' .or. trim(dimname)=='topounit') then
           start(i)=lonidx
           count(i)=1
        else if ( trim(dimname)=='column') then
@@ -2067,6 +2147,7 @@ contains
           count(i)=dimlen
        end if
     enddo
+
     deallocate(dids)
 
   end subroutine scam_field_offsets
@@ -2181,7 +2262,7 @@ contains
     gsmap_lsize = mct_gsmap_lsize(gsmap,mpicom)
     gsmap_gsize = mct_gsmap_gsize(gsmap)
 
-    call mct_gsmap_OP(gsmap,iam,gsmOP)
+    call mct_gsMap_orderedPoints(gsmap,iam,gsmOP)
 
     fullsize = 1
     do n = 1,ndims

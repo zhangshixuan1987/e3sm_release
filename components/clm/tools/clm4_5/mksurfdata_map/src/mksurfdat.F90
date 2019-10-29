@@ -30,7 +30,7 @@ program mksurfdat
     use mkurbanparMod      , only : mkurbanInit, mkurban, mkurbanpar, numurbl
     use mkutilsMod         , only : normalize_classes_by_gcell
     use mkfileMod          , only : mkfile
-    use mkvarpar           , only : nlevsoi, elev_thresh
+    use mkvarpar           , only : nlevsoi, nlevslp, elev_thresh
     use mkvarctl
     use nanMod             , only : nan, bigint
     use mkncdio            , only : check_ret
@@ -42,6 +42,8 @@ program mksurfdat
     use mktopostatsMod     , only : mktopostats
     use mkVICparamsMod     , only : mkVICparams
     use mkCH4inversionMod  , only : mkCH4inversion
+    use mksoilphosphorusMod, only : mksoilphosphorus
+    use mkSedMod           , only : mkgrvl, mkslp10, mkEROparams
 !
 ! !ARGUMENTS:
     implicit none
@@ -137,6 +139,15 @@ program mksurfdat
     real(r8), allocatable  :: f0(:)              ! max fractional inundated area (unitless)
     real(r8), allocatable  :: p3(:)              ! coefficient for qflx_surf_lag for finundated (s/mm)
     real(r8), allocatable  :: zwt0(:)            ! decay factor for finundated (m)
+    real(r8), allocatable  :: apatiteP(:)        ! apptite phosphorus
+    real(r8), allocatable  :: labileP(:)         ! labile phosphorus
+    real(r8), allocatable  :: occludedP(:)       ! occluded phosphorus
+    real(r8), allocatable  :: secondaryP(:)      ! secondaryP phosphorus
+    real(r8), allocatable  :: grvl(:,:)          ! soil gravel content (percent)
+    real(r8), allocatable  :: slp10(:,:)         ! slope percentile (km/km)
+    real(r8), allocatable  :: ero_c1(:)          ! ELM-Erosion c1 parameter (unitless)
+    real(r8), allocatable  :: ero_c2(:)          ! ELM-Erosion c2 parameter (unitless)
+    real(r8), allocatable  :: ero_c3(:)          ! ELM-Erosion c3 parameter (unitless) 
 
 
     type(domain_type) :: ldomain
@@ -167,6 +178,10 @@ program mksurfdat
          mksrf_ftopostats,         &
          mksrf_fvic,               &
          mksrf_fch4,               &
+         mksrf_fphosphorus,        &
+         mksrf_fgrvl,              &
+         mksrf_fslp10,             &
+         mksrf_fero,               &
          nglcec,                   &
          numpft,                   &
          soil_color,               &
@@ -199,6 +214,10 @@ program mksurfdat
          map_ftopostats,           &
          map_fvic,                 &
          map_fch4,                 &
+         map_fphosphorus,          &
+         map_fgrvl,                &
+         map_fslp10,               &
+         map_fero,                 &
          outnc_large_files,        &
          outnc_double,             &
          outnc_dims,               &
@@ -236,6 +255,10 @@ program mksurfdat
     !    mksrf_ftopostats Topography statistics dataset
     !    mksrf_fvic ----- VIC parameters dataset
     !    mksrf_fch4 ----- inversion-derived CH4 parameters dataset
+    !    mksrf_fphosphorus Soil phosphorus dataset
+    !    mksrf_fgrvl ---- Soil gravel content dataset
+    !    mksrf_fslp10 --- Slope percentile dataset
+    !    mksrf_fero ----- ELM-Erosion parameters dataset 
     ! ======================================
     ! Must specify mapping file for the different datafiles above
     ! ======================================
@@ -260,6 +283,10 @@ program mksurfdat
     !    map_ftopostats -- Mapping for mksrf_ftopostats
     !    map_fvic -------- Mapping for mksrf_fvic
     !    map_fch4 -------- Mapping for mksrf_fch4
+    !    map_fphosphorus - Mapping for mksrf_fphosphorus
+    !    map_fgrvl ------- Mapping for mksrf_fgrvl
+    !    map_fslp10 ------ Mapping for mksrf_fslp10
+    !    map_fero -------- Mapping for mksrf_fero
     ! ======================================
     ! Optionally specify setting for:
     ! ======================================
@@ -416,7 +443,17 @@ program mksurfdat
                lakedepth(ns_o)                    , &
                f0(ns_o)                           , &
                p3(ns_o)                           , &
-               zwt0(ns_o)                         )       
+               zwt0(ns_o)                         , &
+               apatiteP(ns_o)                     , &
+               labileP(ns_o)                      , &
+               occludedP(ns_o)                    , &
+               secondaryP(ns_o)                   , &
+               grvl(ns_o,nlevsoi)                 , &
+               slp10(ns_o,nlevslp)                , &
+               ero_c1(ns_o)                       , &
+               ero_c2(ns_o)                       , &
+               ero_c3(ns_o)                       )
+
     landfrac_pft(:)       = spval 
     pctlnd_pft(:)         = spval
     pftdata_mask(:)       = -999
@@ -449,6 +486,15 @@ program mksurfdat
     f0(:)                 = spval
     p3(:)                 = spval
     zwt0(:)               = spval
+    apatiteP(:)           = spval
+    labileP(:)            = spval
+    occludedP(:)          = spval
+    secondaryP(:)         = spval
+    grvl(:,:)             = spval
+    slp10(:,:)            = spval
+    ero_c1(:)             = spval
+    ero_c2(:)             = spval
+    ero_c3(:)             = spval 
 
     ! ----------------------------------------------------------------------
     ! Open diagnostic output log file
@@ -491,6 +537,7 @@ program mksurfdat
     write(ndiag,*) 'topography statistics from:  ',trim(mksrf_ftopostats)
     write(ndiag,*) 'VIC parameters from:         ',trim(mksrf_fvic)
     write(ndiag,*) 'CH4 parameters from:         ',trim(mksrf_fch4)
+    write(ndiag,*) 'Soil phosphorus from:        ',trim(mksrf_fphosphorus)
     write(ndiag,*)' mapping for pft              ',trim(map_fpft)
     write(ndiag,*)' mapping for lake water       ',trim(map_flakwat)
     write(ndiag,*)' mapping for wetland          ',trim(map_fwetlnd)
@@ -512,6 +559,10 @@ program mksurfdat
     write(ndiag,*)' mapping for topography stats ',trim(map_ftopostats)
     write(ndiag,*)' mapping for VIC parameters   ',trim(map_fvic)
     write(ndiag,*)' mapping for CH4 parameters   ',trim(map_fch4)
+    write(ndiag,*)' mapping for soil phosphorus  ',trim(map_fphosphorus)
+    write(ndiag,*)' mapping for soil gravel      ',trim(map_fgrvl)
+    write(ndiag,*)' mapping for slope percentile ',trim(map_fslp10)
+    write(ndiag,*)' mapping for erosion params   ',trim(map_fero)
 
     if (mksrf_fdynuse /= ' ') then
        write(6,*)'mksrf_fdynuse = ',trim(mksrf_fdynuse)
@@ -682,10 +733,21 @@ program mksurfdat
 
     call change_landuse( ldomain, dynpft=.false. )
 
+    call mksoilphosphorus (ldomain, mapfname=map_fphosphorus, datfname=mksrf_fphosphorus, &
+         ndiag=ndiag, apatiteP_o=apatiteP, labileP_o=labileP, occludedP_o=occludedP, &
+         secondaryP_o=secondaryP)
+
+    call mkgrvl(ldomain, mapfname=map_fgrvl, datfname=mksrf_fgrvl, ndiag=ndiag, grvl_o=grvl) 
+
+    call mkslp10(ldomain, mapfname=map_fslp10, datfname=mksrf_fslp10, ndiag=ndiag, slp10_o=slp10)
+
+    call mkEROparams(ldomain, mapfname=map_fero, datfname=mksrf_fero, ndiag=ndiag, &
+         ero_c1_o=ero_c1, ero_c2_o=ero_c2, ero_c3_o=ero_c3)
+
     do n = 1,ns_o
 
        ! Assume wetland and/or lake when dataset landmask implies ocean 
-       ! (assume medium soil color (15), soil order(16) and loamy texture).
+       ! (assume medium soil color (15), soil order(15) and loamy texture).
        
        ! Also set pftdata_mask here
        ! Note that pctpft_full is NOT adjusted here, so that we still have information
@@ -695,13 +757,18 @@ program mksurfdat
        if (pctlnd_pft(n) < 1.e-6_r8) then
           pftdata_mask(n)  = 0
           soicol(n)        = 15
-          soiord(n)        = 16
+          soiord(n)        = 15
           pctwet(n)        = 100._r8 - pctlak(n)
           pcturb(n)        = 0._r8
           pctgla(n)        = 0._r8
           pctsand(n,:)     = 43._r8
           pctclay(n,:)     = 18._r8
           organic(n,:)   = 0._r8
+          grvl(n,:)        = 0._r8
+          slp10(n,:)       = 0._r8
+          ero_c1(n)        = 0._r8
+          ero_c2(n)        = 0._r8
+          ero_c3(n)        = 0._r8
        else
           pftdata_mask(n) = 1
        end if
@@ -713,6 +780,7 @@ program mksurfdat
        do k = 1,nlevsoi
           pctsand(n,k) = float(nint(pctsand(n,k)))
           pctclay(n,k) = float(nint(pctclay(n,k)))
+          grvl(n,k)    = float(nint(grvl(n,k)))
        end do
        pctlak(n) = float(nint(pctlak(n)))
        pctwet(n) = float(nint(pctwet(n)))
@@ -968,6 +1036,33 @@ program mksurfdat
     call check_ret(nf_inq_varid(ncid, 'URBAN_REGION_ID', varid), subname)
     call check_ret(nf_put_var_int(ncid, varid, urban_region), subname)
 
+    call check_ret(nf_inq_varid(ncid, 'APATITE_P', varid), subname)
+    call check_ret(nf_put_var_double(ncid, varid, apatiteP), subname)
+
+    call check_ret(nf_inq_varid(ncid, 'LABILE_P', varid), subname)
+    call check_ret(nf_put_var_double(ncid, varid, labileP), subname)
+
+    call check_ret(nf_inq_varid(ncid, 'OCCLUDED_P', varid), subname)
+    call check_ret(nf_put_var_double(ncid, varid, occludedP), subname)
+
+    call check_ret(nf_inq_varid(ncid, 'SECONDARY_P', varid), subname)
+    call check_ret(nf_put_var_double(ncid, varid, secondaryP), subname)
+
+    call check_ret(nf_inq_varid(ncid, 'PCT_GRVL', varid), subname)
+    call check_ret(nf_put_var_double(ncid, varid, grvl), subname) 
+
+    call check_ret(nf_inq_varid(ncid, 'SLP_P10', varid), subname)
+    call check_ret(nf_put_var_double(ncid, varid, slp10), subname)
+
+    call check_ret(nf_inq_varid(ncid, 'parEro_c1', varid), subname)
+    call check_ret(nf_put_var_double(ncid, varid, ero_c1), subname)
+
+    call check_ret(nf_inq_varid(ncid, 'parEro_c2', varid), subname)
+    call check_ret(nf_put_var_double(ncid, varid, ero_c2), subname)
+
+    call check_ret(nf_inq_varid(ncid, 'parEro_c3', varid), subname)
+    call check_ret(nf_put_var_double(ncid, varid, ero_c3), subname)
+
     ! Deallocate arrays NOT needed for dynamic-pft section of code
 
     deallocate ( organic )
@@ -984,6 +1079,8 @@ program mksurfdat
     deallocate ( vic_binfl, vic_ws, vic_dsmax, vic_ds )
     deallocate ( lakedepth )
     deallocate ( f0, p3, zwt0 )
+    deallocate ( apatiteP, labileP, occludedP, secondaryP )
+    deallocate ( grvl, slp10, ero_c1, ero_c2, ero_c3 )
 
     ! Synchronize the disk copy of a netCDF dataset with in-memory buffers
 

@@ -509,8 +509,14 @@ end if
       qvadv(k,m) = - fac*(wfldint(k)*(q3m1(k,m) - q3m1(k-1,m)))
    end do
 
-!!$   call outfld('TVADV'   ,tvadv,plon,lat)
-!!$   call outfld('QVADV'   ,qvadv,plon,lat)
+   if (have_vertdivt .and. have_vertdivq .and. use_3dfrc .and. use_iop) then
+      tvadv(:) = vertdivt(:)
+      qvadv(:,:) = vertdivq(:,:)
+   end if
+
+   call outfld('TVADV'   ,tvadv,plon,lat)
+   call outfld('QVADV'   ,qvadv,plon,lat)
+
 !
 !---end diagnostic estimates of vertical advection term----------
 !

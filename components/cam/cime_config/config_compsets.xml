@@ -282,6 +282,12 @@
   </compset>
 
   <compset>
+    <alias>FAMIPC5</alias>
+    <lname>AMIP_CAM5_CLM45%SP_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
+  </compset>
+
+
+  <compset>
     <alias>F1850PDC5L45BGC</alias>
     <lname>20TR_CAM5_CLM45%BGC_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
   </compset>

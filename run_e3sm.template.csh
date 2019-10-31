@@ -9,12 +9,15 @@
 ###===================================================================
 
 ### BASIC INFO ABOUT RUN
-set job_name       = A_WCYCL1850_template
+set job_name       = A_WCYCL1850_template_test7
 set compset        = A_WCYCL1850
 set resolution     = ne4_oQU240
-set machine        = default
-set walltime       = default
-setenv project       default
+set machine        = cori-knl
+set walltime       = 00:30:00
+setenv project       m2689
+setenv ntasks 960
+setenv nthrds 1
+
 
 ### SOURCE CODE OPTIONS
 set fetch_code     = false
@@ -54,7 +57,7 @@ set short_term_archive_root_dir = default
 
 ### LENGTH OF SIMULATION, RESTARTS, AND ARCHIVING
 set stop_units                  = ndays
-set stop_num                    = 1
+set stop_num                    = 15
 set restart_units               = $stop_units
 set restart_num                 = $stop_num
 set num_resubmits               = 0

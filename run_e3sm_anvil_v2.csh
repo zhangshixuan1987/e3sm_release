@@ -9,7 +9,7 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = subcol_silhs_test5 #A_WCYCL1850_template
+set job_name       = 1year_test1 #A_WCYCL1850_template
 #set compset        = FAMIPC5 
 set compset        =  FC5CLBMG2BCL72
 set resolution     = ne16_ne16
@@ -66,20 +66,20 @@ set restart_files_dir = none
 
 ### LENGTH OF SIMULATION, RESTARTS, AND ARCHIVING
 set stop_units                  = ndays
-set stop_num                    = 1
+set stop_num                    = 12
 set restart_units               = $stop_units
 set restart_num                 = $stop_num
 set num_resubmits               = 0
 set do_short_term_archiving     = false
 
 ### SIMULATION OPTIONS
-set atm_output_freq             = 1
-set records_per_atm_output_file = 1500
-set start_date                  = 0001-06-01 #default
+set atm_output_freq             = 0
+set records_per_atm_output_file = 1
+set start_date                  = default
 
 ### COUPLER HISTORY FILES
 set do_cpl_hist    = true
-set cpl_hist_units = ndays
+set cpl_hist_units = nmonths
 set cpl_hist_num   = 1
 
 ### Flag options

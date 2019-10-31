@@ -801,7 +801,7 @@ end subroutine clubb_init_cnst
 
     prec_dp_idx = pbuf_get_index('PREC_DP') !PMA ZM precip for gustiness
     snow_dp_idx = pbuf_get_index('SNOW_DP') !PMA ZM snow for gustiness
-    vmag_gust_idx = pbuf_get_index('vmag_gust') !PMA ZM snow for gustiness
+!    vmag_gust_idx = pbuf_get_index('vmag_gust') !PMA ZM snow for gustiness
 
     iisclr_rt  = -1
     iisclr_thl = -1

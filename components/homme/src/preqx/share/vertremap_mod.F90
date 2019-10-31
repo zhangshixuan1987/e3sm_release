@@ -93,6 +93,7 @@ contains
            if (dp_star(i,j,k ) < 0) then
               print *,'level = ',k
               print *,"column location lat,lon (radians):",elem(ie)%spherep(i,j)%lat,elem(ie)%spherep(i,j)%lon
+!              dp_star(i,j,k ) = 0  ! Zhun 20191004
            endif
         enddo
         enddo

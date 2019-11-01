@@ -14,7 +14,7 @@ import os
 from subprocess import call
 
  
-def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs):
+def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir):
 
 # ncases, the number of models
 # cases, the name of models
@@ -22,8 +22,8 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
 # filepath, model output filepath
 # filepathobs, filepath for observational data
 # inptrs = [ncases]
- if not os.path.exists("pic"):
-        os.mkdir("pic")
+ if not os.path.exists(casedir):
+        os.mkdir(casedir)
 
 
  _Font   = 25
@@ -49,10 +49,10 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
 
  for ire in range (0, nsite):
      for im in range (0,ncases):
-         if not os.path.exists('pic/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
-             os.mkdir('pic/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
+         if not os.path.exists(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
+             os.mkdir(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
 
-         plotname = './pic/'+str(lons[ire])+'E_'+str(lats[ire])+'N/Budgets_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+         plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/Budgets_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
          plotbgt[im+ncases*ire] = 'Budgets_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
 
          wks= Ngl.open_wks(ptype,plotname)

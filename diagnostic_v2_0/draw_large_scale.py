@@ -6,15 +6,15 @@
 
 import Ngl
 from netCDF4 import Dataset
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
-import pylab
+#import pylab
 import os
 from subprocess import call
 
 
-def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs):
+def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs, casedir):
 
 # ncases, the number of models
 # cases, the name of models
@@ -22,8 +22,8 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
 # filepath, model output filepath
 # filepathobs, filepath for observational data
 # inptrs = [ncases]
- if not os.path.exists("pic"):
-        os.mkdir("pic")
+ if not os.path.exists(casedir):
+        os.mkdir(casedir)
 
  _Font   = 25
  interp = 2
@@ -48,10 +48,10 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
 
 
  for ire in range (0, nsite):
-     if not os.path.exists('pic/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
-         os.mkdir('pic/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
+     if not os.path.exists(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
+         os.mkdir(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
 
-     plotname = './pic/'+str(lons[ire])+'E_'+str(lats[ire])+'N/Largescale_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+     plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/Largescale_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
      plotlgs[ire] = 'Largescale_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
      wks= Ngl.open_wks(ptype,plotname)
 
@@ -61,7 +61,6 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
      res     = Ngl.Resources()
      res.nglDraw              = False
      res.nglFrame             = False
-     res.lgLabelFontHeightF     = .012                   # change font height
      res.lgPerimOn              = False                 # no box around
      res.vpWidthF         = 0.30                      # set width and height
      res.vpHeightF        = 0.30
@@ -186,7 +185,7 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
              A_field[im,:] = A_field[im,:] *cscale[iv]
              inptrs.close()
 
-         res.tiMainString    =  varis[iv]+"  "+theunits
+         res.tiMainString  =  varis[iv]+"  "+theunits
          res.trXMinF = min(np.min(A_field[0, :]),np.min(B))
          res.trXMaxF = max(np.max(A_field[0, :]),np.max(B))
          if(varis[iv] == "THETA"):

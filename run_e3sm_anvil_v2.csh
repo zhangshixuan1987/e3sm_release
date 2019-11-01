@@ -9,7 +9,7 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = 1year_test1 #A_WCYCL1850_template
+set job_name       = subcolsilhson #A_WCYCL1850_template
 #set compset        = FAMIPC5 
 set compset        =  FC5CLBMG2BCL72
 set resolution     = ne16_ne16
@@ -27,7 +27,7 @@ setenv init_aero_type cons_droplet # keep this as none for REPLAY option
 ### SOURCE CODE OPTIONS
 set fetch_code     = false       # flag to toggle cloning source code
 set e3sm_tag       = maint-1.0   # github tag or hash
-set tag_name       = clubb_silhs_v2
+set tag_name       = clubb_silhs_v2_tau
 module load python
 
 set clubb_vars_zt_list = "'thlm', 'thvm', 'rtm', 'rcm', 'rvm', 'um', 'vm', 'um_ref','vm_ref','ug', 'vg', 'cloud_frac', 'cloud_cover', 'rcm_in_layer', 'rcm_in_cloud', 'p_in_Pa', 'exner', 'rho_ds_zt', 'thv_ds_zt', 'Lscale', 'Lscale_pert_1', 'Lscale_pert_2', 'T_in_K', 'rel_humidity', 'wp3', 'wpthlp2', 'wp2thlp', 'wprtp2', 'wp2rtp', 'Lscale_up', 'Lscale_down', 'tau_zt', 'Kh_zt', 'wp2thvp', 'wp2rcp', 'wprtpthlp', 'sigma_sqd_w_zt', 'rho', 'radht', 'radht_LW', 'radht_SW', 'Ncm', 'Nc_in_cloud', 'Nc_activated', 'snowslope', 'sed_rcm', 'rsat', 'rsati', 'diam', 'mass_ice_cryst', 'rcm_icedfs', 'u_T_cm', 'rtm_bt', 'rtm_ma', 'rtm_ta', 'rtm_mfl', 'rtm_tacl', 'rtm_cl', 'rtm_forcing', 'rtm_sdmp','rtm_mc', 'rtm_pd', 'rvm_mc', 'rcm_mc', 'rcm_sd_mg_morr', 'thlm_bt', 'thlm_ma', 'thlm_ta', 'thlm_mfl', 'thlm_tacl', 'thlm_cl', 'thlm_forcing', 'thlm_sdmp','thlm_mc', 'thlm_old', 'thlm_without_ta', 'thlm_mfl_min', 'thlm_mfl_max', 'thlm_enter_mfl', 'thlm_exit_mfl', 'rtm_old', 'rtm_without_ta', 'rtm_mfl_min', 'rtm_mfl_max', 'rtm_enter_mfl', 'rtm_exit_mfl', 'um_bt', 'um_ma', 'um_gf', 'um_cf', 'um_ta', 'um_f', 'um_sdmp', 'um_ndg', 'vm_bt', 'vm_ma', 'vm_gf', 'vm_cf', 'vm_ta', 'vm_f', 'vm_sdmp', 'vm_ndg', 'wp3_bt', 'wp3_ma', 'wp3_ta', 'wp3_tp', 'wp3_ac', 'wp3_bp1', 'wp3_bp2', 'wp3_pr1', 'wp3_pr2', 'wp3_dp1', 'wp3_cl', 'mixt_frac', 'w_1', 'w_2', 'varnce_w_1', 'varnce_w_2', 'thl_1', 'thl_2', 'varnce_thl_1', 'varnce_thl_2', 'rt_1', 'rt_2', 'varnce_rt_1', 'varnce_rt_2', 'rc_1', 'rc_2', 'rsatl_1', 'rsatl_2', 'cloud_frac_1', 'cloud_frac_2', 'a3_coef_zt', 'wp3_on_wp2_zt', 'chi_1', 'chi_2', 'stdev_chi_1', 'stdev_chi_2', 'stdev_eta_1', 'stdev_eta_2', 'covar_chi_eta_1', 'covar_chi_eta_2', 'corr_chi_eta_1', 'corr_chi_eta_2', 'corr_rt_thl_1', 'crt_1', 'crt_2', 'cthl_1', 'cthl_2', 'precip_frac', 'precip_frac_1', 'precip_frac_2', 'Ncnm', 'wp2_zt', 'thlp2_zt', 'wpthlp_zt', 'wprtp_zt', 'rtp2_zt', 'rtpthlp_zt', 'up2_zt', 'vp2_zt', 'upwp_zt', 'vpwp_zt', 'C11_Skw_fnc'"
@@ -855,7 +855,7 @@ else
   #$xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-e3smreplay'
   #$xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-dyn se -phys cam5 -clubb_sgs -rad rrtmg -nlev 72 -microphys mg2 -cppdefs '-DUWM_MISC' ' 
   #$xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-dyn se -phys cam5 -clubb_sgs -rad rrtmg -chem trop_mam3 -silent -nlev 72 -microphys mg$MGVER  -cppdefs '-DUWM_MISC' '
-   $xmlchange_exe --id CAM_CONFIG_OPTS="-dyn se -phys cam5 -clubb_sgs -rad rrtmg -chem trop_mam3 -silent -nlev 72 -microphys mg$MGVER -psubcols $NUMSC -cppdefs '-DUWM_MISC -DSILHS'"
+   $xmlchange_exe --id CAM_CONFIG_OPTS="-dyn se -phys cam5 -clubb_sgs -chem trop_mam3 -silent -nlev 72 -microphys mg$MGVER -psubcols $NUMSC -cppdefs '-DUWM_MISC -DSILHS'"
 endif
 
 if ($init_aero_type == cons_droplet || $init_aero_type == none) then
@@ -1008,36 +1008,36 @@ EOF
 cat <<EOF >> user_nl_cam 
 ! dtime = 300
 ! clubb_timestep = 150
-! clubb_C1 = 1.0D0
-! clubb_C1b = 1.0D0
-! clubb_C2rt = 2.0D0
-! clubb_C2thl = 2.0D0
-! clubb_C2rtthl = 2.0D0
-! clubb_C4   = 2.0D0
-! clubb_C5   = 0.3D0
-! clubb_C6rt = 2.0D0
-! clubb_C6rtb = 2.0D0
-! clubb_C6thlb = 2.0D0
-! clubb_beta = 1.0D0
-! clubb_gamma_coef = 0.25D0
-! clubb_gamma_coefb = 0.25D0
-! clubb_c_K2 = 0.025D0
-! clubb_c_K10= 0.3D0
-! clubb_nu2  = 1.0D0
-! clubb_C14 = 1.0D0
-! clubb_C15 = 0.0D0
-! clubb_C8 = 0.5D0
-! clubb_C11  = 0.4D0
-! clubb_C11b = 0.4D0
-! clubb_C_invrs_tau_bkgnd = 1.1D0
-! clubb_C_invrs_tau_sfc = 0.1D0
-! clubb_C_invrs_tau_shear = 0.02D0
-! clubb_C_invrs_tau_N2 = 0.4D0
-! clubb_C_invrs_tau_N2_wp2 = 0.1D0
-! clubb_C_invrs_tau_N2_xp2 = 0.05D0
-! clubb_C_invrs_tau_N2_wpxp= 0.0D0
-! clubb_C_invrs_tau_N2_clear_wp3 = 1.0D0
-! clubb_C_wp2_splat = 1.0D0
+ clubb_C1 = 1.0D0
+ clubb_C1b = 1.0D0
+ clubb_C2rt = 2.0D0
+ clubb_C2thl = 2.0D0
+ clubb_C2rtthl = 2.0D0
+ clubb_C4   = 2.0D0
+ clubb_C5   = 0.3D0
+ clubb_C6rt = 2.0D0
+ clubb_C6rtb = 2.0D0
+ clubb_C6thlb = 2.0D0
+ clubb_beta = 1.0D0
+ clubb_gamma_coef = 0.25D0
+ clubb_gamma_coefb = 0.25D0
+ clubb_c_K2 = 0.025D0
+ clubb_c_K10= 0.3D0
+ clubb_nu2  = 1.0D0
+ clubb_C14 = 1.0D0
+ clubb_C15 = 0.0D0
+ clubb_C8 = 0.5D0
+ clubb_C11  = 0.4D0
+ clubb_C11b = 0.4D0
+ clubb_C_invrs_tau_bkgnd = 1.1D0
+ clubb_C_invrs_tau_sfc = 0.1D0
+ clubb_C_invrs_tau_shear = 0.02D0
+ clubb_C_invrs_tau_N2 = 0.4D0
+ clubb_C_invrs_tau_N2_wp2 = 0.1D0
+ clubb_C_invrs_tau_N2_xp2 = 0.05D0
+ clubb_C_invrs_tau_N2_wpxp= 0.0D0
+ clubb_C_invrs_tau_N2_clear_wp3 = 1.0D0
+ clubb_C_wp2_splat = 1.0D0
 
  clubb_ice_deep = 16.e-6 
  clubb_ice_sh = 50.e-6
@@ -1052,10 +1052,10 @@ cat <<EOF >> user_nl_cam
  macrop_scheme = 'CLUBB_SGS'
  eddy_scheme = 'CLUBB_SGS'
  shallow_scheme = 'CLUBB_SGS'
- !deep_scheme = 'off'
- !subcol_scheme = 'SILHS'
- !use_subcol_microp = .true.
- !microp_uniform = .true.
+ deep_scheme = 'off'
+ subcol_scheme = 'SILHS'
+ use_subcol_microp = .true.
+ microp_uniform = .true.
  clubb_do_adv = .false.
  clubb_expldiff = .false.
  clubb_rainevap_turb = .false.
@@ -1068,7 +1068,47 @@ cat <<EOF >> user_nl_cam
  mfilt  = $records_per_atm_output_file                                 
  avgflag_pertape = 'A','A','I','A','A','A'
 
- fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list
+ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,'U:A','PS:A','T:A','V:A','OMEGA:A','Z3:A','PRECT:A',
+'CLDLIQ:A', 'CLDICE:A', 'LWCF:A', 'SWCF:A', 'FLUT:A',
+'TMQ:A', 'PRECC:A', 'PRECL:A', 'CME:A', 'PRODPREC:A',
+'EVAPPREC:A','EVAPSNOW:A','ICWMRST:A','ICIMRST:A','PRAO:A',
+'PRCO:A','QCSEVAP:A','QISEVAP:A','QVRES:A','CMEIOUT:A','VTRMI:A',
+'VTRMC:A','QCSEDTEN:A','QISEDTEN:A','MNUCCCO:A','MNUCCTO:A',
+'MNUCCDO:A','MNUCCDOhet:A','MSACWIO:A','PSACWSO:A','BERGSO:A',
+'BERGO:A','MELTO:A','HOMOO:A','QCRESO:A','PRCIO:A','PRAIO:A',
+'MELTSDT:A','FRZRDT:A','ADRAIN:A','ADSNOW:A','FREQR:A','FREQS:A',
+'PE:A','APRL:A','PEFRAC:A','VPRCO:A','VPRAO:A','RACAU:A',
+'QIRESO:A','QCRESO:A','PRACSO:A','MPDT:A','MPDQ:A','MPDLIQ:A',
+'MPDICE:A','INEGCLPTEND', 'LNEGCLPTEND', 'VNEGCLPTEND',
+'QCRAT:A', 'QVHFTEN', 'QCHFTEN', 'QRHFTEN', 'QIHFTEN', 'QSHFTEN', 'THFTEN',
+'SL', 'Q', 'RHW', 'QRS', 'QRL', 'HR', 'FDL', 'SILHS_CLUBB_PRECIP_FRAC',
+'SILHS_CLUBB_ICE_SS_FRAC', 'T_ADJ_CLUBB'
+
+subcol_SILHS_weight = .true.
+subcol_SILHS_numsubcol = $NUMSC
+subcol_SILHS_corr_file_name = 'arm_97'
+subcol_silhs_q_to_micro = .true. ! if .false. gridbox means are used instead of sample points
+subcol_silhs_n_to_micro = .true. ! if .false. gridbox means are used instead of sample points
+subcol_silhs_use_clear_col = .false.
+subcol_SILHS_constrainmn = .false.
+subcol_silhs_ncnp2_on_ncnm2 = 0.05,
+hmp2_ip_on_hmm2_ip_slope%rr = 0.0,
+hmp2_ip_on_hmm2_ip_slope%Nr = 0.0,
+hmp2_ip_on_hmm2_ip_slope%rs = 0.0,
+hmp2_ip_on_hmm2_ip_slope%Ns = 0.0,
+hmp2_ip_on_hmm2_ip_slope%ri = 0.0,
+hmp2_ip_on_hmm2_ip_slope%Ni = 0.0,
+hmp2_ip_on_hmm2_ip_intrcpt%rr = 1.0,
+hmp2_ip_on_hmm2_ip_intrcpt%Nr = 1.0,
+hmp2_ip_on_hmm2_ip_intrcpt%rs = 1.0,
+hmp2_ip_on_hmm2_ip_intrcpt%Ns = 1.0,
+hmp2_ip_on_hmm2_ip_intrcpt%ri = 1.0,
+hmp2_ip_on_hmm2_ip_intrcpt%Ni = 1.0
+sol_facti_cloud_borne = 1.0D0
+dust_emis_fact = 0.3D0
+nucleate_ice_subgrid = 1.0
+seasalt_emis_scale = 0.6
+
 ! fincl2lonlat = '240e_27n'
  nhtfrq(2) = 1
  mfilt(2) = 1500

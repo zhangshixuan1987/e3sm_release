@@ -14,7 +14,7 @@ import os
 from subprocess import call
 
 
-def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs):
+def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs, casedir):
 
 # ncases, the number of models
 # cases, the name of models
@@ -22,8 +22,8 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
 # filepath, model output filepath
 # filepathobs, filepath for observational data
 # inptrs = [ncases]
- if not os.path.exists("pic"):
-        os.mkdir("pic")
+ if not os.path.exists(casedir):
+        os.mkdir(casedir)
 
  _Font   = 25
  interp = 2
@@ -48,10 +48,10 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
 
 
  for ire in range (0, nsite):
-     if not os.path.exists('pic/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
-         os.mkdir('pic/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
+     if not os.path.exists(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
+         os.mkdir(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
 
-     plotname = './pic/'+str(lons[ire])+'E_'+str(lats[ire])+'N/CLUBB_standard_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+     plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/CLUBB_standard_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
      plotstd[ire] = 'CLUBB_standard_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
      wks= Ngl.open_wks(ptype,plotname)
 

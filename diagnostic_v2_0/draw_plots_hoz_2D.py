@@ -14,7 +14,7 @@ import Common_functions
 from subprocess import call
 
 
-def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs):
+def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir):
 
 # ncases, the number of models
 # cases, the name of models
@@ -22,11 +22,11 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
 # filepath, model output filepath
 # filepathobs, filepath for observational data
 # inptrs = [ncases]
- if not os.path.exists("pic"):
-        os.mkdir("pic")
+ if not os.path.exists(casedir):
+        os.mkdir(casedir)
 
- if not os.path.exists("pic/2D"):
-        os.mkdir("pic/2D") 
+ if not os.path.exists(casedir+"/2D"):
+        os.mkdir(casedir+"/2D") 
 
  _Font   = 25
  interp = 2
@@ -88,7 +88,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    #************************************************
    # create plot
    #************************************************
-   plotname = './pic/2D/Horizontal_'+varis[iv]+'_'+cseason
+   plotname = casedir+'/2D/Horizontal_'+varis[iv]+'_'+cseason
    plot2d[iv] = 'Horizontal_'+varis[iv]+'_'+cseason
    wks= Ngl.open_wks(ptype,plotname)
  

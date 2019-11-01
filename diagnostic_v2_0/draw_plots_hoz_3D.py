@@ -14,7 +14,7 @@ import Common_functions
 from subprocess import call
 
 
-def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs):
+def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir):
 
 # ncases, the number of models
 # cases, the name of models
@@ -22,11 +22,11 @@ def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, l
 # filepath, model output filepath
 # filepathobs, filepath for observational data
 # inptrs = [ncases]
- if not os.path.exists("pic"):
-        os.mkdir("pic")
+ if not os.path.exists(casedir):
+        os.mkdir(casedir)
 
- if not os.path.exists("pic/2D"):
-        os.mkdir("pic/2D") 
+ if not os.path.exists(casedir+"/2D"):
+        os.mkdir(casedir+"/2D") 
 
  _Font   = 25
  interp = 2
@@ -87,7 +87,7 @@ def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, l
    #************************************************
    # create plot
    #************************************************
-   plotname = './pic/2D/Horizontal_'+varis[iv]+'_'+cseason+str(clevel)
+   plotname = casedir+'/2D/Horizontal_'+varis[iv]+'_'+cseason+str(clevel)
    plot3d[iv] = 'Horizontal_'+varis[iv]+'_'+cseason+str(clevel)
 
    

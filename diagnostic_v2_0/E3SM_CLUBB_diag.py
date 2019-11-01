@@ -11,35 +11,34 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-casename="pic"
-outdir="/global/u2/z/zhun/E3SM.wiki/python_scripts/"
+casename="test" # A general case name
+outdir="/home/zhun/E3SM_code/clubb_silhs_v2_tau/diagnostic_v2_0/" # Location of plots
 
-filepath=["/global/cscratch1/sd/zhun/E3SM_simulations/",\
-               "/global/cscratch1/sd/zhun/E3SM_simulations/" \
+filepath=["/lcrc/group/acme/zhun/E3SM_simulations/",\
+          "/lcrc/group/acme/zhun/E3SM_simulations/" \
               ]
 cases=[ \
-               "zhun.A_WCYCL1850S_CMIP6_ifort18_taus_splat1.ne30_oEC.cori-knl",\
-               "zhun.A_WCYCL1850S_CMIP6_ifort18_taus_C63.ne30_oEC.cori-knl"    \
+        "anvil.clubb_silhs_v2_tau.1year_test1.ne16_ne16",\
+        "anvil.clubb_silhs_v2.1year_test1.ne16_ne16"\
               ]
 # Give a short name for your experiment which will appears on plots
 
-casenames=['splat=1','C63']
+casenames=['mergetau','mergesilhs']
 
 years=[\
                 "0001","0001"]
 
 # Observation Data
-filepathobs="/global/project/projectdirs/m2689/zhun/amwg/obs_data_20140804/"
-
+#filepathobs="/global/project/projectdirs/m2689/zhun/amwg/obs_data_20140804/"
+filepathobs="/blues/gpfs/home/zhun/amwg_diag_20140804/obs_data_20140804/"
 #------------------------------------------------------------------------
 # Setting of plots.
 ptype="png"   # eps, pdf, ps... are supported by this package
 cseason="JJA" # Seasons, or others
 
 #------------------------------------------------------------------------
-# set to true when you first use it.
-calmean=False     # make mean states
-findout=False     # pick out the locations of your sites
+calmean=False      # make mean states
+findout=True      # pick out the locations of your sites
 draw2d=True       # This flag control 2D plots
 drawlarge= True   # profiles for large-scale variable on your sites 
 drawclubb=True    # profiles for standard clubb output
@@ -47,9 +46,13 @@ drawskw=True      # profiles for skewness functions
 drawsilhs=False   # profiles for silhs variables
 drawbgt=True      # budgets of 9 prognostic Eqs 
 
-makeweb=True
-maketar=True
+makeweb=True      # Make a webpage?
+maketar=True      # Tar them?
 
+clevel = 500
+area  = 1.
+# Note, this para helps to find out the 'ncol' within
+# lats - area < lat(ncol) < lons + area .and. lons- area < lon(ncol) < lons + area
 #------------------------------------------------------------------------
 # Please give the lat and lon of sites here.
 # sites    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
@@ -58,16 +61,15 @@ maketar=True
 lats = [  20,  27, -20, -20,  -5,  -1,  60,   2,   9,  56,  45,   0,  10]
 lons = [ 190, 240, 275, 285, 355, 259,  180, 140, 229, 311,  180, 295,  90]
 
-clevel = 500
-area  = .5
-# Note, this para helps to find out the 'ncol' within
-# lats - area < lat(ncol) < lons + area .and. lons- area < lon(ncol) < lons + area
 
 #========================================================================
 #------------------------------------------------------------------------
 # Do not need to change
 ncases=len(cases)
 nsite=len(lats)
+
+casedir=outdir+casename
+print(casedir)
 
 import os
 import function_cal_mean
@@ -98,28 +100,28 @@ if findout:
 
 if draw2d:
     print("Drawing 2d")
-    plot2d=draw_plots_hoz_2D.draw_2D_plot(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs)
-    plot3d=draw_plots_hoz_3D.draw_3D_plot(ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs)
+    plot2d=draw_plots_hoz_2D.draw_2D_plot(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
+    plot3d=draw_plots_hoz_3D.draw_3D_plot(ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 if drawlarge:
     print("Large-scale variables on selected sites")
-    plotlgs=draw_large_scale.large_scale_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs)
+    plotlgs=draw_large_scale.large_scale_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 if drawclubb:
     print("CLUBB standard variables on selected sites")
-    plotstd=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs)
+    plotstd=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 if drawskw:
     print("CLUBB standard variables on selected sites")
-    plotskw=draw_clubb_skew.clubb_skw_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs)
+    plotskw=draw_clubb_skew.clubb_skw_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 if drawsilhs:
     print("CLUBB standard variables on selected sites")
-    plotsilhs=draw_silhs_standard.silhs_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs)
+    plotsilhs=draw_silhs_standard.silhs_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 if drawbgt:
     print("CLUBB BUDGET on selected sites")
-    plotbgt=draw_clubb_budget.draw_clubb_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs)
+    plotbgt=draw_clubb_budget.draw_clubb_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 ## ============================
 # Make Web Page   

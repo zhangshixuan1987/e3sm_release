@@ -2559,6 +2559,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
       end do
    end do
 
+!   write (iulog, *) icwmrst
    ! Calculate cloud fraction for prognostic precip sizes.
    if (micro_mg_version > 1) then
       ! Cloud fraction for purposes of precipitation is maximum cloud
@@ -2582,6 +2583,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
 
    ! Average the fields which are needed later in this paramterization to be on the grid
    if (use_subcol_microp) then
+      
       call subcol_field_avg(prec_str,  ngrdcol, lchnk, prec_str_grid)
       call subcol_field_avg(iclwpst,   ngrdcol, lchnk, iclwpst_grid)
       call subcol_field_avg(cvreffliq, ngrdcol, lchnk, cvreffliq_grid)
@@ -2616,7 +2618,9 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
       call subcol_field_avg(qireso,    ngrdcol, lchnk, qireso_grid)
       call subcol_field_avg(prcio,     ngrdcol, lchnk, prcio_grid)
       call subcol_field_avg(praio,     ngrdcol, lchnk, praio_grid)
+      write (iulog, *) "before ngrdcol", ngrdcol ,lchnk,psubcols,pcols !icwmrst_grid
       call subcol_field_avg(icwmrst,   ngrdcol, lchnk, icwmrst_grid)
+      write (iulog, *) "after",icwmrst_grid
       call subcol_field_avg(icimrst,   ngrdcol, lchnk, icimrst_grid)
       call subcol_field_avg(liqcldf,   ngrdcol, lchnk, liqcldf_grid)
       call subcol_field_avg(icecldf,   ngrdcol, lchnk, icecldf_grid)
@@ -2797,6 +2801,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    rel_fn_grid = 10._r8
 
    ncic_grid = 1.e8_r8
+
+!   write(iulog,*) icwmrst_grid(:ngrdcol,top_lev:)
 
    call size_dist_param_liq(mg_liq_props, icwmrst_grid(:ngrdcol,top_lev:), &
         ncic_grid(:ngrdcol,top_lev:), rho_grid(:ngrdcol,top_lev:), &

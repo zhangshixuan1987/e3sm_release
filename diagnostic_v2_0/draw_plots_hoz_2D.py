@@ -52,13 +52,13 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
  for iv in range(0, nvaris):
 # make plot for each field 
    if(varis[iv] == "CLDTOT"):
-       cntrs[iv,:] = [1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 90]
+       cntrs[iv,:] = [ 2, 5, 10, 20, 30, 40, 50, 60, 70,80, 90]
    if(varis[iv] == "LWCF"):
        cntrs[iv,:] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110] 
    if(varis[iv] =="SWCF"):
-       cntrs[iv,:] = [-30, -40, -50, -60, -70, -80, -90, -100, -110, -120, -130]
+       cntrs[iv,:] = [-40, -50, -60, -70, -80, -90, -100, -110, -120, -130,-140]
    if(varis[iv]=="PRECT" or varis[iv]=="QFLX"):
-       cntrs[iv,:] = [0.1, 0.2, 0.5, 1.0, 2, 3, 4, 5, 6, 7, 8]
+       cntrs[iv,:] = [0.5, 1, 2, 3, 4, 5, 6, 7, 8,9,10]
    if(varis[iv] == "FLUT"):
        cntrs[iv,:] = [210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310]
    
@@ -91,6 +91,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    plotname = casedir+'/2D/Horizontal_'+varis[iv]+'_'+cseason
    plot2d[iv] = 'Horizontal_'+varis[iv]+'_'+cseason
    wks= Ngl.open_wks(ptype,plotname)
+   Ngl.define_colormap(wks,"BlueRed")
  
 #   ngl_define_colormap(wks,"prcp_1")
    plot = []

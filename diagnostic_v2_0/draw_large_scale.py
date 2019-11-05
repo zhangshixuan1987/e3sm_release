@@ -71,7 +71,7 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
      res.tmXBLabelFont  = 12
      res.tmXBLabelFontHeightF = 0.005
      res.tmXBLabelFontThicknessF = 1.0
-     res.tmXBLabelAngleF = 45
+#     res.tmXBLabelAngleF = 45
      res.xyMarkLineMode      = "Lines"
      res.xyLineThicknesses = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0,2.,2.,2.,2.,2,2,2,2,2,2,2]
 

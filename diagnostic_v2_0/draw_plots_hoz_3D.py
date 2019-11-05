@@ -80,7 +80,7 @@ def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, l
        cntrs[iv,:] = [5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300]
 
    if(varis[iv] == "T"):
-       cntrs[iv,:] = [205,210,215,220,225,230,235,240,245,250,255]
+       cntrs[iv,:] = [210,220,230,240,250,260,270,280,290,300,310]
 
 
 
@@ -93,7 +93,7 @@ def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, l
    
    wks= Ngl.open_wks(ptype,plotname)
  
-#   ngl_define_colormap(wks,"prcp_1")
+   Ngl.define_colormap(wks,"amwg256")
    plot = []
 
    txres               = Ngl.Resources()

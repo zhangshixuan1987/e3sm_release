@@ -9,13 +9,11 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = subcolsilhson #A_WCYCL1850_template
+set job_name       = nosubcolsilhson_test1 #A_WCYCL1850_template
 #set compset        = FAMIPC5 
 set compset        =  FC5CLBMG2BCL72
 set resolution     = ne16_ne16
 set machine        = anvil
-setenv NUMSC 4
-setenv MGVER 2 
 
 set walltime       = 18:00:00
 setenv project condo      
@@ -66,7 +64,7 @@ set restart_files_dir = none
 
 ### LENGTH OF SIMULATION, RESTARTS, AND ARCHIVING
 set stop_units                  = ndays
-set stop_num                    = 12
+set stop_num                    = 1
 set restart_units               = $stop_units
 set restart_num                 = $stop_num
 set num_resubmits               = 0
@@ -855,7 +853,6 @@ else
   #$xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-e3smreplay'
   #$xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-dyn se -phys cam5 -clubb_sgs -rad rrtmg -nlev 72 -microphys mg2 -cppdefs '-DUWM_MISC' ' 
   #$xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-dyn se -phys cam5 -clubb_sgs -rad rrtmg -chem trop_mam3 -silent -nlev 72 -microphys mg$MGVER  -cppdefs '-DUWM_MISC' '
-   $xmlchange_exe --id CAM_CONFIG_OPTS="-dyn se -phys cam5 -clubb_sgs -chem trop_mam3 -silent -nlev 72 -microphys mg$MGVER -psubcols $NUMSC -cppdefs '-DUWM_MISC -DSILHS'"
 endif
 
 if ($init_aero_type == cons_droplet || $init_aero_type == none) then
@@ -1052,10 +1049,6 @@ cat <<EOF >> user_nl_cam
  macrop_scheme = 'CLUBB_SGS'
  eddy_scheme = 'CLUBB_SGS'
  shallow_scheme = 'CLUBB_SGS'
- deep_scheme = 'off'
- subcol_scheme = 'SILHS'
- use_subcol_microp = .true.
- microp_uniform = .true.
  clubb_do_adv = .false.
  clubb_expldiff = .false.
  clubb_rainevap_turb = .false.
@@ -1068,47 +1061,7 @@ cat <<EOF >> user_nl_cam
  mfilt  = $records_per_atm_output_file                                 
  avgflag_pertape = 'A','A','I','A','A','A'
 
- fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,'U:A','PS:A','T:A','V:A','OMEGA:A','Z3:A','PRECT:A',
-'CLDLIQ:A', 'CLDICE:A', 'LWCF:A', 'SWCF:A', 'FLUT:A',
-'TMQ:A', 'PRECC:A', 'PRECL:A', 'CME:A', 'PRODPREC:A',
-'EVAPPREC:A','EVAPSNOW:A','ICWMRST:A','ICIMRST:A','PRAO:A',
-'PRCO:A','QCSEVAP:A','QISEVAP:A','QVRES:A','CMEIOUT:A','VTRMI:A',
-'VTRMC:A','QCSEDTEN:A','QISEDTEN:A','MNUCCCO:A','MNUCCTO:A',
-'MNUCCDO:A','MNUCCDOhet:A','MSACWIO:A','PSACWSO:A','BERGSO:A',
-'BERGO:A','MELTO:A','HOMOO:A','QCRESO:A','PRCIO:A','PRAIO:A',
-'MELTSDT:A','FRZRDT:A','ADRAIN:A','ADSNOW:A','FREQR:A','FREQS:A',
-'PE:A','APRL:A','PEFRAC:A','VPRCO:A','VPRAO:A','RACAU:A',
-'QIRESO:A','QCRESO:A','PRACSO:A','MPDT:A','MPDQ:A','MPDLIQ:A',
-'MPDICE:A','INEGCLPTEND', 'LNEGCLPTEND', 'VNEGCLPTEND',
-'QCRAT:A', 'QVHFTEN', 'QCHFTEN', 'QRHFTEN', 'QIHFTEN', 'QSHFTEN', 'THFTEN',
-'SL', 'Q', 'RHW', 'QRS', 'QRL', 'HR', 'FDL', 'SILHS_CLUBB_PRECIP_FRAC',
-'SILHS_CLUBB_ICE_SS_FRAC', 'T_ADJ_CLUBB'
-
-subcol_SILHS_weight = .true.
-subcol_SILHS_numsubcol = $NUMSC
-subcol_SILHS_corr_file_name = 'arm_97'
-subcol_silhs_q_to_micro = .true. ! if .false. gridbox means are used instead of sample points
-subcol_silhs_n_to_micro = .true. ! if .false. gridbox means are used instead of sample points
-subcol_silhs_use_clear_col = .false.
-subcol_SILHS_constrainmn = .false.
-subcol_silhs_ncnp2_on_ncnm2 = 0.05,
-hmp2_ip_on_hmm2_ip_slope%rr = 0.0,
-hmp2_ip_on_hmm2_ip_slope%Nr = 0.0,
-hmp2_ip_on_hmm2_ip_slope%rs = 0.0,
-hmp2_ip_on_hmm2_ip_slope%Ns = 0.0,
-hmp2_ip_on_hmm2_ip_slope%ri = 0.0,
-hmp2_ip_on_hmm2_ip_slope%Ni = 0.0,
-hmp2_ip_on_hmm2_ip_intrcpt%rr = 1.0,
-hmp2_ip_on_hmm2_ip_intrcpt%Nr = 1.0,
-hmp2_ip_on_hmm2_ip_intrcpt%rs = 1.0,
-hmp2_ip_on_hmm2_ip_intrcpt%Ns = 1.0,
-hmp2_ip_on_hmm2_ip_intrcpt%ri = 1.0,
-hmp2_ip_on_hmm2_ip_intrcpt%Ni = 1.0
-sol_facti_cloud_borne = 1.0D0
-dust_emis_fact = 0.3D0
-nucleate_ice_subgrid = 1.0
-seasalt_emis_scale = 0.6
-
+ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list
 ! fincl2lonlat = '240e_27n'
  nhtfrq(2) = 1
  mfilt(2) = 1500

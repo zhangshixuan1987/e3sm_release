@@ -486,7 +486,8 @@ contains
 
       use physics_buffer,         only : physics_buffer_desc, pbuf_get_index, &
                                          pbuf_get_field
-      use ppgrid,                 only : pver, pverp, pcols
+     ! use ppgrid,                 only : pver, pverp, pcols
+      use ppgrid,                 only: pver, pverp, pcols, begchunk, endchunk !Zhun
       use ref_pres,               only : top_lev => trop_cloud_top_lev
       use time_manager,           only : get_nstep
       use subcol_utils,           only : subcol_set_subcols, subcol_set_weight
@@ -496,6 +497,7 @@ contains
 
 #ifdef CLUBB_SGS
 #ifdef SILHS
+      use time_manager,           only : is_first_step  ! Zhun
       use clubb_api_module,       only : pdf_parameter, &
                                          unpack_pdf_params_api, &
                                          init_pdf_params_api, &
@@ -616,6 +618,7 @@ contains
       real(r8), allocatable, dimension(:,:)   :: lh_sample_point_weights ! Subcolumn weights
       integer,  allocatable, dimension(:,:)    :: X_mixt_comp_all_levs ! Which Mixture Component
 
+      integer ::  idx_chunk, idx_pcols ! Zhun Indices
       real(r8), allocatable, dimension(:,:) :: rc_all_points ! Calculate RCM from LH output
       real(r8), allocatable, dimension(:,:) :: rain_all_pts  ! Calculate Rain from LH output
       real(r8), allocatable, dimension(:,:) :: nrain_all_pts ! Calculate Rain Conc from LH
@@ -719,6 +722,8 @@ contains
       real(r8), pointer, dimension(:,:) :: nrain     ! micro_mg rain num conc 
       real(r8), pointer, dimension(:,:) :: nsnow
 
+!      type(pdf_parameter), target, allocatable :: pdf_params_chnk(:,:)    ! PDF
+!      type(pdf_parameter), pointer :: pdf_params ! Zhun
 
       ! Initialize CLUBB's PDF parameter type variable
       call init_pdf_params_api( pverp-top_lev+1, pdf_params )
@@ -741,6 +746,18 @@ contains
       ! Establish associations between pointers and physics buffer fields
       ! (Do this now so that num_subcol_ptr is available for the state copy below)
       !----------------
+      
+      ! Zhun added 
+      !allocate( &
+      ! pdf_params_chnk(pcols,begchunk:endchunk) )
+
+      !do idx_chunk = begchunk, endchunk
+      !  do idx_pcols = 1, pcols
+      !      call init_pdf_params_api( pverp, pdf_params_chnk(idx_pcols,idx_chunk) )
+      !  end do
+      !end do
+      ! Zhun
+
       call pbuf_get_field(pbuf, thlm_idx, thlm)
       call pbuf_get_field(pbuf, num_subcols_idx, num_subcol_ptr)
       call pbuf_get_field(pbuf, ztodt_idx, ztodt_ptr)
@@ -954,6 +971,15 @@ contains
          ! simply be set to 0 to simplify matters.
          wphydrometp = 0.0_r8
      
+!         pdf_params    => pdf_params_chnk(i,lchnk) ! Zhun 
+
+!#ifdef SILHS
+!         if (is_first_step()) then
+!           pdf_params%mixt_frac=0.5
+!         end if
+!#endif
+!         write(iulog,*) "mixt silhs",pdf_params%mixt_frac
+
          ! make the call
          call setup_pdf_parameters_api( pverp-top_lev+1, pdf_dim, ztodt, &    ! In
                                         Nc_in_cloud, rcm_in, cld_frac_in, &            ! In

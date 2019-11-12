@@ -11,22 +11,24 @@
 #######################################################
 #######  BEGIN USER DEFINED SETTINGS
 
-  setenv casename run_e3sm_scm_DYCOMSrf01_default
+  setenv casename run_DYCOMSrf01_default
 
   # Set the case directory here
-  setenv casedirectory $CSCRATCH/SCM_runs
+  setenv casedirectory /lcrc/group/acme/$USER/SCM_runs 
+setenv NUMSC 4
+setenv MGVER 2
 
   # Directory where code lives
   setenv code_dir $HOME/E3SM_code
 
   # Code tag name 
-  setenv code_tag zhun 
+  setenv code_tag clubb_silhs_v2_tau 
 
   # Name of machine you are running on (i.e. cori, anvil, etc)                                                    
-  setenv machine cori-knl
+  setenv machine anvil
 
   # Name of project to run on, if submitting to queue
-  setenv projectname m2136
+  setenv projectname condo 
 
 
   # Aerosol specification
@@ -99,7 +101,7 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
   endif
   
   if ($dycore == SE) then
-    set grid=ne4_ne4
+    set grid=ne16_ne16
   endif
 
   set CASEID=$casename   
@@ -113,7 +115,9 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
   set case_build_dir   = $run_root_dir/build
   set case_run_dir     = $run_root_dir/run 
 
-  set walltime = '00:10:00'
+  set walltime = '00:02:00'
+  ./xmlchange -file env_batch.xml  -id  JOB_QUEUE  -val 'acme-centos6' 
+  ./xmlchange PROJECT="condo",CHARGE_ACCOUNT="condo"
 
 # COSP, set to false unless user really wants it
   setenv do_cosp  false
@@ -142,7 +146,7 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
 
 # Get local input data directory path
 
- set input_data_dir = "/project/projectdirs/acme/inputdata" #`./xmlquery DIN_LOC_ROOT -value` 
+ set input_data_dir = `./xmlquery DIN_LOC_ROOT -value` 
 
 # need to use single thread
   set npes = 1
@@ -258,21 +262,23 @@ cat <<EOF >> user_nl_cam
  clubb_gamma_coef = 0.25D0
  clubb_gamma_coefb = 0.25D0
  clubb_c_K2 = 0.025D0
+ clubb_c_K10= 0.3D0
  clubb_nu2  = 1.0D0
  clubb_C14 = 1.0D0
  clubb_C15 = 0.0D0
  clubb_C8 = 0.5D0
  clubb_C11  = 0.4D0
  clubb_C11b = 0.4D0
- clubb_C_invrs_tau_bkgnd = 1.1
- clubb_C_invrs_tau_sfc = 0.1
- clubb_C_invrs_tau_shear = 0.02
- clubb_C_invrs_tau_N2 = 0.4
- clubb_C_invrs_tau_N2_wp2 = 0.1
- clubb_C_invrs_tau_N2_xp2 = 0.05
- clubb_C_invrs_tau_N2_wpxp= 0.0
- clubb_C_invrs_tau_N2_clear_wp3 = 1.0
- clubb_ice_deep = 16.e-6
+ clubb_C_invrs_tau_bkgnd = 1.1D0
+ clubb_C_invrs_tau_sfc = 0.1D0
+ clubb_C_invrs_tau_shear = 0.02D0
+ clubb_C_invrs_tau_N2 = 0.4D0
+ clubb_C_invrs_tau_N2_wp2 = 0.1D0
+ clubb_C_invrs_tau_N2_xp2 = 0.05D0
+ clubb_C_invrs_tau_N2_wpxp= 0.0D0
+ clubb_C_invrs_tau_N2_clear_wp3 = 1.0D0
+ clubb_c_wp2_splat  = 1.0D0
+ clubb_ice_deep = 25.e-6
  clubb_ice_sh = 50.e-6
  clubb_liq_deep = 8.e-6
  clubb_liq_sh = 10.e-6
@@ -299,6 +305,7 @@ cat <<EOF >> user_nl_cam
  clubb_vars_zm = $clubb_vars_zm_list
 
  fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list
+ ncdata         = '/home/ccsm-data/inputdata/atm/cam/inic/homme/cami_mam3_Linoz_ne16np4_L72_c160614.nc'
 
  relvar_fix = .true. 
  mg_prc_coeff_fix = .true.
@@ -326,8 +333,8 @@ EOF
 endif
 
 # if prescribed or observed aerosols set then need to put in settings for prescribed aerosol model
-if ($init_aero_type == prescribed ||$init_aero_type == observed) then
 
+if ($init_aero_type == prescribed ||$init_aero_type == observed) then
 cat <<EOF >> user_nl_cam
   use_hetfrz_classnuc = .false.
   aerodep_flx_type = 'CYCLICAL'

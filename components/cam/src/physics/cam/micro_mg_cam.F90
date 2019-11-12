@@ -2618,9 +2618,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
       call subcol_field_avg(qireso,    ngrdcol, lchnk, qireso_grid)
       call subcol_field_avg(prcio,     ngrdcol, lchnk, prcio_grid)
       call subcol_field_avg(praio,     ngrdcol, lchnk, praio_grid)
-      write (iulog, *) "before ngrdcol", ngrdcol ,lchnk,psubcols,pcols !icwmrst_grid
       call subcol_field_avg(icwmrst,   ngrdcol, lchnk, icwmrst_grid)
-      write (iulog, *) "after",icwmrst_grid
       call subcol_field_avg(icimrst,   ngrdcol, lchnk, icimrst_grid)
       call subcol_field_avg(liqcldf,   ngrdcol, lchnk, liqcldf_grid)
       call subcol_field_avg(icecldf,   ngrdcol, lchnk, icecldf_grid)

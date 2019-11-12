@@ -129,7 +129,8 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
 
 # SCM must run in serial mode
   if ($dycore == Eulerian) then
-    ./xmlchange --id MPILIB --val mpi-serial
+    ./tic_v2_0                
+hange --id MPILIB --val mpi-serial
   endif
   
 # Define executable and run directories

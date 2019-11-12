@@ -62,7 +62,7 @@ module model_flags
   ! approximated by eddy diffusivity when <u> and <v> are advanced in
   ! subroutine advance_windm_edsclrm.
   logical, public :: &
-    l_predict_upwp_vpwp = .false.
+    l_predict_upwp_vpwp = .true.
 
 !$omp threadprivate( l_predict_upwp_vpwp )
 
@@ -77,13 +77,13 @@ module model_flags
   ! correlation of w and x (w and rt, as well as w and theta-l) within the
   ! limits of -max_mag_correlation_flux to max_mag_correlation_flux.
   logical, public :: &
-    l_min_wp2_from_corr_wx = .false.
+    l_min_wp2_from_corr_wx = .true.
 
   ! Flag to base the threshold minimum value of xp2 (rtp2 and thlp2) on
   ! keeping the overall correlation of w and x within the limits of
   ! -max_mag_correlation_flux to max_mag_correlation_flux.
   logical, public :: &
-    l_min_xp2_from_corr_wx = .false.
+    l_min_xp2_from_corr_wx = .true.
 
   ! Flag to use cloud fraction to adjust the value of the turbulent dissipation
   ! coefficient, C2.
@@ -240,10 +240,10 @@ module model_flags
 !$omp threadprivate( l_const_Nc_in_cloud, l_fix_w_chi_eta_correlations )
 
   logical, public :: &
-    l_stability_correct_tau_zm = .true., & ! Use tau_N2_zm instead of tau_zm in wpxp_pr1
+    l_stability_correct_tau_zm = .false., & ! Use tau_N2_zm instead of tau_zm in wpxp_pr1
                                            ! stability correction
 
-    l_damp_wp2_using_em = .false.,       & ! In wp2 equation, use a dissipation
+    l_damp_wp2_using_em = .true.,       & ! In wp2 equation, use a dissipation
                                            ! formula of -(2/3)*em/tau_zm, as in Bougeault (1981)
 
     l_do_expldiff_rtm_thlm = .false.,    & ! Diffuse rtm and thlm explicitly
@@ -257,7 +257,7 @@ module model_flags
     l_use_ice_latent = .false.,          & ! Includes the effects of ice latent heating in
                                            !  turbulence terms
 
-    l_use_C7_Richardson = .false.,       & ! Parameterize C7 based on Richardson number
+    l_use_C7_Richardson = .true.,       & ! Parameterize C7 based on Richardson number
     l_use_C11_Richardson = .false.,      & ! Parameterize C16 based on Richardson number
 
     l_brunt_vaisala_freq_moist = .false.,& ! Use a different formula for the Brunt-Vaisala 
@@ -271,7 +271,7 @@ module model_flags
 
   logical, public :: &
     l_single_C2_Skw = .false.,  & ! Use a single Skewness dependent C2 for rtp2, thlp2, and rtpthlp
-    l_damp_wp3_Skw_squared = .false. ! Set damping on wp3 to use Skw^2 rather than Skw^4
+    l_damp_wp3_Skw_squared = .true. ! Set damping on wp3 to use Skw^2 rather than Skw^4
 
 !$omp threadprivate( l_stability_correct_tau_zm, l_damp_wp2_using_em, &
 !$omp                l_do_expldiff_rtm_thlm, &

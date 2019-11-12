@@ -1,30 +1,35 @@
+
 #! /bin/csh -fe
 ### This script was created 2015-11-15 by Philip Cameron-Smith (pjc@llnl.gov) and Peter Caldwell
 ### and incorporates some features originally from Hui Wan, Kai Zhang, and Balwinder Singh.
 ### Significant improvements from Michael Deakin and Chris Golaz.
-### Zhun Guo modified for clubb-tau. 
+### Zhun Guo modified for clubb-silhs-tau. 
 
 ###===================================================================
 ### THINGS USERS USUALLY CHANGE (SEE END OF SECTION FOR GUIDANCE)
 ###===================================================================
 
+
+
 ### BASIC INFO ABOUT RUN
-set job_name       = test #A_WCYCL1850_template
-#set compset        = FC5ATMMOD
-#set resolution     = ne16_ne16
-set compset        = A_WCYCL1850S_CMIP6
-set resolution     = ne30_oECv3_ICG
+set job_name       = mltp_CLBV2_SILHS_deftau_oldset #A_WCYCL1850_template
+set compset        = FAMIPC5 
+set resolution     = ne16_ne16
 set machine        = anvil
+setenv NUMSC 4
+setenv MGVER 2 
 
 set walltime       = 18:00:00
 setenv project condo      
-setenv ntasks 960
+setenv ntasks 432
 setenv nthrds 1
 
+setenv init_aero_type cons_droplet # keep this as none for REPLAY option 
+
 ### SOURCE CODE OPTIONS
-set fetch_code     = false        # flag to toggle cloning source code
+set fetch_code     = false       # flag to toggle cloning source code
 set e3sm_tag       = maint-1.0   # github tag or hash
-set tag_name       = zhun 
+set tag_name       = clubb_silhs_v2_tau
 module load python
 
 set clubb_vars_zt_list = "'thlm', 'thvm', 'rtm', 'rcm', 'rvm', 'um', 'vm', 'um_ref','vm_ref','ug', 'vg', 'cloud_frac', 'cloud_cover', 'rcm_in_layer', 'rcm_in_cloud', 'p_in_Pa', 'exner', 'rho_ds_zt', 'thv_ds_zt', 'Lscale', 'Lscale_pert_1', 'Lscale_pert_2', 'T_in_K', 'rel_humidity', 'wp3', 'wpthlp2', 'wp2thlp', 'wprtp2', 'wp2rtp', 'Lscale_up', 'Lscale_down', 'tau_zt', 'Kh_zt', 'wp2thvp', 'wp2rcp', 'wprtpthlp', 'sigma_sqd_w_zt', 'rho', 'radht', 'radht_LW', 'radht_SW', 'Ncm', 'Nc_in_cloud', 'Nc_activated', 'snowslope', 'sed_rcm', 'rsat', 'rsati', 'diam', 'mass_ice_cryst', 'rcm_icedfs', 'u_T_cm', 'rtm_bt', 'rtm_ma', 'rtm_ta', 'rtm_mfl', 'rtm_tacl', 'rtm_cl', 'rtm_forcing', 'rtm_sdmp','rtm_mc', 'rtm_pd', 'rvm_mc', 'rcm_mc', 'rcm_sd_mg_morr', 'thlm_bt', 'thlm_ma', 'thlm_ta', 'thlm_mfl', 'thlm_tacl', 'thlm_cl', 'thlm_forcing', 'thlm_sdmp','thlm_mc', 'thlm_old', 'thlm_without_ta', 'thlm_mfl_min', 'thlm_mfl_max', 'thlm_enter_mfl', 'thlm_exit_mfl', 'rtm_old', 'rtm_without_ta', 'rtm_mfl_min', 'rtm_mfl_max', 'rtm_enter_mfl', 'rtm_exit_mfl', 'um_bt', 'um_ma', 'um_gf', 'um_cf', 'um_ta', 'um_f', 'um_sdmp', 'um_ndg', 'vm_bt', 'vm_ma', 'vm_gf', 'vm_cf', 'vm_ta', 'vm_f', 'vm_sdmp', 'vm_ndg', 'wp3_bt', 'wp3_ma', 'wp3_ta', 'wp3_tp', 'wp3_ac', 'wp3_bp1', 'wp3_bp2', 'wp3_pr1', 'wp3_pr2', 'wp3_dp1', 'wp3_cl', 'mixt_frac', 'w_1', 'w_2', 'varnce_w_1', 'varnce_w_2', 'thl_1', 'thl_2', 'varnce_thl_1', 'varnce_thl_2', 'rt_1', 'rt_2', 'varnce_rt_1', 'varnce_rt_2', 'rc_1', 'rc_2', 'rsatl_1', 'rsatl_2', 'cloud_frac_1', 'cloud_frac_2', 'a3_coef_zt', 'wp3_on_wp2_zt', 'chi_1', 'chi_2', 'stdev_chi_1', 'stdev_chi_2', 'stdev_eta_1', 'stdev_eta_2', 'covar_chi_eta_1', 'covar_chi_eta_2', 'corr_chi_eta_1', 'corr_chi_eta_2', 'corr_rt_thl_1', 'crt_1', 'crt_2', 'cthl_1', 'cthl_2', 'precip_frac', 'precip_frac_1', 'precip_frac_2', 'Ncnm', 'wp2_zt', 'thlp2_zt', 'wpthlp_zt', 'wprtp_zt', 'rtp2_zt', 'rtpthlp_zt', 'up2_zt', 'vp2_zt', 'upwp_zt', 'vpwp_zt', 'C11_Skw_fnc'"
@@ -48,7 +53,7 @@ set submit_run       = true
 set debug_queue      = False
 
 ### PROCESSOR CONFIGURATION
-set processor_config = S
+set processor_config = customknl
 
 ### STARTUP TYPE
 set model_start_type = initial
@@ -70,14 +75,23 @@ set num_resubmits               = 0
 set do_short_term_archiving     = false
 
 ### SIMULATION OPTIONS
-set atm_output_freq             = -24
-set records_per_atm_output_file = 40
-set start_date                  = default
+set atm_output_freq             = 0
+set records_per_atm_output_file = 1
+set start_date                  = 1979-01-01 #default
 
 ### COUPLER HISTORY FILES
 set do_cpl_hist    = true
-set cpl_hist_units = ndays
+set cpl_hist_units = nmonths
 set cpl_hist_num   = 1
+
+### Flag options
+set do_turnoff_swrad = .false. # Turn off SW calculation
+set do_turnoff_lwrad = .false. # Turn off LW calculation
+set do_turnoff_precip = .false. # Turn off precipitation
+set micro_nccons_val = 55.0D6 # cons_droplet value for liquid
+set micro_nicons_val = 0.0001D6 # cons_droplet value for ice
+set presc_aero_path = atm/cam/chem/trop_mam/aero
+set presc_aero_file = mam4_0.9x1.2_L72_2000clim_c170323.nc
 
 #==============================
 #EXPLANATION FOR OPTIONS ABOVE:
@@ -840,9 +854,22 @@ else
   e3sm_newline
   e3sm_print 'Configuring E3SM to use the COSP simulator.'
   e3sm_newline
-  $xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-dyn se -phys cam5 -clubb_sgs -rad rrtmg -chem trop_mam3 -silent -nlev 72 -microphys mg$MGVER  -cppdefs '-DUWM_MISC' '
+  #$xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-e3smreplay'
+  #$xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-dyn se -phys cam5 -clubb_sgs -rad rrtmg -nlev 72 -microphys mg2 -cppdefs '-DUWM_MISC' ' 
+  #$xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-dyn se -phys cam5 -clubb_sgs -rad rrtmg -chem trop_mam3 -silent -nlev 72 -microphys mg$MGVER  -cppdefs '-DUWM_MISC' '
+#   $xmlchange_exe --id CAM_CONFIG_OPTS="-dyn se -phys cam5 -clubb_sgs -rad rrtmg -chem trop_mam3 -silent -nlev 72 -microphys mg$MGVER -psubcols $NUMSC -cppdefs '-DUWM_MISC -DSILHS'"
 endif
 
+
+if ($init_aero_type == cons_droplet || $init_aero_type == none) then
+#    $xmlchange_exe --id CAM_CONFIG_OPTS --append --val='-chem linoz_mam4_resus_mom_soag -rain_evap_to_coarse_aero -bc_dep_to_snow_updates'
+endif
+
+if ($init_aero_type == prescribed || $init_aero_type == observed) then
+    $xmlchange_exe --id CAM_CONFIG_OPTS --append --val='$CAM_CONFIG_OPTS -chem none'
+endif
+
+$xmlchange_exe --id CAM_CONFIG_OPTS --append --val="-dyn se -phys cam5 -nadv 29 -clubb_sgs -rad rrtmg -chem trop_mam3 -silent -nlev 72 -microphys mg$MGVER  -psubcols $NUMSC -cppdefs '-DUWM_MISC -DSILHS'"
 #===========================
 # SET THE PARTITION OF NODES
 #===========================
@@ -939,22 +966,9 @@ $xmlchange_exe --id DEBUG --val `uppercase $debug_compile`
 # NOTE: The user_nl files need to be set before the build, because case_scripts.build checks whether input files exist.
 # NOTE: $atm_output_freq and $records_per_atm_output_file are so commonly used, that they are set in the options at the top of this script.
 
-cat <<EOF >> user_nl_clm
-! finidat=''
-EOF
+cat <<EOF >> user_nl_cam 
+use_gw_convect = .false.
 
-cat <<EOF >> user_nl_cam
-! finidat=''
- do_tms = .false.
-clubb_history = .true.
-clubb_rad_history = .false.
-clubb_vars_zt = $clubb_vars_zt_list
-clubb_vars_zm = $clubb_vars_zm_list
-deep_scheme = 'ZM'
- nhtfrq = $atm_output_freq
- mfilt  = $records_per_atm_output_file
- avgflag_pertape = 'A','A','I','A','A','A'
- fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list
  clubb_C1 = 1.0D0
  clubb_C1b = 1.0D0
  clubb_C2rt = 2.0D0
@@ -962,30 +976,177 @@ deep_scheme = 'ZM'
  clubb_C2rtthl = 2.0D0
  clubb_C4   = 2.0D0
  clubb_C5   = 0.3D0
- clubb_C6rt = 3.0D0
- clubb_C6rtb = 3.0D0
- clubb_C6thlb = 3.0D0
+ clubb_C6rt = 2.0D0
+ clubb_C6rtb = 2.0D0
+ clubb_C6thlb = 2.0D0
  clubb_beta = 1.0D0
  clubb_gamma_coef = 0.25D0
  clubb_gamma_coefb = 0.25D0
  clubb_c_K2 = 0.025D0
+ clubb_c_K10= 0.3D0
  clubb_nu2  = 1.0D0
  clubb_C14 = 1.0D0
  clubb_C15 = 0.0D0
  clubb_C8 = 0.5D0
  clubb_C11  = 0.4D0
  clubb_C11b = 0.4D0
- clubb_C_invrs_tau_bkgnd = 1.1
- clubb_C_invrs_tau_sfc = 0.1
- clubb_C_invrs_tau_shear = 0.02
- clubb_C_invrs_tau_N2 = 0.4
- clubb_C_invrs_tau_N2_wp2 = 0.1
- clubb_C_invrs_tau_N2_xp2 = 0.05
- clubb_C_invrs_tau_N2_wpxp= 0.0
- clubb_C_invrs_tau_N2_clear_wp3 = 1.0
- clubb_C_wp2_splat = 1.0
+ clubb_C_invrs_tau_bkgnd = 1.1D0
+ clubb_C_invrs_tau_sfc = 0.1D0
+ clubb_C_invrs_tau_shear = 0.02D0
+ clubb_C_invrs_tau_N2 = 0.4D0
+ clubb_C_invrs_tau_N2_wp2 = 0.1D0
+ clubb_C_invrs_tau_N2_xp2 = 0.05D0
+ clubb_C_invrs_tau_N2_wpxp= 0.0D0
+ clubb_C_invrs_tau_N2_clear_wp3 = 1.0D0
+
+ clubb_ice_deep = 25.e-6
+ clubb_ice_sh = 50.e-6
+ clubb_liq_deep = 8.e-6
+ clubb_liq_sh = 10.e-6
+
+ use_hetfrz_classnuc = .false.
+! micro_mg_dcs_tdep = .true.
+ microp_aero_wsub_scheme = 1
+ sscav_tuning = .false.
+ convproc_do_aer = .false.
+ demott_ice_nuc = .false.
+ liqcf_fix = .false.
+ regen_fix = .false.
+ resus_fix = .false.
+ mam_amicphys_optaa = 0
+ fix_g1_err_ndrop = .false.
+ ssalt_tuning = .false.
+! use_rad_dt_cosz = .false.
+ ice_sed_ai = 700.0
+ cldfrc_dp1 = 0.1D0
+ zmconv_c0_lnd = 0.0075D0
+ zmconv_c0_ocn = 0.045D0
+ zmconv_dmpdz = -1e-3
+ zmconv_ke = 1E-6
+ effgw_oro = 0.125D0
+ seasalt_emis_scale = 0.85
+ dust_emis_fact = 2.05D0
+ cldfrc2m_rhmaxi = 1.05D0
+! effgw_beres = 0.4
+ do_tms = .true.
+ so4_sz_thresh_icenuc = 0.1e-6
+ n_so4_monolayers_pcage = 3.0D0
+ micro_mg_accre_enhan_fac = 1.0D0
+ zmconv_tiedke_add = 0.5D0
+ zmconv_cape_cin = 5
+ zmconv_mx_bot_lyr_adj = 0
+ taubgnd = 1.5D-3
+ raytau0 = 5.0D0
+ prc_coef1 = 1350.0D0
+ prc_exp = 2.47D0
+ prc_exp1 = -1.79D0
+ se_ftype = 0
+
+dtime = 1800
+nhtfrq = 0,-24,0
+mfilt = 1,5000,5000
+ndens = 1,1,1,1,1,1
+history_budget = .true.
+microp_scheme = 'MG'
+micro_mg_version = $MGVER
+micro_mg_sub_version = 0
+micro_mg_num_steps = 1
+micro_mg_dcs = 390e-6
+micro_mg_berg_eff_factor = 1.0
+cldfrc2m_rhmini = 0.8
+cldfrc2m_rhmaxi = 1.05
+
+ice_supersat = .true.
+macrop_scheme = 'CLUBB_SGS'
+eddy_scheme = 'CLUBB_SGS'
+shallow_scheme = 'CLUBB_SGS'
+deep_scheme = 'off'
+subcol_scheme = 'SILHS'
+use_subcol_microp = .true.
+microp_uniform = .true.
+history_amwg = .true.
+clubb_do_adv = .false.
+clubb_expldiff = .false.
+clubb_rainevap_turb = .false.
+clubb_cloudtop_cooling = .false.
+fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,'U:A','PS:A','T:A','V:A','OMEGA:A','Z3:A','PRECT:A',
+'CLDLIQ:A', 'CLDICE:A', 'LWCF:A', 'SWCF:A', 'FLUT:A',
+'TMQ:A', 'PRECC:A', 'PRECL:A', 'CME:A', 'PRODPREC:A',
+'EVAPPREC:A','EVAPSNOW:A','ICWMRST:A','ICIMRST:A','PRAO:A',
+'PRCO:A','QCSEVAP:A','QISEVAP:A','QVRES:A','CMEIOUT:A','VTRMI:A',
+'VTRMC:A','QCSEDTEN:A','QISEDTEN:A','MNUCCCO:A','MNUCCTO:A',
+'MNUCCDO:A','MNUCCDOhet:A','MSACWIO:A','PSACWSO:A','BERGSO:A',
+'BERGO:A','MELTO:A','HOMOO:A','QCRESO:A','PRCIO:A','PRAIO:A',
+'MELTSDT:A','FRZRDT:A','ADRAIN:A','ADSNOW:A','FREQR:A','FREQS:A',
+'PE:A','APRL:A','PEFRAC:A','VPRCO:A','VPRAO:A','RACAU:A',
+'QIRESO:A','QCRESO:A','PRACSO:A','MPDT:A','MPDQ:A','MPDLIQ:A',
+'MPDICE:A','INEGCLPTEND', 'LNEGCLPTEND', 'VNEGCLPTEND',
+'QCRAT:A', 'QVHFTEN', 'QCHFTEN', 'QRHFTEN', 'QIHFTEN', 'QSHFTEN', 'THFTEN',
+'SL', 'Q', 'RHW', 'QRS', 'QRL', 'HR', 'FDL', 'SILHS_CLUBB_PRECIP_FRAC',
+'SILHS_CLUBB_ICE_SS_FRAC', 'T_ADJ_CLUBB'
+
+fincl2 = 'CLDTOT', 'CLDST','CDNUMC','CLDLIQ','CLDICE','FLUT',
+'LWCF','SWCF','PRECT'
+end_restart = .true.
+subcol_SILHS_weight = .true.
+subcol_SILHS_numsubcol = $NUMSC
+subcol_SILHS_corr_file_name = 'arm_97'
+subcol_silhs_q_to_micro = .true. ! if .false. gridbox means are used instead of sample points
+subcol_silhs_n_to_micro = .true. ! if .false. gridbox means are used instead of sample points
+subcol_silhs_use_clear_col = .false.
+subcol_SILHS_constrainmn = .false.
+subcol_silhs_ncnp2_on_ncnm2 = 0.05,
+hmp2_ip_on_hmm2_ip_slope%rr = 0.0,
+hmp2_ip_on_hmm2_ip_slope%Nr = 0.0,
+hmp2_ip_on_hmm2_ip_slope%rs = 0.0,
+hmp2_ip_on_hmm2_ip_slope%Ns = 0.0,
+hmp2_ip_on_hmm2_ip_slope%ri = 0.0,
+hmp2_ip_on_hmm2_ip_slope%Ni = 0.0,
+hmp2_ip_on_hmm2_ip_intrcpt%rr = 1.0,
+hmp2_ip_on_hmm2_ip_intrcpt%Nr = 1.0,
+hmp2_ip_on_hmm2_ip_intrcpt%rs = 1.0,
+hmp2_ip_on_hmm2_ip_intrcpt%Ns = 1.0,
+hmp2_ip_on_hmm2_ip_intrcpt%ri = 1.0,
+hmp2_ip_on_hmm2_ip_intrcpt%Ni = 1.0
+sol_facti_cloud_borne = 1.0D0
+dust_emis_fact = 0.3D0
+nucleate_ice_subgrid = 1.0
+seasalt_emis_scale = 0.6
+
+! CLUBB history!!!
+clubb_history = .true.
+clubb_rad_history = .false.
+history_budget = .true.
+clubb_vars_zt = $clubb_vars_zt_list
+clubb_vars_zm = $clubb_vars_zm_list
 EOF
 
+
+if ($init_aero_type == cons_droplet) then
+cat <<EOF >> user_nl_cam
+!  micro_do_nccons = .true.
+!  micro_do_nicons = .true.
+!  micro_nccons = $micro_nccons_val 
+!  micro_nicons = $micro_nicons_val
+EOF
+endif
+
+# if prescribed or observed aerosols set then need to put in settings for prescribed aerosol model
+
+if ($init_aero_type == prescribed ||$init_aero_type == observed) then
+cat <<EOF >> user_nl_cam
+  use_hetfrz_classnuc = .false.
+  aerodep_flx_type = 'CYCLICAL'
+  aerodep_flx_datapath = '$input_data_dir/$presc_aero_path' 
+  aerodep_flx_file = '$presc_aero_file'
+  aerodep_flx_cycle_yr = 01
+  prescribed_aero_type = 'CYCLICAL'
+  prescribed_aero_datapath='$input_data_dir/$presc_aero_path'
+  prescribed_aero_file='$presc_aero_file'
+  prescribed_aero_cycle_yr = 01
+EOF
+endif
+  
 ### NOTES ON COMMON NAMELIST OPTIONS ###
 
 ### ATMOSPHERE NAMELIST ###

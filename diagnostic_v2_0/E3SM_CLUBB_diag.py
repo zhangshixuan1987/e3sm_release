@@ -11,43 +11,41 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-casename="tauN21vslscale" # A general case name
+casename="Merge_lscale" # A general case name
 outdir="/home/zhun/E3SM_code/clubb_silhs_v2_tau/diagnostic_v2_0/" # Location of plots
 
 filepath=["/lcrc/group/acme/zhun/E3SM_simulations/",\
-          "/lcrc/group/acme/zhun/E3SM_simulations/" \
               ]
 cases=[ \
-        "anvil.tau_diagnosed_try2.invN21.ne16_ne16",\
-        "anvil.tau_diagnosed_try2.lscale_def_flag.ne16_ne16"\
+        "anvil.clubb_silhs_v2_tau.lscale_flag_merge.ne30_ne30",\
               ]
 # Give a short name for your experiment which will appears on plots
 
-casenames=['tau +defflag','lscale flag']
+casenames=['merge']
 
 years=[\
-                "0001","0001"]
+                "1979"]
 
 # Observation Data
 #filepathobs="/global/project/projectdirs/m2689/zhun/amwg/obs_data_20140804/"
 filepathobs="/blues/gpfs/home/zhun/amwg_diag_20140804/obs_data_20140804/"
 #------------------------------------------------------------------------
 # Setting of plots.
-ptype="x11"   # eps, pdf, ps... are supported by this package
-cseason="JJA" # Seasons, or others
+ptype="png"   # eps, pdf, ps... are supported by this package
+cseason="ANN" # Seasons, or others
 
 #------------------------------------------------------------------------
-calmean=False    # make mean states
+calmean=False   # make mean states
 findout=False      # pick out the locations of your sites
-draw2d=False       # This flag control 2D plots
+draw2d=True       # This flag control 2D plots
 drawlarge= True   # profiles for large-scale variable on your sites 
-drawclubb= False    # profiles for standard clubb output
-drawskw= False      # profiles for skewness functions
+drawclubb= True    # profiles for standard clubb output
+drawskw= True     # profiles for skewness functions
 drawsilhs=False   # profiles for silhs variables
-drawbgt= False      # budgets of 9 prognostic Eqs 
+drawbgt= True      # budgets of 9 prognostic Eqs 
 
-makeweb=False      # Make a webpage?
-maketar=False      # Tar them?
+makeweb=True      # Make a webpage?
+maketar=True      # Tar them?
 
 clevel = 500
 area  = 1.
@@ -141,7 +139,7 @@ if makeweb:
              plotclb.append(plotstd[ire])
              plotclb.append(plotskw[ire])
              plotclb.append(plotbgt[ire*ncases])
-             plotclb.append(plotbgt[ire*ncases+1])        
+#             plotclb.append(plotbgt[ire*ncases+1])        
              Diagnostic_webpage.sets_web(casename,casedir,plotclb,str(lons[ire])+'E_'+str(lats[ire])+'N',\
                                   "Profiles on "+str(lons[ire])+'E_'+str(lats[ire])+'N',"454","318")
 

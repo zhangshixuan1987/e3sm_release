@@ -29,7 +29,7 @@ setenv CCSMROOT $PWD
 #setenv COMPSET FC5AV1C-04P2
 setenv COMPSET FAMIPC5
 setenv RESOLUTION ne30_ne30
-setenv MACH      anvil
+setenv MACH      anvil-centos7
 setenv PTMP      /lcrc/group/acme/$USER/bld
 setenv ntasks 864
 setenv nthrds 1
@@ -140,7 +140,7 @@ cd $CASEROOT
 
 ./xmlchange  -file env_batch.xml  -id  JOB_WALLCLOCK_TIME   -val '20:00:00'
 #./xmlchange  -file env_batch.xml  -id  JOB_WALLCLOCK_TIME   -val '00:30:00'
-./xmlchange  -file env_batch.xml  -id  JOB_QUEUE   -val 'acme-centos6'
+./xmlchange  -file env_batch.xml  -id  JOB_QUEUE   -val 'acme-medium'
 ./xmlchange PROJECT="condo",CHARGE_ACCOUNT="condo"
 
 ./xmlchange -file env_run.xml -id SAVE_TIMING_DIR -val $HOME

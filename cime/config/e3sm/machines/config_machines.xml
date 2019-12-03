@@ -372,7 +372,7 @@
       <env name="MPICH_MEMORY_REPORT">1</env>
     </environment_variables>
   </machine>
-	
+
   <!-- Skylake nodes of Stampede2 at TACC -->
   <machine MACH="stampede2">
     <DESC>Stampede2. Intel skylake nodes at TACC. 48 cores per node, batch system is SLURM</DESC>
@@ -992,23 +992,6 @@
       <env name="OMP_STACKSIZE">64M</env>
     </environment_variables>
   </machine>
-	
-<compiler MACH="carson">
-  <SCC>/usr/local/mpi/MPICH-3.3.1-gfortran/bin/mpicc</SCC>
-  <SFC>/usr/local/mpi/MPICH-3.3.1-gfortran/bin/mpif90</SFC>
-  <MPICC>/usr/local/mpi/MPICH-3.3.1-gfortran/bin/mpicc</MPICC>
-  <MPIFC>/usr/local/mpi/MPICH-3.3.1-gfortran/bin/mpif90</MPIFC>
-  <SLIBS>
-   <base> -L/usr/local/NETCDF-Fortran-4.4.5-gfortran/lib -lnetcdff -lnetcdf -L/usr/local/NETCDF-C-4.7.0-gfortran/lib -lnetcdf -L/usr/local/lapack-3.8.0 -llapack -lrefblas </base>
- </SLIBS>
- <LDFLAGS>
-   <append> -Wl,-rpath,/usr/local/NETCDF-Fortran-4.4.5-gfortran/lib </append>
-   <append> -Wl,-rpath,/usr/local/NETCDF-C-4.7.0-gfortran/lib </append>
- </LDFLAGS>
-  <NETCDF_C_PATH>/usr/local/NETCDF-C-4.7.0-gfortran</NETCDF_C_PATH>
-  <NETCDF_FORTRAN_PATH>/usr/local/NETCDF-Fortran-4.4.5-gfortran</NETCDF_FORTRAN_PATH>
-</compiler>
-
 
   <machine MACH="anvil">
     <DESC>ANL/LCRC Linux Cluster</DESC>
@@ -1804,7 +1787,8 @@
     </environment_variables>
   </machine>
 
-<machine MACH="carson">
+
+  <machine MACH="carson">
     <DESC>
      Also for carson
     </DESC>
@@ -1840,6 +1824,7 @@
       <env name="INC_NETCDF">/usr/local/NETCDF-Fortran-4.4.5-gfortran/include</env>
     </environment_variables>
   </machine>
+
 
   <machine MACH="cascade">
     <DESC>PNNL Intel KNC cluster, OS is Linux, batch system is SLURM</DESC>

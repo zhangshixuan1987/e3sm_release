@@ -1339,7 +1339,8 @@ module advance_clubb_core_module
               + C_invrs_tau_shear * zt2zm( zm2zt( sqrt( (ddzt( um ))**2 + (ddzt( vm ))**2 ) ) )& 
               + C_invrs_tau_N2_xp2 &
               * sqrt( max( zero_threshold, &
-              brunt_vaisala_freq_sqd_smth ) )!,0.002_core_rknd )
+              brunt_vaisala_freq_sqd_smth ) ) &
+              + C_invrs_tau_sfc *2 * sqrt(em)/max((gr%zm - sfc_elevation + z_displace),300.) 
 
         invrs_tau_xp2_zm = merge(0.003_core_rknd, invrs_tau_xp2_zm, &
               zt2zm(ice_supersat_frac) <= 0.01_core_rknd &

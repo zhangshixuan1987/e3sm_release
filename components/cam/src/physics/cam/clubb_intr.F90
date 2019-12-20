@@ -334,7 +334,7 @@ module clubb_intr
     call pbuf_add_field('UM',         'global', dtype_r8, (/pcols,pverp,dyn_time_lvls/), um_idx)
     call pbuf_add_field('VM',         'global', dtype_r8, (/pcols,pverp,dyn_time_lvls/), vm_idx)
 
-!Zhun HEAD Keep these
+!Zhun Keep these
     call pbuf_add_field('WPTHVP',     'global', dtype_r8, (/pcols,pverp/), wpthvp_idx)
     call pbuf_add_field('WP2THVP',    'global', dtype_r8, (/pcols,pverp/), wp2thvp_idx)
     call pbuf_add_field('RTPTHVP',    'global', dtype_r8, (/pcols,pverp/), rtpthvp_idx)
@@ -387,9 +387,7 @@ module clubb_intr
       call pbuf_add_field('vp2t_laststep','global',dtype_r8,(/pcols,pverp/), vp2t_laststep_idx)
       call pbuf_add_field('vp2t_advtend','global',dtype_r8,(/pcols,pverp/), vp2t_advtend_idx)
     endif
-!=======
     call pbuf_add_field('vmag_gust',       'global', dtype_r8, (/pcols/),      vmag_gust_idx) !PMA total gustiness
-!>>>>>>> origin/master_tmp
 #endif 
 
   end subroutine clubb_register_cam
@@ -685,14 +683,14 @@ end subroutine clubb_init_cnst
 !    allocate( &
 !       pdf_params_chnk(pcols,begchunk:endchunk),   &
 !       pdf_params_zm_chnk(pcols,begchunk:endchunk) )
-
+!
 !    do idx_chunk = begchunk, endchunk
 !        do idx_pcols = 1, pcols
 !            call init_pdf_params_api( pverp, pdf_params_chnk(idx_pcols,idx_chunk) )
 !            call init_pdf_params_api( pverp, pdf_params_zm_chnk(idx_pcols,idx_chunk) )
 !        end do
 !    end do
-
+!
     ! ----------------------------------------------------------------- !
     ! Determine how many constituents CLUBB will transport.  Note that  
     ! CLUBB does not transport aerosol consituents.  Therefore, need to 
@@ -802,7 +800,7 @@ end subroutine clubb_init_cnst
 
     prec_dp_idx = pbuf_get_index('PREC_DP') !PMA ZM precip for gustiness
     snow_dp_idx = pbuf_get_index('SNOW_DP') !PMA ZM snow for gustiness
-!    vmag_gust_idx = pbuf_get_index('vmag_gust') !PMA ZM snow for gustiness
+    vmag_gust_idx = pbuf_get_index('vmag_gust') !PMA ZM snow for gustiness
 
     iisclr_rt  = -1
     iisclr_thl = -1

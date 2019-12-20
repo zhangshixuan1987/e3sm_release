@@ -30,10 +30,9 @@ def cal_mean(ncases, cases,years, nsite,lats, lons,area, filepath):
 #  ncea_str='/global/common/sw/cray/cnl7/haswell/nco/4.7.9/gcc/8.2.0/unbt25h/bin/ncea '
   ncea_str='/blues/gpfs/home/software/spack-0.10.1/opt/spack/linux-centos7-x86_64/intel-17.0.4/nco-4.7.4-x4y66ep2ydoyegnckicvv5ljwrheniun/bin/ncea '
   outfile=filepath[im]+cases[im]+'/'+cases[im]+'_DJF_climo.nc'
-  infile=datalocal+cases[im]+'.cam.h0.'+years[im]+'-01.nc '+ datalocal+cases[im]+'.cam.h0.'+years[im]+'-02.nc '+ datalocal+cases[im]+'.cam.h0.'+years[im]+'-12.nc '
+  infile=datalocal+cases[im]+'.cam.h0.0002-01.nc '+ datalocal+cases[im]+'.cam.h0.0002-02.nc '+ datalocal+cases[im]+'.cam.h0.'+years[im]+'-12.nc '
   os.system(ncea_str+infile +' -O '+outfile)
 
-  
   outfile=filepath[im]+cases[im]+'/'+cases[im]+'_MAM_climo.nc'
   infile=datalocal+cases[im]+'.cam.h0.'+years[im]+'-03.nc '+ datalocal+cases[im]+'.cam.h0.'+years[im]+'-04.nc '+ datalocal+cases[im]+'.cam.h0.'+years[im]+'-05.nc '
   os.system(ncea_str+infile +' -O '+outfile)
@@ -47,7 +46,7 @@ def cal_mean(ncases, cases,years, nsite,lats, lons,area, filepath):
   os.system(ncea_str+infile +' -O '+outfile)
 
   outfile=filepath[im]+cases[im]+'/'+cases[im]+'_ANN_climo.nc'
-  infile=datalocal+cases[im]+'.cam.h0.'+years[im]+'-*.nc '
+  infile=filepath[im]+cases[im]+'/'+cases[im]+'_SON_climo.nc '+filepath[im]+cases[im]+'/'+cases[im]+'_JJA_climo.nc '+filepath[im]+cases[im]+'/'+cases[im]+'_MAM_climo.nc '+filepath[im]+cases[im]+'/'+cases[im]+'_DJF_climo.nc '
   os.system(ncea_str+infile +' -O '+outfile)
 
 

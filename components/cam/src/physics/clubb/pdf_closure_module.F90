@@ -835,7 +835,6 @@ module pdf_closure_module
           pdf_params%rsatl_2 = sat_mixrat_liq( p_in_Pa, tl2 )
        elsewhere ( tl2 > t2_combined )
           pdf_params%rsatl_2 = sat_mixrat_liq( p_in_Pa, tl2 ) &
-=======
           rsatl_1 = sat_mixrat_ice( p_in_Pa, tl1 ) &
                     + sat_mixrat_ice( p_in_Pa, tl1 ) * (RH_crit(1, 1) -one ) &
                       * ( t2_combined -tl1)/(t2_combined - t3_combined)
@@ -847,7 +846,6 @@ module pdf_closure_module
           rsatl_2 = sat_mixrat_liq( p_in_Pa, tl2 )
        elsewhere ( tl2 > t2_combined )
           rsatl_2 = sat_mixrat_liq( p_in_Pa, tl2 ) &
->>>>>>> origin/master_tmp
                     * (tl2 - t2_combined)/(t1_combined - t2_combined) &
                     + sat_mixrat_ice( p_in_Pa, tl2 ) &
                       * (t1_combined - tl2)/(t1_combined - t2_combined)

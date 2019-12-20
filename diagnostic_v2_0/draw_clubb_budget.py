@@ -37,7 +37,7 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
  ncdfs    = ["" for x in range(ncases)]
  nregions = nsite
 
- varis = [ "wp2","wp3","wprtp","wpthlp","rtp2","thlp2","up2","vp2","rtpthlp"]
+ varis = [ "wp2","wp3","wprtp","wpthlp","rtp2","thlp2","up2","vp2","rtpthlp","um","vm","thlm","rtm"]
  varisobs = [ "CLOUD", "OMEGA","SHUM","CLWC_ISBL", "THATA","RELHUM"]
  nvaris = len(varis)
  cunits = ["%", "mba/day","g/kg","g/kg","K", "%", "mba/day", "K", "g/kg", "m/s", "m/s","K","m"]
@@ -66,6 +66,7 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          res.lgPerimOn              = False                 # no box around
          res.vpWidthF         = 0.30                      # set width and height
          res.vpHeightF        = 0.30
+
 #         res.txFontHeightF   = .01
          #  res.vpXF             = 0.04
          # res.vpYF             = 0.30
@@ -73,7 +74,6 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          res.tmXBLabelFont  = 12
          res.tmXBLabelFontHeightF = 0.005
          res.tmXBLabelFontThicknessF = 1.0
-         res.tmXBLabelAngleF = 45
          res.xyMarkLineMode      = "MarkLines"
          res.xyLineThicknesses = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0,2.,2.,2.,2.,2,2,2,2,2,2,2]
          res.xyLineColors      = np.arange(2,25,2)
@@ -90,7 +90,7 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          res.lgLabelFontHeightF     = .01                   # change font height
          res.lgLabelFontThicknessF  = 1.
          res.lgPerimOn              = True
-         res.tiYAxisString   = "Height  (unit: KM)"
+         res.tiYAxisString   = "PRESSURE"
      
 #         res.nglLeftString     = varis[iv]
 #         res.nglRightString    = cunits[iv]
@@ -98,6 +98,9 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
 
          pres            = Ngl.Resources() 
 #         pres.nglMaximize = True
+         pres.wkWidth              = 2000
+         pres.wkHeight             = 2000
+
          pres.nglFrame = False
          pres.txFont = 12
          pres.nglPanelYWhiteSpacePercent = 5
@@ -134,6 +137,16 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
                  budget_ends = ["_bt", "_ma", "_ta", "_tp", "_dp1", "_dp2","_pr1","_pr2" ,"_cl", "_pd", "_sf"]
                  nterms = len (budget_ends)
 
+             if (varis[iv] == "um" or varis[iv] == "vm") :
+                 budget_ends = ["_bt", "_ma","_ta","_gf",  "_f"]
+                 nterms = len (budget_ends)
+         
+             if (varis[iv] == "thlm" or varis[iv] == "rtm") :
+                 budget_ends = ["_bt", "_ma","_ta","_cl",  "_mc"]
+                 nterms = len (budget_ends)
+
+
+
              ncdfs[im]  = './data/'+cases[im]+'_site_location.nc'
              infiles[im]= filepath[im]+cases[im]+'/'+cases[im]+'_'+cseason+'_climo.nc'
              inptrs = Dataset(infiles[im],'r')       # pointer to file1
@@ -165,8 +178,8 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
              p = Ngl.xy(wks,A_field,ilev,res)
              plot.append(p)
 
-             xp=np.mod(iv,3)
-             yp=int(iv/3)
+             xp=np.mod(iv,2)
+             yp=int(iv/2)
 
          pres.txFontHeightF = 0.02
          pres.txString   = casenames[im]+"  BUDGET at" +str(lons[ire])+"E,"+str(lats[ire])+"N"

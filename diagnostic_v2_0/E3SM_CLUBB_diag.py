@@ -11,20 +11,25 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-casename="Merge_lscale" # A general case name
+casename="c81wp3p1vsZM_ANN" # A general case name
 outdir="/home/zhun/E3SM_code/clubb_silhs_v2_tau/diagnostic_v2_0/" # Location of plots
 
 filepath=["/lcrc/group/acme/zhun/E3SM_simulations/",\
-              ]
+"/lcrc/group/acme/zhun/E3SM_simulations/",\
+      "/lcrc/group/acme/zhun/E3SM_simulations/",\
+
+          ]
 cases=[ \
-        "anvil.clubb_silhs_v2_tau.lscale_flag_merge.ne30_ne30",\
+        "anvil-centos7.clubb_silhs_v2_tau.silhson_sample484_try7.ne16_ne16",\
+	"anvil-centos7.clubb_silhs_v2_tau.silhson_sample484_try5.ne16_ne16",\
+        "anvil-centos7.master_20191113.gust_polun.ne16_ne16" \
               ]
 # Give a short name for your experiment which will appears on plots
 
-casenames=['merge']
+casenames=['silhs c81wp3p1','silhs c82wp3p1', 'zm gust']
 
 years=[\
-                "1979"]
+         "0001",  "0001","0001"]
 
 # Observation Data
 #filepathobs="/global/project/projectdirs/m2689/zhun/amwg/obs_data_20140804/"
@@ -35,14 +40,16 @@ ptype="png"   # eps, pdf, ps... are supported by this package
 cseason="ANN" # Seasons, or others
 
 #------------------------------------------------------------------------
-calmean=False   # make mean states
-findout=False      # pick out the locations of your sites
-draw2d=True       # This flag control 2D plots
-drawlarge= True   # profiles for large-scale variable on your sites 
+calmean=False      # make mean states
+findout=False       # pick out the locations of your sites
+draw2d=True        # This flag control 2D plots
+drawlarge= True    # profiles for large-scale variable on your sites 
 drawclubb= True    # profiles for standard clubb output
 drawskw= True     # profiles for skewness functions
-drawsilhs=False   # profiles for silhs variables
-drawbgt= True      # budgets of 9 prognostic Eqs 
+drawsilhs=False    # profiles for silhs variables
+drawbgt= True     # budgets of CLUBB prognostic Eqs 
+drawhf= False      # Tendency of holl filler 
+drawenergy= True   # Energy
 
 makeweb=True      # Make a webpage?
 maketar=True      # Tar them?
@@ -56,8 +63,8 @@ area  = 1.
 # sites    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
 #lats = [  20,  27, -20, -20,  -5,  -1, -60,  60,   2,   9,  56,  76,  45,   0,  10]
 #lons = [ 190, 240, 275, 285, 355, 259, 340, 180, 140, 229, 311, 320, 180, 295,  90]
-lats = [  20,  27, -20, -20,  -5,  -1,  60,   2,   9,  56,  45,   0,  10]
-lons = [ 190, 240, 275, 285, 355, 259,  180, 140, 229, 311,  180, 295,  90]
+lats = [  20,  27, -20, -20,  -5,  -1,  60,   2,   9,  56,  45,   0,  10, 20 ]
+lons = [ 190, 240, 275, 285, 355, 259,  180, 140, 229, 311,  180, 295,  90, 205]
 
 
 #========================================================================
@@ -79,6 +86,8 @@ import draw_clubb_skew
 import draw_silhs_standard 
 import draw_clubb_standard
 import draw_clubb_budget
+import draw_hollfiller
+import draw_energy 
 import Common_functions
 import Diagnostic_webpage
 
@@ -117,6 +126,15 @@ if drawsilhs:
     print("CLUBB standard variables on selected sites")
     plotsilhs=draw_silhs_standard.silhs_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
+if drawhf:
+    print("Holl filler")
+    plothf=draw_hollfiller.hollfiller_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
+
+if drawenergy:
+    print("Energy")
+    plotenergy=draw_energy.energy_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
+
+
 if drawbgt:
     print("CLUBB BUDGET on selected sites")
     plotbgt=draw_clubb_budget.draw_clubb_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
@@ -130,16 +148,20 @@ if makeweb:
     if (draw2d):
         plot2d.extend(plot3d[:])
         Diagnostic_webpage.sets_web(casename,casedir,plot2d,"2D",\
-                                  "Horizontal Plots","354","268")
+                                  "Horizontal Plots","1000","1000")
 
-    if (drawlarge or drawclubb or drawskw or drawsilhs or drawbgt):
+    if (drawlarge or drawclubb or drawskw or drawsilhs or drawbgt or drawenergy or drawhf):
          for ire in range (0, nsite):
              plotclb=[]
              plotclb.append(plotlgs[ire])
              plotclb.append(plotstd[ire])
              plotclb.append(plotskw[ire])
+#             plotclb.append(plothf[ire])
+             plotclb.append(plotenergy[ire])
              plotclb.append(plotbgt[ire*ncases])
-#             plotclb.append(plotbgt[ire*ncases+1])        
+             plotclb.append(plotbgt[ire*ncases+1])        
+             plotclb.append(plotbgt[ire*ncases+2])
+#             plotclb.append(plotbgt[ire*ncases+3])
              Diagnostic_webpage.sets_web(casename,casedir,plotclb,str(lons[ire])+'E_'+str(lats[ire])+'N',\
                                   "Profiles on "+str(lons[ire])+'E_'+str(lats[ire])+'N',"454","318")
 

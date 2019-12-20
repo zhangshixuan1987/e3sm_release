@@ -250,7 +250,7 @@ module model_flags
     l_Lscale_plume_centered = .false.,   & ! Alternate that uses the PDF to
                                            ! compute the perturbed values
 
-    l_diag_Lscale_from_tau  = .false.,   & ! First diagnose dissipation time tau, 
+    l_diag_Lscale_from_tau  = .true.,   & ! First diagnose dissipation time tau, 
                                            ! and then diagnose the mixing length
                                            ! scale as Lscale = tau * tke
 

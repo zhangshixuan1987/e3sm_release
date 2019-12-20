@@ -36,13 +36,13 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
  ncdfs    = ["" for x in range(ncases)]
  nregions = nsite
 
- varis    = [ "wp2","wp3","wprtp","wpthlp","up2","vp2","rtp2","thlp2","upwp","vpwp","rcm","cloud_frac"]
+ varis    = [ 'wp2','wp3','wprtp','wpthlp','up2','vp2','rtp2','thlp2','upwp','vpwp','wp2thlp','wp2rtp','wprtpthlp','wpthvp','wp2thvp','thlpthvp','rtpthvp','wp4','wprtp2','wpthlp2']
  varisobs = ["CC_ISBL", "OMEGA","SHUM","CLWC_ISBL", "THETA","RELHUM","U","CIWC_ISBL","T" ]
  nvaris = len(varis)
  cunits = ["%","mba/day","g/kg","g/kg","K", "%", "m/s", "g/kg", "m/s", "m/s","K","m" ]
- cscale = [1, 1, 1000, 1, 1, 1, 1E6,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+ cscale = [1, 1, 1000, 1, 1, 1, 1E6,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
  cscaleobs = [100,        1,     1, 1000 , 1.,   1,     1,   1000,     1,1,1,1,1,1,1]
- obsdataset =["ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
+ obsdataset =["ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
 
  plotstd=["" for x in range(nsite)]
 
@@ -60,7 +60,7 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      res     = Ngl.Resources()
      res.nglDraw              = False
      res.nglFrame             = False
-     res.lgLabelFontHeightF     = .012                   # change font height
+     res.lgLabelFontHeightF     = .02                   # change font height
      res.lgPerimOn              = False                 # no box around
      res.vpWidthF         = 0.30                      # set width and height
      res.vpHeightF        = 0.30
@@ -68,9 +68,8 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      # res.vpYF             = 0.30
      res.tmYLLabelFont  = 12
      res.tmXBLabelFont  = 12
-     res.tmXBLabelFontHeightF = 0.005
+     res.tmXBLabelFontHeightF = 0.02
      res.tmXBLabelFontThicknessF = 1.0
-     res.tmXBLabelAngleF = 45
      res.xyMarkLineMode      = "Lines"
      res.xyLineThicknesses = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0,2.,2.,2.,2.,2,2,2,2,2,2,2]
 
@@ -80,7 +79,7 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
 
 
      pres            = Ngl.Resources()
-#     pres.nglMaximize = True
+     pres.nglMaximize = True
      pres.nglFrame = False
      pres.txFont = 12
      pres.nglPanelYWhiteSpacePercent = 5
@@ -187,7 +186,7 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      txres.txFontHeightF = 0.020
      Ngl.text_ndc(wks,"CLUBB VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.95,txres)
 
-     Ngl.panel(wks,plot[:],[nvaris/3,3],pres)
+     Ngl.panel(wks,plot[:],[nvaris/4,4],pres)
      Ngl.frame(wks)
      Ngl.destroy(wks)
 

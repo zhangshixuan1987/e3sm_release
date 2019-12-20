@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 import pylab
+import math
 import os
 import Common_functions
 from subprocess import call
@@ -37,32 +38,41 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
  mkres.gsMarkerSizeF = 15.   
  infiles  = ["" for x in range(ncases)] 
  ncdfs    = ["" for x in range(ncases)] 
- varis    = ["CLDTOT",     "SWCF","LWCF","PRECT"]
- varisobs = ["CLDTOT_CS2", "SWCF","LWCF","PRECT"]
+ varis    = ["CLDTOT",     "SWCF","LWCF","PRECT","LHFLX","U10","SHFLX","CLDLOW"    ,"CLDHGH"    ,"TMQ"   ,"TS","FLUT"]
+ varisobs = ["CLDTOT_CAL", "SWCF","LWCF","PRECT","LHFLX","U10","SHFLX","CLDTOT_CAL","CLDTOT_CAL","PREH2O","TS","FLUT"]
  nvaris = len(varis)
  cunits = [""]
- cscale = [100,1,1,86400000, 86400,  1]
- cscaleobs =  [1,1,1,1,0.04]
+ cscale = [100,1,1,86400000, 1,  1,1,100,100,1,1,1,1,1,1,1]
+ cscaleobs =  [1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 # cntrs = [[0 for col in range(11)] for row in range(nvaris)]
  cntrs = np.zeros((nvaris,11),np.float32)
 
- obsdataset=  ["CLOUDSATCOSP","CERES","CERES","GPCP","ERAI", "ERAI", "ERAI", "ERAI"]
+ obsdataset=  ["CALIPSOCOSP","CERES-EBAF","CERES-EBAF","GPCP","ERAI", "ERAI", "NCEP", "CALIPSOCOSP","CALIPSOCOSP","NCEP","NCEP","MERRA"]
  
  plot2d=["" for x in range(nvaris)]
  for iv in range(0, nvaris):
 # make plot for each field 
-   if(varis[iv] == "CLDTOT"):
+   if(varis[iv] == "CLDTOT" or varis[iv] == "CLDLOW" or varis[iv] == "CLDHGH"):
        cntrs[iv,:] = [ 2, 5, 10, 20, 30, 40, 50, 60, 70,80, 90]
    if(varis[iv] == "LWCF"):
-       cntrs[iv,:] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110] 
-   if(varis[iv] =="SWCF"):
+       cntrs[iv,:] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55] 
+   if(varis[iv] =="SWCF" or varis[iv] =="FLUT"):
        cntrs[iv,:] = [-40, -50, -60, -70, -80, -90, -100, -110, -120, -130,-140]
    if(varis[iv]=="PRECT" or varis[iv]=="QFLX"):
        cntrs[iv,:] = [0.5, 1, 2, 3, 4, 5, 6, 7, 8,9,10]
-   if(varis[iv] == "FLUT"):
-       cntrs[iv,:] = [210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310]
-   
-    
+#   if(varis[iv] == "FLUT"):
+#       cntrs[iv,:] = [210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310]
+   if(varis[iv] == "LHFLX"):
+       cntrs[iv,:] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
+   if(varis[iv] == "SHFLX"):
+       cntrs[iv,:] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
+   if(varis[iv] == "U10"):
+       cntrs[iv,:] = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33]
+   if(varis[iv] == "TMQ"):
+       cntrs[iv,:] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+
+
+
 
 #  Observational data
    if(obsdataset[iv] =="CCCM"):
@@ -82,8 +92,14 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    inptrobs = Dataset(fileobs,'r') 
    latobs=inptrobs.variables['lat'][:]
    lonobs=inptrobs.variables['lon'][:]
-   B=inptrobs.variables[varisobs[iv]][0,:,:] 
-   B=B * cscaleobs[iv]
+   if (varisobs[iv] =="U10"):
+      B0=inptrobs.variables[varisobs[iv]][0,:,:] 
+      B1=inptrobs.variables["V10"][0,:,:]
+      B=(B0*B0+B1*B1)
+      B=B * cscaleobs[iv]
+   else:
+      B=inptrobs.variables[varisobs[iv]][0,:,:]
+      B=B * cscaleobs[iv]
 
    #************************************************
    # create plot
@@ -91,7 +107,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    plotname = casedir+'/2D/Horizontal_'+varis[iv]+'_'+cseason
    plot2d[iv] = 'Horizontal_'+varis[iv]+'_'+cseason
    wks= Ngl.open_wks(ptype,plotname)
-   Ngl.define_colormap(wks,"BlueRed")
+   Ngl.define_colormap(wks,"cmocean_thermal")
  
 #   ngl_define_colormap(wks,"prcp_1")
    plot = []
@@ -100,7 +116,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    txres.txFontHeightF = 0.018
 
    pres            = Ngl.Resources()
-#   pres.nglMaximize = True
+   pres.nglMaximize = True
    pres.nglPanelYWhiteSpacePercent = 5
    pres.nglPanelXWhiteSpacePercent = 5
    pres.nglPanelBottom = 0.02
@@ -203,6 +219,19 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
            A = inptrs.variables['PRECC'][0,:]+inptrs.variables['PRECL'][0,:]
        else:
            A = inptrs.variables[varis[iv]][0,:]
+
+       if (varis[iv] == 'FLUT'):
+           A = inptrs.variables['FLUT'][0,:]-inptrs.variables['FLNS'][0,:]
+       else:
+           A = inptrs.variables[varis[iv]][0,:]
+
+
+       if (varis[iv] == 'U10'):
+           A = inptrs.variables['U10'][0,:]*inptrs.variables['U10'][0,:]
+       else:
+           A = inptrs.variables[varis[iv]][0,:]
+
+
 
        A_xy=A
        A_xy = A_xy * cscale[iv]

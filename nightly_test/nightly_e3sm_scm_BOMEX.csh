@@ -14,13 +14,16 @@
   setenv casename test_BOMEX 
 
   # Set the case directory here
-  setenv casedirectory  /usr/nightly_tests/E3SM/projects/scratch/SCM_runs 
+  setenv casedirectory  $e3smSource/projects/scratch/SCM_runs 
 
   # Directory where code lives
-  setenv code_dir /usr/nightly_tests/E3SM
+  setenv code_dir $e3smSource
 
   # Directory of input data
   setenv input_data_dir /home/pub/cam_inputdata
+
+  # Directory of output
+  setenv output_dir $e3smSource/projects/scratch
 
   # Name of machine you are running on (i.e. cori, anvil, etc)                                                    
   setenv machine carson
@@ -131,6 +134,11 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
   ./xmlchange --id EXEROOT --val "${case_build_dir}"
   ./xmlchange --id RUNDIR --val "${case_run_dir}" 
   ./xmlchange --id DIN_LOC_ROOT --val "${input_data_dir}"
+  ./xmlchange --id CIME_OUTPUT_ROOT --val "${output_dir}"
+  ./xmlchange --id DIN_LOC_ROOT_CLMFORC --val "${e3smSource}/projects/ptclm-data"
+#  ./xmlchange --id DOUT_S_ROOT --val "${e3smSource}/projects/scratch/archive/\$CASE"
+  ./xmlchange --id BASELINE_ROOT --val "${e3smSource}/projects/baselines"
+  ./xmlchange --id CCSM_CPRNC --val "${e3smSource}/cime/tools/cprnc"
   ./xmlchange -file env_batch.xml  -id  JOB_QUEUE  -val 'acme-small'  
   ./xmlchange PROJECT="condo",CHARGE_ACCOUNT="condo"
 

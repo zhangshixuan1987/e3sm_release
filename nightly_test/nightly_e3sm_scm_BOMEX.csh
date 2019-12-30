@@ -14,13 +14,13 @@
   setenv casename test_BOMEX 
 
   # Set the case directory here
-  setenv casedirectory  ~/projects/scratch/SCM_runs 
+  setenv casedirectory  /usr/nightly_tests/E3SM/projects/scratch/SCM_runs 
 
   # Directory where code lives
-  setenv code_dir $HOME/E3SM_code
+  setenv code_dir /usr/nightly_tests/E3SM
 
-  # Code tag name 
-  setenv code_tag clubb_silhs_v2 
+  # Directory of input data
+  setenv input_data_dir /home/pub/cam_inputdata
 
   # Name of machine you are running on (i.e. cori, anvil, etc)                                                    
   setenv machine carson
@@ -89,7 +89,7 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
   set presc_aero_file = mam4_0.9x1.2_L72_2000clim_c170323.nc
 
   set PROJECT=$projectname
-  set E3SMROOT=${code_dir}/${code_tag}
+  set E3SMROOT=${code_dir}
   
   cd $E3SMROOT/cime/scripts
   set compset=F_SCAM5
@@ -130,9 +130,9 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
 # Define executable and run directories
   ./xmlchange --id EXEROOT --val "${case_build_dir}"
   ./xmlchange --id RUNDIR --val "${case_run_dir}" 
+  ./xmlchange --id DIN_LOC_ROOT --val "${input_data_dir}"
   ./xmlchange -file env_batch.xml  -id  JOB_QUEUE  -val 'acme-small'  
   ./xmlchange PROJECT="condo",CHARGE_ACCOUNT="condo"
-
 
 # Set to debug, only on certain machines  
   if ($machine =~ 'cori*') then 
@@ -142,10 +142,6 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
   if ($machine == 'quartz' || $machine == 'syrah') then
     ./xmlchange --id JOB_QUEUE --val 'pdebug'
   endif
-
-# Get local input data directory path
-
- set input_data_dir = `./xmlquery DIN_LOC_ROOT -value` 
 
 # need to use single thread
   set npes = 1
@@ -205,7 +201,7 @@ cat <<EOF >> user_nl_cam
  precip_off = $do_turnoff_precip
  scmlat = $lat 
  scmlon = $lon
- ncdata         = '/home/guozhun/projects/cesm-inputdata/atm/cam/inic/homme/cami_mam3_Linoz_ne16np4_L72_c160614.nc'
+ ncdata         = '$input_data_dir/atm/cam/inic/homme/cami_mam3_Linoz_ne16np4_L72_c160614.nc'
 EOF
 
 # CAM namelist options to match E3SMv1 settings

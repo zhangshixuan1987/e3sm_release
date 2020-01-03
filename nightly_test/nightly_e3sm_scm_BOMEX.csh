@@ -209,6 +209,8 @@ cat <<EOF >> user_nl_cam
  precip_off = $do_turnoff_precip
  scmlat = $lat 
  scmlon = $lon
+ clubb_vars_zt = $clubb_vars_zt_list
+ clubb_vars_zm = $clubb_vars_zm_list
  ncdata         = '$input_data_dir/atm/cam/inic/homme/cami_mam3_Linoz_ne16np4_L72_c160614.nc'
  fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
 'U:A','PS:A','T:A','V:A','OMEGA:A','Z3:A','PRECT:A',

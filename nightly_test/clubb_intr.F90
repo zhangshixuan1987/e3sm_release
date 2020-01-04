@@ -3941,7 +3941,8 @@ end function diag_ustar
     !  Read variables to compute from the namelist    
     if (masterproc) then
        iunit= getunit()
-!       open(unit=iunit,file="atm_in",status='old')
+       close(unit=97)
+       open(unit=iunit,file="atm_in",status='old')
        call find_group_name(iunit, 'clubb_stats_nl', status=read_status)
        if (read_status == 0) then
           read(unit=iunit, nml=clubb_stats_nl, iostat=read_status)
@@ -3949,7 +3950,7 @@ end function diag_ustar
              call endrun('stats_init_clubb:  error reading namelist')
           end if
        end if
-!       close(unit=iunit)
+       close(unit=iunit)
        call freeunit(iunit)
     end if
 

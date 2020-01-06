@@ -1790,7 +1790,7 @@
 
   <machine MACH="carson">
     <DESC>
-     Also for carson
+     Configuration for carson.math.uwm.edu (Carson Nightly Tests)
     </DESC>
     <NODENAME_REGEX>carson.math.uwm.edu</NODENAME_REGEX>
     <OS>Linux</OS>
@@ -1801,7 +1801,44 @@
     <DIN_LOC_ROOT_CLMFORC>$ENV{HOME}/projects/ptclm-data</DIN_LOC_ROOT_CLMFORC>
     <DOUT_S_ROOT>$ENV{HOME}/projects/scratch/archive/$CASE</DOUT_S_ROOT>
     <BASELINE_ROOT>$ENV{HOME}/projects/baselines</BASELINE_ROOT>
-    <CCSM_CPRNC>/home/guozhun/subcol_SILHS_UWM_v2/cime/tools/cprnc</CCSM_CPRNC>
+    <CCSM_CPRNC>$ENV{e3smSource}/cime/tools/cprnc</CCSM_CPRNC>
+    <GMAKE>make</GMAKE>
+    <GMAKE_J>4</GMAKE_J>
+    <BATCH_SYSTEM>none</BATCH_SYSTEM>
+    <SUPPORTED_BY>Larson Group</SUPPORTED_BY>
+    <MAX_TASKS_PER_NODE>1</MAX_TASKS_PER_NODE>
+    <MAX_MPITASKS_PER_NODE>1</MAX_MPITASKS_PER_NODE>
+    <mpirun mpilib="default">
+      <executable>/usr/local/mpi/MPICH-3.3.1-gfortran/bin/mpirun</executable>
+      <arguments>
+        <arg name="anum_tasks"> -np $TOTALPES</arg>
+        <arg name="labelstdout">-prepend-rank</arg>
+      </arguments>
+    </mpirun>
+    <module_system type="none"/>
+    <environment_variables>
+      <env name="NETCDF_C_PATH">/usr/local/NETCDF-C-4.7.0-gfortran</env>
+      <env name="NETCDF_FORTRAN_PATH">/usr/local/NETCDF-Fortran-4.4.5-gfortran</env>
+      <env name="NETCDF_C_PATH">/usr/local/NETCDF-C-4.7.0-gfortran</env>
+      <env name="LIB_NETCDF">/usr/local/NETCDF-Fortran-4.4.5-gfortran/lib</env>
+      <env name="INC_NETCDF">/usr/local/NETCDF-Fortran-4.4.5-gfortran/include</env>
+    </environment_variables>
+  </machine>
+
+    <machine MACH="nelson">
+    <DESC>
+     Configuration for nelson.math.uwm.edu (Bitten Tests)
+    </DESC>
+    <NODENAME_REGEX>nelson.math.uwm.edu</NODENAME_REGEX>
+    <OS>Linux</OS>
+    <COMPILERS>gnu</COMPILERS>
+    <MPILIBS>mpich</MPILIBS>
+    <CIME_OUTPUT_ROOT>$ENV{HOME}/projects/scratch</CIME_OUTPUT_ROOT>
+    <DIN_LOC_ROOT>$ENV{HOME}/projects/cesm-inputdata</DIN_LOC_ROOT>
+    <DIN_LOC_ROOT_CLMFORC>$ENV{HOME}/projects/ptclm-data</DIN_LOC_ROOT_CLMFORC>
+    <DOUT_S_ROOT>$ENV{HOME}/projects/scratch/archive/$CASE</DOUT_S_ROOT>
+    <BASELINE_ROOT>$ENV{HOME}/projects/baselines</BASELINE_ROOT>
+    <CCSM_CPRNC>$ENV{e3smSource}/cime/tools/cprnc</CCSM_CPRNC>
     <GMAKE>make</GMAKE>
     <GMAKE_J>4</GMAKE_J>
     <BATCH_SYSTEM>none</BATCH_SYSTEM>

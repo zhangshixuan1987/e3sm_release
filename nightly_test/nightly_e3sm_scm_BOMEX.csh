@@ -136,7 +136,6 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
   ./xmlchange --id DIN_LOC_ROOT --val "${input_data_dir}"
   ./xmlchange --id CIME_OUTPUT_ROOT --val "${output_dir}"
   ./xmlchange --id DIN_LOC_ROOT_CLMFORC --val "${e3smSource}/projects/ptclm-data"
-#  ./xmlchange --id DOUT_S_ROOT --val "${e3smSource}/projects/scratch/archive/\$CASE"
   ./xmlchange --id BASELINE_ROOT --val "${e3smSource}/projects/baselines"
   ./xmlchange --id CCSM_CPRNC --val "${e3smSource}/cime/tools/cprnc"
   ./xmlchange -file env_batch.xml  -id  JOB_QUEUE  -val 'acme-small'  

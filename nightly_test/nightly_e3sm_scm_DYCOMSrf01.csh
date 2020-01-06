@@ -11,7 +11,7 @@
 #######################################################
 #######  BEGIN USER DEFINED SETTINGS
 
-  setenv casename test_RF01 
+  setenv casename test_DYCOMSrf01
 
   # Set the case directory here
   setenv casedirectory  $e3smSource/projects/scratch/SCM_runs 

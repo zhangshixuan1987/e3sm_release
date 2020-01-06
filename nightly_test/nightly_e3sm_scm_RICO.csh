@@ -14,21 +14,22 @@
   setenv casename test_RICO 
 
   # Set the case directory here
-  setenv casedirectory  ~/projects/scratch/SCM_runs 
+  setenv casedirectory  $e3smSource/projects/scratch/SCM_runs 
 
   # Directory where code lives
-  setenv code_dir $HOME/E3SM_code
+  setenv code_dir $e3smSource
 
-  # Code tag name 
-  setenv code_tag clubb_silhs_v2 
+  # Directory of input data
+  setenv input_data_dir /home/pub/cam_inputdata
+
+  # Directory of output
+  setenv output_dir $e3smSource/projects/scratch
 
   # Name of machine you are running on (i.e. cori, anvil, etc)                                                    
   setenv machine carson
 
   # Name of project to run on, if submitting to queue
   setenv projectname condo 
-
-
 
   # Aerosol specification
   # Options include:
@@ -89,7 +90,7 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
   set presc_aero_file = mam4_0.9x1.2_L72_2000clim_c170323.nc
 
   set PROJECT=$projectname
-  set E3SMROOT=${code_dir}/${code_tag}
+  set E3SMROOT=${code_dir}
   
   cd $E3SMROOT/cime/scripts
   set compset=F_SCAM5
@@ -130,6 +131,11 @@ set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 
 # Define executable and run directories
   ./xmlchange --id EXEROOT --val "${case_build_dir}"
   ./xmlchange --id RUNDIR --val "${case_run_dir}" 
+  ./xmlchange --id DIN_LOC_ROOT --val "${input_data_dir}"
+  ./xmlchange --id CIME_OUTPUT_ROOT --val "${output_dir}"
+  ./xmlchange --id DIN_LOC_ROOT_CLMFORC --val "${e3smSource}/projects/ptclm-data"
+  ./xmlchange --id BASELINE_ROOT --val "${e3smSource}/projects/baselines"
+  ./xmlchange --id CCSM_CPRNC --val "${e3smSource}/cime/tools/cprnc"
   ./xmlchange -file env_batch.xml  -id  JOB_QUEUE  -val 'acme-small'  
   ./xmlchange PROJECT="condo",CHARGE_ACCOUNT="condo"
 
@@ -205,11 +211,10 @@ cat <<EOF >> user_nl_cam
  precip_off = $do_turnoff_precip
  scmlat = $lat 
  scmlon = $lon
- 
+ ncdata         = '$input_data_dir/atm/cam/inic/homme/cami_mam3_Linoz_ne16np4_L72_c160614.nc'
  clubb_vars_zt = $clubb_vars_zt_list
  clubb_vars_zm = $clubb_vars_zm_list
-
-fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
+ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
 'U:A','PS:A','T:A','V:A','OMEGA:A','Z3:A','PRECT:A',
 'CLDLIQ:A', 'CLDICE:A', 'LWCF:A', 'SWCF:A', 'FLUT:A',
 'TMQ:A', 'PRECC:A', 'PRECL:A', 'CME:A', 'PRODPREC:A',
@@ -225,8 +230,6 @@ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
 'QCRAT:A', 'QVHFTEN', 'QCHFTEN', 'QRHFTEN', 'QIHFTEN', 'QSHFTEN', 'THFTEN',
 'SL', 'Q', 'RHW', 'QRS', 'QRL', 'HR', 'FDL', 'SILHS_CLUBB_PRECIP_FRAC',
 'SILHS_CLUBB_ICE_SS_FRAC', 'T_ADJ_CLUBB'
-
- ncdata         = '/home/guozhun/projects/cesm-inputdata/atm/cam/inic/homme/cami_mam3_Linoz_ne16np4_L72_c160614.nc'
 EOF
 
 # CAM namelist options to match E3SMv1 settings

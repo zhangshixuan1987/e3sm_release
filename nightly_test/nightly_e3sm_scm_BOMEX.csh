@@ -453,8 +453,8 @@ set CLM_CONFIG_OPTS="-phys clm4_5"
   ./xmlchange CICE_CONFIG_OPTS="-nodecomp -maxblocks 1 -nx 1 -ny 1"
 
 # Build the case 
-  ./case.build
+  ./case.build  || (echo "failed" && exit 1)
 
-  ./case.submit
+  ./case.submit  || (echo "failed" && exit 1) 
   
-  exit
+  exit 0

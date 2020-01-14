@@ -30,7 +30,8 @@ module clubb_intr
   use mpishorthand
   use cam_history_support, only: fillvalue
 #ifdef CLUBB_SGS
-  use clubb_api_module, only: pdf_parameter
+  use clubb_api_module, only: pdf_parameter, implicit_coefs_terms
+  use clubb_api_module, only: clubb_config_flags_type
 #endif
 
   implicit none
@@ -187,8 +188,6 @@ module clubb_intr
     radf_idx, &         !
     ice_supersat_idx, & ! ice cloud fraction for SILHS
     num_subcols_idx, &  ! number of subcolumns or samples for SILHS
-    pdf_params_idx, &   ! PDF parameters
-    pdf_params_zm_idx, & ! PDF parameters on momentum levels
     rcm_idx, &          ! Cloud water mixing ratio
     cloud_frac_idx, &   ! Cloud fraction
     ztodt_idx           ! physics timestep for SILHS
@@ -241,8 +240,10 @@ module clubb_intr
   logical            :: do_cnst=.false.
   
 #ifdef CLUBB_SGS
-!  type(pdf_parameter), target, allocatable :: pdf_params_chnk(:,:)    ! PDF parameters (thermo. levs.) [units vary]
-!  type(pdf_parameter), target, allocatable :: pdf_params_zm_chnk(:,:) ! PDF parameters on momentum levs. [units vary]
+  type(pdf_parameter), target, allocatable, public, protected :: &
+                                              pdf_params_chnk(:,:)    ! PDF parameters (thermo. levs.) [units vary]
+  type(pdf_parameter), target, allocatable :: pdf_params_zm_chnk(:,:) ! PDF parameters on momentum levs. [units vary]
+  type(implicit_coefs_terms), target, allocatable :: pdf_implicit_coefs_terms_chnk(:,:) ! PDF impl. coefs. & expl. terms      [units vary]
 #endif
 
   logical :: liqcf_fix = .FALSE.  ! HW for liquid cloud fraction fix
@@ -271,7 +272,6 @@ module clubb_intr
 
     !  Add CLUBB fields to pbuf 
     use physics_buffer,  only: pbuf_add_field, dtype_r8, dyn_time_lvls
-    use clubb_api_module,only: num_pdf_params
     use ppgrid,          only: pver, pverp, pcols
     use cam_abortutils,  only: endrun
     
@@ -341,8 +341,6 @@ module clubb_intr
     call pbuf_add_field('THLPTHVP',   'global', dtype_r8, (/pcols,pverp/), thlpthvp_idx)
 
     call pbuf_add_field('ISS_FRAC',      'global', dtype_r8, (/pcols,pverp/), ice_supersat_idx)
-    call pbuf_add_field('PDF_PARAMS',    'global', dtype_r8, (/pcols,pverp,num_pdf_params/), pdf_params_idx)
-    call pbuf_add_field('PDF_PARAMS_ZM', 'global', dtype_r8, (/pcols,pverp,num_pdf_params/), pdf_params_zm_idx)
     call pbuf_add_field('RCM',           'global', dtype_r8, (/pcols,pverp/), rcm_idx)
     call pbuf_add_field('CLOUD_FRAC',    'global', dtype_r8, (/pcols,pverp/), cloud_frac_idx)
     call pbuf_add_field('ZTODT',         'global', dtype_r8, (/pcols/),       ztodt_idx)
@@ -607,7 +605,7 @@ end subroutine clubb_init_cnst
                                 iC8, iC11, iC11b, iC4, iC14, iup2_vp2_factor, params_list, &
                                 l_use_C7_Richardson, l_use_C11_Richardson, l_brunt_vaisala_freq_moist, &
                                 l_use_thvm_in_bv_freq, l_rcm_supersat_adj, l_do_expldiff_rtm_thlm, &
-                                init_pdf_params_api
+                                init_pdf_params_api, init_pdf_implicit_coefs_terms_api
 
     use units,                     only: getunit, freeunit
     use error_messages,            only: handle_errmsg
@@ -679,18 +677,20 @@ end subroutine clubb_init_cnst
     l_do_expldiff_rtm_thlm = do_expldiff
     !$OMP END PARALLEL
     
-! Zhun
-!    allocate( &
-!       pdf_params_chnk(pcols,begchunk:endchunk),   &
-!       pdf_params_zm_chnk(pcols,begchunk:endchunk) )
-!
-!    do idx_chunk = begchunk, endchunk
-!        do idx_pcols = 1, pcols
-!            call init_pdf_params_api( pverp, pdf_params_chnk(idx_pcols,idx_chunk) )
-!            call init_pdf_params_api( pverp, pdf_params_zm_chnk(idx_pcols,idx_chunk) )
-!        end do
-!    end do
-!
+    allocate( &
+       pdf_params_chnk(pcols,begchunk:endchunk),   &
+       pdf_params_zm_chnk(pcols,begchunk:endchunk), &
+       pdf_implicit_coefs_terms_chnk(pcols,begchunk:endchunk) )
+
+    do idx_chunk = begchunk, endchunk
+       do idx_pcols = 1, pcols
+          call init_pdf_params_api( pverp, pdf_params_chnk(idx_pcols,idx_chunk) )
+          call init_pdf_params_api( pverp, pdf_params_zm_chnk(idx_pcols,idx_chunk) )
+          call init_pdf_implicit_coefs_terms_api( pverp, sclr_dim, &
+                                                  pdf_implicit_coefs_terms_chnk(idx_pcols,idx_chunk) )
+       enddo
+    enddo
+
     ! ----------------------------------------------------------------- !
     ! Determine how many constituents CLUBB will transport.  Note that  
     ! CLUBB does not transport aerosol consituents.  Therefore, need to 
@@ -1155,10 +1155,6 @@ end subroutine clubb_init_cnst
                                         l_use_boussinesq, &
                                         l_stats, stats_tsamp, stats_tout, stats_zt, &
                                         stats_sfc, stats_zm, stats_rad_zt, stats_rad_zm, l_output_rad_files, &
-                                        pdf_parameter, num_pdf_params, &  ! Type, dimension
-                                        unpack_pdf_params_api, & ! convert array to type
-                                        pack_pdf_params_api, & ! convert type to 2d real array
-                                        init_pdf_params_api, &
                                         stats_begin_timestep_api, &
                                         hydromet_dim, calculate_thlp2_rad_api, mu, update_xp2_mc_api, &
                                         sat_mixrat_liq_api
@@ -1448,11 +1444,6 @@ end subroutine clubb_init_cnst
    integer             :: time_elapsed               ! time keep track of stats          [s]
    real(r8), dimension(nparams)          :: clubb_params                ! These adjustable CLUBB parameters (C1, C2 ...)
    real(r8), dimension(sclr_dim)         :: sclr_tol                    ! Tolerance on passive scalar       [units vary]
-! Zhun not sure
-   type(pdf_parameter) :: pdf_params                                    ! PDF parameters                    [units vary]
-   type(pdf_parameter) :: pdf_params_zm                                 ! PDF parameters on momentum levels [units vary]
-   real(r8), dimension(pverp,num_pdf_params) :: pdf_params_packed       ! Packed for storage in pbuf
-   real(r8), dimension(pverp,num_pdf_params) :: pdf_params_zm_packed    ! Packed for storage in pbuf
    integer :: stats_nsamp, stats_nout                               ! Stats sampling and output intervals for CLUBB [timestep]
 !=======
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
@@ -1501,12 +1492,8 @@ end subroutine clubb_init_cnst
    real(r8), pointer, dimension(:,:) :: accre_enhan ! accretion enhancement factor              [-]
    real(r8), pointer, dimension(:,:) :: naai
    real(r8), pointer, dimension(:,:) :: cmeliq 
-   real(r8), pointer, dimension(:,:,:) :: pdf_params_ptr    ! putting the params in the pbuf          [variable]
-   real(r8), pointer, dimension(:,:,:) :: pdf_params_zm_ptr ! putting the params (zm) in the pbuf     [variable]
    real(r8), pointer, dimension(:,:) :: cmfmc_sh ! Shallow convective mass flux--m subc (pcols,pverp) [kg/m2/s/]
    
-!   type(pdf_parameter), pointer :: pdf_params
-!   type(pdf_parameter), pointer :: pdf_params_zm
    real(r8), pointer, dimension(:,:) :: prer_evap
    real(r8), pointer, dimension(:,:) :: qrl
    real(r8), pointer, dimension(:,:) :: radf_clubb
@@ -1669,10 +1656,6 @@ end subroutine clubb_init_cnst
    
    itim_old = pbuf_old_tim_idx()
 
-   ! Initialize CLUBB's PDF parameter type variables
-   call init_pdf_params_api( pverp, pdf_params )
-   call init_pdf_params_api( pverp, pdf_params_zm )
-
    !  Establish associations between pointers and physics buffer fields   
 
    call pbuf_get_field(pbuf, wp2_idx,     wp2,     start=(/1,1,itim_old/), kount=(/pcols,pverp,1/))
@@ -1713,8 +1696,6 @@ end subroutine clubb_init_cnst
    call pbuf_get_field(pbuf, cmeliq_idx,  cmeliq)
 
    call pbuf_get_field(pbuf, ice_supersat_idx, ice_supersat_frac)
-   call pbuf_get_field(pbuf, pdf_params_idx,  pdf_params_ptr)
-   call pbuf_get_field(pbuf, pdf_params_zm_idx,  pdf_params_zm_ptr)
 !   call pbuf_get_field(pbuf, rcm_idx,     rcm)
 !   call pbuf_get_field(pbuf, cloud_frac_idx, cloud_frac)
    call pbuf_get_field(pbuf, ztodt_idx,   ztodtptr)
@@ -2337,12 +2318,6 @@ end subroutine clubb_init_cnst
       sclrpthlp(:,:)      = 0._r8
       
      
-!      ! Unpack up pdf_params from the pbuf
-      pdf_params_packed(:,:) = pdf_params_ptr(i,:,:)
-      pdf_params_zm_packed(:,:) = pdf_params_zm_ptr(i,:,:)
-      call unpack_pdf_params_api(pdf_params_packed, pverp, pdf_params)
-      call unpack_pdf_params_api(pdf_params_zm_packed, pverp, pdf_params_zm)
- 
       if (clubb_do_adv) then
         if ((macmic_it .eq. 1).and.(.not.clubb_interp_advtend)) then
           wp2_in=zt2zm_api(wp2_in)    
@@ -2465,16 +2440,6 @@ end subroutine clubb_init_cnst
       ! End cloud-top radiative cooling contribution to CLUBB     !
       ! --------------------------------------------------------- !  
 
-!      pdf_params    => pdf_params_chnk(i,lchnk)
-!      pdf_params_zm => pdf_params_zm_chnk(i,lchnk)
-
-!#ifdef SILHS
-!      if (is_first_step()) then
-!           pdf_params%mixt_frac=0.5
-!      end if
-!#endif
-!      write(iulog,*) "mixt intr",pdf_params%mixt_frac
-
       call t_startf('adv_clubb_core_ts_loop')
 
       stats_nsamp = nint(stats_tsamp/dtime)
@@ -2522,16 +2487,17 @@ end subroutine clubb_init_cnst
               rcm_inout, cloud_frac_inout, &                               ! intent(inout)
               wpthvp_in, wp2thvp_in, rtpthvp_in, thlpthvp_in, &            ! intent(inout)
               sclrpthvp_in, &                                              ! intent(inout)
-              pdf_params, pdf_params_zm, &                                 ! intent(inout)
+              pdf_params_chnk(i,lchnk), pdf_params_zm(i,lchnk), &          ! intent(inout)
+              pdf_implicit_coefs_terms_chnk(i,lchnk), &                    ! intent(inout)
               khzm_out, khzt_out, qclvar_out, thlprcp_out, &               ! intent(out)
-              wprcp_out, ice_supersat_frac_out, &                              ! intent(out)
+              wprcp_out, ice_supersat_frac_out, &                          ! intent(out)
               rcm_in_layer_out, cloud_cover_out)                           ! intent(out)
          call t_stopf('advance_clubb_core')
 
          if (do_rainturb) then
             rvm_in = rtm_in - rcm_inout 
             call update_xp2_mc_api(pverp, dtime, cloud_frac_inout, &
-            rcm_inout, rvm_in, thlm_in, wm_zt, exner, pre_in, pdf_params, &
+            rcm_inout, rvm_in, thlm_in, wm_zt, exner, pre_in, pdf_params_chnk(i,lchnk), &
             rtp2_mc_out, thlp2_mc_out, &
             wprtp_mc_out, wpthlp_mc_out, &
             rtpthlp_mc_out)
@@ -2606,12 +2572,6 @@ end subroutine clubb_init_cnst
       endif
    
 
-      ! Pack up pdf_params and store it in the pbuf
-      call pack_pdf_params_api(pdf_params, pverp, pdf_params_packed)
-      call pack_pdf_params_api(pdf_params_zm, pverp, pdf_params_zm_packed)
-      pdf_params_ptr(i,:,:) = pdf_params_packed(:,:)
-      pdf_params_zm_ptr(i,:,:) = pdf_params_zm_packed(:,:)
-
       ! Calculate the change in theta-l from CLUBB for use in the energy fixer.
       ! This needs to be done before the thlm array is overwritten with the new
       ! value of thlm.  Make the calculatation on the CAM grid.
@@ -2675,13 +2635,19 @@ end subroutine clubb_init_cnst
              vp2t_laststep(i,k) = vp2t(pverp-k+1) 
           endif
 
-          mean_rt           = pdf_params%mixt_frac(pverp-k+1)*pdf_params%rt_1(pverp-k+1) &
-             + (1.0_r8-pdf_params%mixt_frac(pverp-k+1))*pdf_params%rt_2(pverp-k+1)
+         mean_rt &
+         = pdf_params_chnk(i,lchnk)%mixt_frac(pverp-k+1) &
+           * pdf_params_chnk(i,lchnk)%rt_1(pverp-k+1) &
+           + ( 1.0_r8 - pdf_params_chnk(i,lchnk)%mixt_frac(pverp-k+1) ) &
+             * pdf_params_chnk(i,lchnk)%rt_2(pverp-k+1)
 
-          pdfp_rtp2(i,k)    = pdf_params%mixt_frac(pverp-k+1) &
-             *((pdf_params%rt_1(pverp-k+1) - mean_rt)**2 + pdf_params%varnce_rt_1(pverp-k+1)) &
-             + (1.0_r8-pdf_params%mixt_frac(pverp-k+1)) &
-             *((pdf_params%rt_2(pverp-k+1) - mean_rt)**2 + pdf_params%varnce_rt_2(pverp-k+1))
+         pdfp_rtp2(i,k) &
+         = pdf_params_chnk(i,lchnk)%mixt_frac(pverp-k+1) &
+           * ( ( pdf_params_chnk(i,lchnk)%rt_1(pverp-k+1) - mean_rt )**2 &
+               + pdf_params_chnk(i,lchnk)%varnce_rt_1(pverp-k+1) ) &
+           + ( 1.0_r8 - pdf_params_chnk(i,lchnk)%mixt_frac(pverp-k+1) ) &
+             * ( ( pdf_params_chnk(i,lchnk)%rt_2(pverp-k+1) - mean_rt )**2 &
+                 + pdf_params_chnk(i,lchnk)%varnce_rt_2(pverp-k+1) )
 
           ice_supersat_frac(i,k) = ice_supersat_frac_out(pverp-k+1)
 

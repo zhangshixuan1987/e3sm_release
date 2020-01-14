@@ -17,9 +17,11 @@ module subcol_SILHS
    use cam_history,      only: addfld, add_default, outfld, horiz_only
 #ifdef CLUBB_SGS
 #ifdef SILHS
+   use clubb_intr,       only: pdf_params_chnk
    use clubb_api_module, only: &
         hmp2_ip_on_hmm2_ip_slope_type, &
-        hmp2_ip_on_hmm2_ip_intrcpt_type
+        hmp2_ip_on_hmm2_ip_intrcpt_type, &
+        pdf_parameter
 #endif
 #endif
    use physconst,     only: cpair, gravit, latvap, latice, rair
@@ -46,13 +48,14 @@ module subcol_SILHS
    private :: stdsc
    private :: fill_holes_sedimentation
    private :: fill_holes_same_phase_vert
+   private :: populate_pdf_params_silhs_col
 #endif
 
    !-----
    ! Private module vars
    !-----
    ! Pbuf indicies
-   integer :: thlm_idx, num_subcols_idx, pdf_params_idx, rcm_idx, rtm_idx, ice_supersat_idx, &
+   integer :: thlm_idx, num_subcols_idx, rcm_idx, rtm_idx, ice_supersat_idx, &
               alst_idx, cld_idx, qrain_idx, qsnow_idx, nrain_idx, nsnow_idx, ztodt_idx, &
               prec_pcw_idx, snow_pcw_idx, prec_str_idx, snow_str_idx, &
               qcsedten_idx, qrsedten_idx, qisedten_idx, qssedten_idx, &
@@ -89,6 +92,7 @@ module subcol_SILHS
 #ifdef SILHS
     type(hmp2_ip_on_hmm2_ip_slope_type) :: hmp2_ip_on_hmm2_ip_slope    
     type(hmp2_ip_on_hmm2_ip_intrcpt_type) :: hmp2_ip_on_hmm2_ip_intrcpt
+    type(pdf_parameter), private :: pdf_params
 #endif
 #endif
 
@@ -231,6 +235,7 @@ contains
       use physics_buffer,          only: physics_buffer_desc, pbuf_get_field, &
                                          dtype_r8, pbuf_get_index
       use units,                   only: getunit, freeunit 
+      use ref_pres,                only : top_lev => trop_cloud_top_lev
 #ifdef CLUBB_SGS
 #ifdef SILHS
       use clubb_api_module,        only: core_rknd, &
@@ -278,6 +283,8 @@ contains
       ! This is called in module clubb_intr; no need to do it here.
 !      call set_clubb_debug_level_api( 0 )
 
+      call init_pdf_params_api( pverp+1-top_lev, pdf_params )
+
       !-------------------------------
       ! CLUBB-SILHS Parameters (global module variables)
       !-------------------------------
@@ -312,7 +319,6 @@ contains
       !-------------------------------
       thlm_idx = pbuf_get_index('THLM')   
       num_subcols_idx = pbuf_get_index('num_subcols')
-      pdf_params_idx = pbuf_get_index('PDF_PARAMS')
       rcm_idx = pbuf_get_index('RCM')
       rtm_idx = pbuf_get_index('RTM')
       cld_idx = pbuf_get_index('CLD')
@@ -486,8 +492,7 @@ contains
 
       use physics_buffer,         only : physics_buffer_desc, pbuf_get_index, &
                                          pbuf_get_field
-     ! use ppgrid,                 only : pver, pverp, pcols
-      use ppgrid,                 only: pver, pverp, pcols, begchunk, endchunk !Zhun
+      use ppgrid,                 only : pver, pverp, pcols
       use ref_pres,               only : top_lev => trop_cloud_top_lev
       use time_manager,           only : get_nstep
       use subcol_utils,           only : subcol_set_subcols, subcol_set_weight
@@ -498,11 +503,7 @@ contains
 #ifdef CLUBB_SGS
 #ifdef SILHS
       use time_manager,           only : is_first_step  ! Zhun
-      use clubb_api_module,       only : pdf_parameter, &
-                                         unpack_pdf_params_api, &
-                                         init_pdf_params_api, &
-                                         num_pdf_params, &
-                                         hydromet_dim, &
+      use clubb_api_module,       only : hydromet_dim, &
 
                                          Lscale, &
 
@@ -592,8 +593,6 @@ contains
       integer :: num_subcols                     ! Number of subcolumns
       integer, dimension(pcols) :: numsubcol_arr ! To set up the state struct
       integer, parameter :: sequence_length = 1  ! Number of timesteps btn subcol calls
-      type(pdf_parameter) :: pdf_params     ! PDF parameters
-      real(r8), dimension(pverp, num_pdf_params) :: pdf_params_packed
       real(r8), dimension(pverp-top_lev+1) :: rho_ds_zt    ! Dry static density (kg/m^3) on thermo levs
       real(r8), dimension(pver)  :: dz_g         ! thickness of layer
       real(r8), dimension(pverp-top_lev+1) :: delta_zm     ! Difference in u wind altitudes
@@ -711,7 +710,6 @@ contains
       real(r8), pointer, dimension(:) :: num_subcol_ptr
       real(r8), pointer, dimension(:) :: ztodt_ptr
       real(r8), pointer, dimension(:,:) :: thlm      ! Mean temperature
-      real(r8), pointer, dimension(:,:,:) :: pdf_params_ptr  ! Packed PDF_Params
       real(r8), pointer, dimension(:,:) :: ice_supersat_frac ! ice cloud fraction
       real(r8), pointer, dimension(:,:) :: rcm       ! CLUBB cld water mr
       real(r8), pointer, dimension(:,:) :: rtm       ! mean moisture mixing ratio
@@ -722,11 +720,6 @@ contains
       real(r8), pointer, dimension(:,:) :: nrain     ! micro_mg rain num conc 
       real(r8), pointer, dimension(:,:) :: nsnow
 
-!      type(pdf_parameter), target, allocatable :: pdf_params_chnk(:,:)    ! PDF
-!      type(pdf_parameter), pointer :: pdf_params ! Zhun
-
-      ! Initialize CLUBB's PDF parameter type variable
-      call init_pdf_params_api( pverp-top_lev+1, pdf_params )
 
       if (.not. allocated(state_sc%lat)) then
          call endrun('subcol_gen error: state_sc must be allocated before calling subcol_gen')
@@ -747,21 +740,9 @@ contains
       ! (Do this now so that num_subcol_ptr is available for the state copy below)
       !----------------
       
-      ! Zhun added 
-      !allocate( &
-      ! pdf_params_chnk(pcols,begchunk:endchunk) )
-
-      !do idx_chunk = begchunk, endchunk
-      !  do idx_pcols = 1, pcols
-      !      call init_pdf_params_api( pverp, pdf_params_chnk(idx_pcols,idx_chunk) )
-      !  end do
-      !end do
-      ! Zhun
-
       call pbuf_get_field(pbuf, thlm_idx, thlm)
       call pbuf_get_field(pbuf, num_subcols_idx, num_subcol_ptr)
       call pbuf_get_field(pbuf, ztodt_idx, ztodt_ptr)
-      call pbuf_get_field(pbuf, pdf_params_idx, pdf_params_ptr)
       call pbuf_get_field(pbuf, ice_supersat_idx, ice_supersat_frac)
       call pbuf_get_field(pbuf, rcm_idx, rcm)
       call pbuf_get_field(pbuf, rtm_idx, rtm)
@@ -841,12 +822,6 @@ contains
          call setup_grid_heights_api( l_implemented, grid_type, &
                                       zi_g(2), zi_g(1), zi_g(1:pverp-top_lev+1), &
                                       zt_g(1:pverp-top_lev+1) )
-
-         ! Pull pdf params out of 2-D real array
-         ! The PDF parameters are passed out of CLUBB and into SILHS without
-         ! being used at all in the rest of the host model code.  The arrays
-         ! aren't flipped for the PDF parameters, and they don't need to be.
-         call unpack_pdf_params_api(pdf_params_ptr(i,1:pverp-top_lev+1,:), pverp-top_lev+1, pdf_params)
 
          ! Inverse delta_zm is required for the 3-level L-scale averaging
          do k = 1, pver-top_lev+1
@@ -970,15 +945,9 @@ contains
          ! The l_calc_w_corr flag is turned off by default, so wphydrometp will
          ! simply be set to 0 to simplify matters.
          wphydrometp = 0.0_r8
-     
-!         pdf_params    => pdf_params_chnk(i,lchnk) ! Zhun 
 
-!#ifdef SILHS
-!         if (is_first_step()) then
-!           pdf_params%mixt_frac=0.5
-!         end if
-!#endif
-!         write(iulog,*) "mixt silhs",pdf_params%mixt_frac
+         call populate_pdf_params_silhs_col( pdf_params_chnk, i, lchnk, &
+                                             pdf_params )
 
          ! make the call
          call setup_pdf_parameters_api( pverp-top_lev+1, pdf_dim, ztodt, &    ! In
@@ -1529,9 +1498,6 @@ contains
      use ref_pres,                only: top_lev => trop_cloud_top_lev
      use subcol_utils,            only: subcol_unpack, subcol_get_nsubcol, subcol_get_weight
      use clubb_api_module,        only: T_in_K2thlm_api, &
-                                        pdf_parameter, &
-                                        unpack_pdf_params_api, &
-                                        init_pdf_params_api
      use silhs_api_module,        only: lh_microphys_var_covar_driver_api
 
      implicit none
@@ -1561,9 +1527,6 @@ contains
 
      real(r8), dimension(pcols,psubcols,pver)  :: dz_g, pdel_all, rho
      real(r8), dimension(pcols,psubcols,pverp) :: zi_all
- 
-     real(r8), pointer, dimension(:,:,:) :: pdf_params_ptr  ! Packed PDF_Params
-     type(pdf_parameter) :: pdf_params  ! PDF parameters [units vary]
 
      integer :: ixcldliq, ixq
 
@@ -1585,15 +1548,11 @@ contains
        wprtp_mc_zt_idx,   &
        wpthlp_mc_zt_idx,  &
        rtpthlp_mc_zt_idx, &
-       pdf_params_idx
 
      !----- Begin Code -----
 
      ! Don't do anything if this option isn't enabled.
      if ( .not. subcol_SILHS_var_covar_src ) return
-
-     ! Initialize CLUBB's PDF parameter type variable
-     call init_pdf_params_api( pverp-top_lev+1, pdf_params )
 
      lchnk = state_sc%lchnk
      ngrdcol  = state_sc%ngrdcol
@@ -1606,10 +1565,6 @@ contains
      wprtp_mc_zt_idx = pbuf_get_index('wprtp_mc_zt')
      wpthlp_mc_zt_idx = pbuf_get_index('wpthlp_mc_zt')
      rtpthlp_mc_zt_idx = pbuf_get_index('rtpthlp_mc_zt')
-     pdf_params_idx = pbuf_get_index('PDF_PARAMS')
-
-     ! Obtain pbuf fields for computation
-     call pbuf_get_field(pbuf, pdf_params_idx, pdf_params_ptr)
 
      ! Obtain pbuf fields for output
      call pbuf_get_field(pbuf, rtp2_mc_zt_idx, rtp2_mc_zt)
@@ -1715,11 +1670,8 @@ contains
      do igrdcol=1, ngrdcol
        ns = nsubcol(igrdcol)
 
-       ! Obtain PDF parameters
-       ! The PDF parameters are passed out of CLUBB and into SILHS without
-       ! being used at all in the rest of the host model code.  The arrays
-       ! aren't flipped for the PDF parameters, and they don't need to be.
-       call unpack_pdf_params_api(pdf_params_ptr(igrdcol,1:pverp-top_lev+1,:), pverp-top_lev+1, pdf_params)
+       call populate_pdf_params_silhs_col( pdf_params_chnk, igrdcol, lchnk, &
+                                           pdf_params )
 
        ! This code assumes that the weights are height independent.
        ! It will have to change once the weights vary with altitude!
@@ -1760,7 +1712,110 @@ contains
    end subroutine subcol_SILHS_var_covar_driver
 
    ! =============================================================================== !
-   !                                                                                 !
+   subroutine populate_pdf_params_silhs_col( pdf_params_chnk, icol, lchnk, &
+                                             pdf_params )
+
+     ! Description:
+     ! Populate local PDF parameter variable pdf_params, which has vertical size
+     ! pverp-top_lev+1, with information from pdf_params_chnk, which has
+     ! vertical size pverp.  Both pdf_params and pdf_params_chnk are defined on
+     ! the CLUBB vertical grid, so the type needs to be copied from level
+     ! indices 1 to pverp-top_lev+1.
+     !
+     ! This is necessary because the PDF parameter allocatable type has a
+     ! vertical size of pverp as defined in clubb_intr.F90.  This is because
+     ! the calls to CLUBB code from clubb_intr.F90 expect a vertical size of
+     ! pverp.  However, the calls to SILHS code from subcol_SILHS.F90 expect a
+     ! vertical size of pverp-top_lev+1.
+
+     ! References:
+     !----------------------------------------------------------------------
+
+     use ppgrid, only : &
+         pcols, &
+         begchunk, &
+         endchunk
+
+     use ref_pres, only : &
+         top_lev => trop_cloud_top_lev
+
+     implicit none
+
+     ! Input Variables
+     type( pdf_parameter ), dimension(pcols,begchunk:endchunk), intent(in) :: &
+       pdf_params_chnk  ! PDF parameters (size pverp) for all columns and chunks
+
+     integer, intent(in) :: &
+       icol,  & ! Column index
+       lchnk    ! Chunk index
+
+     ! Output Variable
+     type( pdf_parameter ), intent(out) :: &
+       pdf_params  ! Local PDF parameters (size pverp-top_lev+1)
+
+     ! Local Variable
+     integer :: k    ! Loop index
+
+
+     do k = 1, pverp-top_lev+1
+
+        pdf_params%w_1(k) = pdf_params_chnk(icol,lchnk)%w_1(k)
+        pdf_params%w_2(k) = pdf_params_chnk(icol,lchnk)%w_2(k)
+        pdf_params%varnce_w_1(k) = pdf_params_chnk(icol,lchnk)%varnce_w_1(k)
+        pdf_params%varnce_w_2(k) = pdf_params_chnk(icol,lchnk)%varnce_w_2(k)
+        pdf_params%rt_1(k) = pdf_params_chnk(icol,lchnk)%rt_1(k)
+        pdf_params%rt_2(k) = pdf_params_chnk(icol,lchnk)%rt_2(k)
+        pdf_params%varnce_rt_1(k) = pdf_params_chnk(icol,lchnk)%varnce_rt_1(k)
+        pdf_params%varnce_rt_2(k) = pdf_params_chnk(icol,lchnk)%varnce_rt_2(k)
+        pdf_params%thl_1(k) = pdf_params_chnk(icol,lchnk)%thl_1(k)
+        pdf_params%thl_2(k) = pdf_params_chnk(icol,lchnk)%thl_2(k)
+        pdf_params%varnce_thl_1(k) = pdf_params_chnk(icol,lchnk)%varnce_thl_1(k)
+        pdf_params%varnce_thl_2(k) = pdf_params_chnk(icol,lchnk)%varnce_thl_2(k)
+        pdf_params%corr_w_rt_1(k) = pdf_params_chnk(icol,lchnk)%corr_w_rt_1(k)
+        pdf_params%corr_w_rt_2(k) = pdf_params_chnk(icol,lchnk)%corr_w_rt_2(k)
+        pdf_params%corr_w_thl_1(k) = pdf_params_chnk(icol,lchnk)%corr_w_thl_1(k)
+        pdf_params%corr_w_thl_2(k) = pdf_params_chnk(icol,lchnk)%corr_w_thl_2(k)
+        pdf_params%corr_rt_thl_1(k) = pdf_params_chnk(icol,lchnk)%corr_rt_thl_1(k)
+        pdf_params%corr_rt_thl_2(k) = pdf_params_chnk(icol,lchnk)%corr_rt_thl_2(k)
+        pdf_params%alpha_thl(k) = pdf_params_chnk(icol,lchnk)%alpha_thl(k)
+        pdf_params%alpha_rt(k) = pdf_params_chnk(icol,lchnk)%alpha_rt(k)
+        pdf_params%crt_1(k) = pdf_params_chnk(icol,lchnk)%crt_1(k)
+        pdf_params%crt_2(k) = pdf_params_chnk(icol,lchnk)%crt_2(k)
+        pdf_params%cthl_1(k) = pdf_params_chnk(icol,lchnk)%cthl_1(k)
+        pdf_params%cthl_2(k) = pdf_params_chnk(icol,lchnk)%cthl_2(k)
+        pdf_params%chi_1(k) = pdf_params_chnk(icol,lchnk)%chi_1(k)
+        pdf_params%chi_2(k) = pdf_params_chnk(icol,lchnk)%chi_2(k)
+        pdf_params%stdev_chi_1(k) = pdf_params_chnk(icol,lchnk)%stdev_chi_1(k)
+        pdf_params%stdev_chi_2(k) = pdf_params_chnk(icol,lchnk)%stdev_chi_2(k)
+        pdf_params%stdev_eta_1(k) = pdf_params_chnk(icol,lchnk)%stdev_eta_1(k)
+        pdf_params%stdev_eta_2(k) = pdf_params_chnk(icol,lchnk)%stdev_eta_2(k)
+        pdf_params%covar_chi_eta_1(k) = pdf_params_chnk(icol,lchnk)%covar_chi_eta_1(k)
+        pdf_params%covar_chi_eta_2(k) = pdf_params_chnk(icol,lchnk)%covar_chi_eta_2(k)
+        pdf_params%corr_w_chi_1(k) = pdf_params_chnk(icol,lchnk)%corr_w_chi_1(k)
+        pdf_params%corr_w_chi_2(k) = pdf_params_chnk(icol,lchnk)%corr_w_chi_2(k)
+        pdf_params%corr_w_eta_1(k) = pdf_params_chnk(icol,lchnk)%corr_w_eta_1(k)
+        pdf_params%corr_w_eta_2(k) = pdf_params_chnk(icol,lchnk)%corr_w_eta_2(k)
+        pdf_params%corr_chi_eta_1(k) = pdf_params_chnk(icol,lchnk)%corr_chi_eta_1(k)
+        pdf_params%corr_chi_eta_2(k) = pdf_params_chnk(icol,lchnk)%corr_chi_eta_2(k)
+        pdf_params%rsatl_1(k) = pdf_params_chnk(icol,lchnk)%rsatl_1(k)
+        pdf_params%rsatl_2(k) = pdf_params_chnk(icol,lchnk)%rsatl_2(k)
+        pdf_params%rc_1(k) = pdf_params_chnk(icol,lchnk)%rc_1(k)
+        pdf_params%rc_2(k) = pdf_params_chnk(icol,lchnk)%rc_2(k)
+        pdf_params%cloud_frac_1(k) = pdf_params_chnk(icol,lchnk)%cloud_frac_1(k)
+        pdf_params%cloud_frac_2(k) = pdf_params_chnk(icol,lchnk)%cloud_frac_2(k)
+        pdf_params%mixt_frac(k) = pdf_params_chnk(icol,lchnk)%mixt_frac(k)
+        pdf_params%ice_supersat_frac_1(k) &
+        = pdf_params_chnk(icol,lchnk)%ice_supersat_frac_1(k)
+        pdf_params%ice_supersat_frac_2(k) &
+        = pdf_params_chnk(icol,lchnk)%ice_supersat_frac_2(k)
+
+     enddo ! k = 1, pverp-top_lev+1
+
+
+     return
+
+   end subroutine populate_pdf_params_silhs_col
+
    ! =============================================================================== !
 
    subroutine subcol_SILHS_massless_droplet_destroyer( ztodt, state, &

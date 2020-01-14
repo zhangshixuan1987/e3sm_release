@@ -47,6 +47,7 @@ module clubb_intr
 #ifdef CLUBB_SGS
             ! This utilizes CLUBB specific variables in its interface
             stats_init_clubb, &
+            init_clubb_config_flags, &
 #endif
             stats_end_timestep_clubb, & 
             clubb_surface, &
@@ -61,6 +62,10 @@ module clubb_intr
 #endif
 
   logical, public :: do_cldcool
+
+#ifdef CLUBB_SGS
+  type(clubb_config_flags_type), public, save :: clubb_config_flags
+#endif
 
   ! ------------ !
   ! Private data !
@@ -119,7 +124,6 @@ module clubb_intr
 
 !  Constant parameters
   logical, parameter, private :: &
-    l_uv_nudge       = .false.,       &  ! Use u/v nudging (not used)
     l_input_fields   = .false.,       &  ! Always false for EAM-CLUBB.
     l_implemented    = .true.,        &  ! Implemented in a host model (always true)
     l_host_applies_sfc_fluxes = .false.  ! Whether the host model applies the surface fluxes
@@ -461,7 +465,6 @@ end subroutine clubb_init_cnst
     use cam_abortutils,  only: endrun
     use stats_variables, only: l_stats, l_output_rad_files
     use mpishorthand
-    use model_flags,     only: l_diffuse_rtm_and_thlm, l_stability_correct_Kh_N2_zm
     use parameters_tunable, only: clubb_param_readnl
 #endif
 
@@ -593,6 +596,7 @@ end subroutine clubb_init_cnst
 
     !  From the CLUBB libraries
     use clubb_api_module, only: setup_clubb_core_api, &
+                                print_clubb_config_flags_api, &
                                 time_precision, core_rknd, &
                                 set_clubb_debug_level_api, & ! Subroutines
                                 nparams, iC11, iC11b, ibeta, iSkw_denom_coef, & ! Constant(s)
@@ -601,10 +605,8 @@ end subroutine clubb_init_cnst
                                 stats_zt, stats_zm, stats_sfc, stats_rad_zt, stats_rad_zm, &
                                 em_min, w_tol_sqd, rt_tol, thl_tol, &
                                 iC1, iC1b, iC2rt, iC2thl, iC2rtthl, ic_K_hm, igamma_coef, igamma_coefb, &
-                                imult_coef, ic_K10, l_stability_correct_tau_zm, &
+                                imult_coef, ic_K10, &
                                 iC8, iC11, iC11b, iC4, iC14, iup2_vp2_factor, params_list, &
-                                l_use_C7_Richardson, l_use_C11_Richardson, l_brunt_vaisala_freq_moist, &
-                                l_use_thvm_in_bv_freq, l_rcm_supersat_adj, l_do_expldiff_rtm_thlm, &
                                 init_pdf_params_api, init_pdf_implicit_coefs_terms_api
 
     use units,                     only: getunit, freeunit
@@ -626,6 +628,8 @@ end subroutine clubb_init_cnst
                                       iiedsclr_rt, iiedsclr_thl, iiedsclr_CO2 ! "    "
     use constituents,           only: cnst_get_ind, qmin, cnst_name
     use phys_control,           only: phys_getopts
+    use spmd_utils,             only: iam
+    use cam_logfile,            only: iulog
     use glb_verif_smry,         only: add_smry_field, SMALLER_THAN, CLIPPING, NO_FIX
 
 #endif
@@ -834,6 +838,21 @@ end subroutine clubb_init_cnst
        zt_g(k) = ((k-1)*1000._r8)-500._r8  !  this is dummy garbage
        zi_g(k) = (k-1)*1000._r8            !  this is dummy garbage
     enddo
+
+    !clubb_params(iC14) = clubb_C14
+    clubb_params(iC14) = 1.0_core_rknd
+
+    call init_clubb_config_flags( clubb_config_flags ) ! In/Out
+    clubb_config_flags%l_uv_nudge = .false.
+    clubb_config_flags%l_use_C7_Richardson = .true.
+    clubb_config_flags%l_use_C11_Richardson = .true.
+    clubb_config_flags%l_brunt_vaisala_freq_moist = .true.
+    clubb_config_flags%l_use_thvm_in_bv_freq = .true.
+    clubb_config_flags%l_rcm_supersat_adj = .false.
+    clubb_config_flags%l_stability_correct_tau_zm = .false.
+    clubb_config_flags%l_do_expldiff_rtm_thlm = do_expldiff
+    clubb_config_flags%l_Lscale_plume_centered = clubb_l_lscale_plume_centered
+    clubb_config_flags%l_use_ice_latent = clubb_l_use_ice_latent
    
     !  Set up CLUBB core.  Note that some of these inputs are overwrote
     !  when clubb_tend_cam is called.  The reason is that heights can change
@@ -845,10 +864,15 @@ end subroutine clubb_init_cnst
            hydromet_dim,  sclr_dim, &                                 ! In
            sclr_tol, edsclr_dim, clubb_params, &                      ! In
            l_host_applies_sfc_fluxes, &                               ! In
-           l_uv_nudge, saturation_equation,  &                        ! In
+           saturation_equation,  &                        ! In
            l_input_fields, &                                          ! In
            l_implemented, grid_type, zi_g(2), zi_g(1), zi_g(pverp), & ! In
            zi_g(1:pverp), zt_g(1:pverp), zi_g(1), &                   ! In
+           clubb_config_flags%l_predict_upwp_vpwp, &                  ! In
+           clubb_config_flags%l_use_ice_latent, &                     ! In
+           clubb_config_flags%l_prescribed_avg_deltaz, &              ! In
+           clubb_config_flags%l_damp_wp2_using_em, &                  ! In
+           clubb_config_flags%l_stability_correct_tau_zm, &           ! In
            err_code )
 !$OMP END PARALLEL
 
@@ -858,6 +882,10 @@ end subroutine clubb_init_cnst
           write(*,*) params_list(j), " = ", clubb_params(j)
        enddo
     endif
+
+    ! Print configurable CLUBB flags
+    write(iulog,'(a,i0,a)') " CLUBB configurable flags set in thread ", iam, ":"
+    call print_clubb_config_flags_api( iulog, clubb_config_flags ) ! Intent(in)
 
     ! ----------------------------------------------------------------- !
     ! Set-up HB diffusion.  Only initialized to diagnose PBL depth      !
@@ -1246,6 +1274,8 @@ end subroutine clubb_init_cnst
    real(r8) :: thlpthvp_in(pverp)               ! momentum levels (< th_l' th_v' >)            [K^2]
    real(r8) :: up2_in(pverp)                    ! meridional wind variance                     [m^2/s^2]
    real(r8) :: vp2_in(pverp)                    ! zonal wind variance                          [m^2/s^2]
+   real(r8) :: up3_in(pverp)                    ! meridional wind third-order                  [m^3/s^3]
+   real(r8) :: vp3_in(pverp)                    ! zonal wind third-order                       [m^3/s^3]
    real(r8) :: upwp_in(pverp)                   ! meridional wind flux                         [m^2/s^2]
    real(r8) :: vpwp_in(pverp)                   ! zonal wind flux                              [m^2/s^2]
    real(r8) :: thlm_in(pverp)                   ! liquid water potential temperature (thetal)  [K]
@@ -1313,6 +1343,7 @@ end subroutine clubb_init_cnst
    real(r8) :: sclrm(pverp,sclr_dim)            ! Passive scalar mean (thermo. levels)          [units vary]
    real(r8) :: wpsclrp(pverp,sclr_dim)          ! w'sclr' (momentum levels)                     [{units vary} m/s]
    real(r8) :: sclrp2(pverp,sclr_dim)           ! sclr'^2 (momentum levels)                     [{units vary}^2]
+   real(r8) :: sclrp3(pverp,sclr_dim)           ! sclr'^3 (thermo. levels)                      [{units vary}^3]
    real(r8) :: sclrprtp(pverp,sclr_dim)         ! sclr'rt' (momentum levels)                    [{units vary} (kg/kg)]
    real(r8) :: sclrpthlp(pverp,sclr_dim)        ! sclr'thlp' (momentum levels)                  [{units vary} (K)]
    real(r8) :: sclrpthvp_inout(pverp,sclr_dim)  ! sclr'thvp' (momentum levels)                  [{units vary} (K)]
@@ -1447,7 +1478,6 @@ end subroutine clubb_init_cnst
    integer :: stats_nsamp, stats_nout                               ! Stats sampling and output intervals for CLUBB [timestep]
 !=======
    character(len=200)                    :: temp1, sub                  ! Strings needed for CLUBB output
-   logical                               :: l_Lscale_plume_centered, l_use_ice_latent
    character(len=3), dimension(pcnst)    :: cnst_type_loc               ! local override option for constituents cnst_type
 
    real(r8) :: rtm_integral_1, rtm_integral_update, rtm_integral_forcing, rtm_integral_vtend, rtm_integral_ltend
@@ -2209,8 +2239,10 @@ end subroutine clubb_init_cnst
       call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), &
          zi_g(1), zi_g, zt_g)
 
-      call setup_parameters_api(zi_g(2), clubb_params, pverp, grid_type, &
-        zi_g, zt_g, err_code)
+      call setup_parameters_api( zi_g(2), clubb_params, pverp, grid_type, &
+                                 zi_g, zt_g, &
+                                 clubb_config_flags%l_prescribed_avg_deltaz, &
+                                 err_code )
  
       !  Compute some inputs from the thermodynamic grid
       !  to the momentum grid
@@ -2242,6 +2274,8 @@ end subroutine clubb_init_cnst
          vpwp_in(k)    = vpwp(i,pverp-k+1)
          up2_in(k)     = up2(i,pverp-k+1)
          vp2_in(k)     = vp2(i,pverp-k+1)
+         up3_in(k)     = up3(i,pverp-k+1)
+         vp3_in(k)     = vp3(i,pverp-k+1)
          wp2_in(k)     = wp2(i,pverp-k+1)
          wp3_in(k)     = wp3(i,pverp-k+1)
          rtp2_in(k)    = rtp2(i,pverp-k+1)
@@ -2292,6 +2326,7 @@ end subroutine clubb_init_cnst
          sclrm(k,:)           = 0._r8
          wpsclrp(k,:)         = 0._r8
          sclrp2(k,:)          = 0._r8
+         sclrp3(k,:)          = 0._r8
          sclrprtp(k,:)        = 0._r8
          sclrpthlp(k,:)       = 0._r8
          sclrpthvp_inout(k,:) = 0._r8
@@ -2476,13 +2511,14 @@ end subroutine clubb_init_cnst
 #endif
               wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, &                ! intent(in)
               host_dx, host_dy, &                                          ! intent(in)
-              um_in, vm_in, upwp_in, &                                     ! intent(inout)
-              vpwp_in, up2_in, vp2_in, &                                   ! intent(inout)
+              clubb_config_flags, &                                        ! intent(in)
+              um_in, vm_in, upwp_in, vpwp_in, &                            ! intent(inout)
+              up2_in, vp2_in, up3_in, vp3_in, &                            ! intent(inout)
               thlm_in, rtm_in, wprtp_in, wpthlp_in, &                      ! intent(inout)
               wp2_in, wp3_in, rtp2_in, &                                   ! intent(inout)
               rtp3_in, thlp2_in, thlp3_in, rtpthlp_in, &                   ! intent(inout)
               sclrm,   &                                                   ! intent(inout)
-              sclrp2, sclrprtp, sclrpthlp, &                               ! intent(inout)
+              sclrp2, sclrp3, sclrprtp, sclrpthlp, &                       ! intent(inout)
               wpsclrp, edsclr_in, err_code, &                              ! intent(inout)
               rcm_inout, cloud_frac_inout, &                               ! intent(inout)
               wpthvp_in, wp2thvp_in, rtpthvp_in, thlpthvp_in, &            ! intent(inout)
@@ -2592,6 +2628,8 @@ end subroutine clubb_init_cnst
           thlpthvp(i,k)     = thlpthvp_in(pverp-k+1)
           up2(i,k)          = up2_in(pverp-k+1)
           vp2(i,k)          = vp2_in(pverp-k+1)
+          up3(i,k)          = up3_in(pverp-k+1)
+          vp3(i,k)          = vp3_in(pverp-k+1)
           thlm(i,k)         = thlm_in(pverp-k+1)
           rtm(i,k)          = rtm_in(pverp-k+1)
           wprtp(i,k)        = wprtp_in(pverp-k+1)
@@ -4606,6 +4644,206 @@ end function diag_ustar
 
   end subroutine stats_avg
 
+#endif
+
+#ifdef CLUBB_SGS
+  subroutine init_clubb_config_flags( clubb_config_flags_in )
+!-------------------------------------------------------------------------------
+! Description:
+!   Initializes the public module variable 'clubb_config_flags' of type
+!   'clubb_config_flags_type' on first call and only on first call.
+! References:
+!   None
+!-------------------------------------------------------------------------------
+    use clubb_api_module, only: &
+      clubb_config_flags_type, &            ! Type
+      set_default_clubb_config_flags_api, & ! Procedure(s)
+      initialize_clubb_config_flags_type_api
+
+    implicit none
+
+    ! Input/Output Variables
+    type(clubb_config_flags_type), intent(inout) :: clubb_config_flags_in
+
+    ! Local Variables
+    logical :: &
+      l_use_precip_frac,            & ! Flag to use precipitation fraction in KK microphysics. The
+                                      ! precipitation fraction is automatically set to 1 when this
+                                      ! flag is turned off.
+      l_predict_upwp_vpwp,          & ! Flag to predict <u'w'> and <v'w'> along with <u> and <v>
+                                      ! alongside the advancement of <rt>, <w'rt'>, <thl>,
+                                      ! <wpthlp>, <sclr>, and <w'sclr'> in subroutine
+                                      ! advance_xm_wpxp.  Otherwise, <u'w'> and <v'w'> are still
+                                      ! approximated by eddy diffusivity when <u> and <v> are
+                                      ! advanced in subroutine advance_windm_edsclrm.
+      l_min_wp2_from_corr_wx,       & ! Flag to base the threshold minimum value of wp2 on keeping
+                                      ! the overall correlation of w and x (w and rt, as well as w
+                                      ! and theta-l) within the limits of -max_mag_correlation_flux
+                                      ! to max_mag_correlation_flux.
+      l_min_xp2_from_corr_wx,       & ! Flag to base the threshold minimum value of xp2 (rtp2 and
+                                      ! thlp2) on keeping the overall correlation of w and x within
+                                      ! the limits of -max_mag_correlation_flux to
+                                      ! max_mag_correlation_flux.
+      l_C2_cloud_frac,              & ! Flag to use cloud fraction to adjust the value of the
+                                      ! turbulent dissipation coefficient, C2.
+      l_diffuse_rtm_and_thlm,       & ! Diffuses rtm and thlm
+      l_stability_correct_Kh_N2_zm, & ! Divides Kh_N2_zm by a stability factor
+      l_calc_thlp2_rad,             & ! Include the contribution of radiation to thlp2
+      l_upwind_wpxp_ta,             & ! This flag determines whether we want to use an upwind
+                                      ! differencing approximation rather than a centered
+                                      ! differencing for turbulent or mean advection terms. It
+                                      ! affects wprtp, wpthlp, & wpsclrp.
+      l_upwind_xpyp_ta,             & ! This flag determines whether we want to use an upwind
+                                      ! differencing approximation rather than a centered
+                                      ! differencing for turbulent or mean advection terms. It
+                                      ! affects rtp2, thlp2, up2, vp2, sclrp2, rtpthlp, sclrprtp, &
+                                      ! sclrpthlp.
+      l_upwind_xm_ma,               & ! This flag determines whether we want to use an upwind
+                                      ! differencing approximation rather than a centered
+                                      ! differencing for turbulent or mean advection terms. It
+                                      ! affects rtm, thlm, sclrm, um and vm.
+      l_uv_nudge,                   & ! For wind speed nudging.
+      l_rtm_nudge,                  & ! For rtm nudging
+      l_tke_aniso,                  & ! For anisotropic turbulent kinetic energy, i.e.
+                                      ! TKE = 1/2 (u'^2 + v'^2 + w'^2)
+      l_vert_avg_closure,           & ! Use 2 calls to pdf_closure and the trapezoidal rule to
+                                      ! compute the varibles that are output from high order
+                                      ! closure
+      l_trapezoidal_rule_zt,        & ! If true, the trapezoidal rule is called for the
+                                      ! thermodynamic-level variables output from pdf_closure.
+      l_trapezoidal_rule_zm,        & ! If true, the trapezoidal rule is called for three
+                                      ! momentum-level variables - wpthvp, thlpthvp, and rtpthvp -
+                                      ! output from pdf_closure.
+      l_call_pdf_closure_twice,     & ! This logical flag determines whether or not to call
+                                      ! subroutine pdf_closure twice.  If true, pdf_closure is
+                                      ! called first on thermodynamic levels and then on momentum
+                                      ! levels so that each variable is computed on its native
+                                      ! level.  If false, pdf_closure is only called on
+                                      ! thermodynamic levels, and variables which belong on
+                                      ! momentum levels are interpolated.
+      l_standard_term_ta,           & ! Use the standard discretization for the turbulent advection
+                                      ! terms.  Setting to .false. means that a_1 and a_3 are
+                                      ! pulled outside of the derivative in
+                                      ! advance_wp2_wp3_module.F90 and in
+                                      ! advance_xp2_xpyp_module.F90.
+      l_use_cloud_cover,            & ! Use cloud_cover and rcm_in_layer to help boost cloud_frac
+                                      ! and rcm to help increase cloudiness at coarser grid
+                                      ! resolutions.
+      l_diagnose_correlations,      & ! Diagnose correlations instead of using fixed ones
+      l_calc_w_corr,                & ! Calculate the correlations between w and the hydrometeors
+      l_const_Nc_in_cloud,          & ! Use a constant cloud droplet conc. within cloud (K&K)
+      l_fix_w_chi_eta_correlations, & ! Use a fixed correlation for s and t Mellor(chi/eta)
+      l_stability_correct_tau_zm,   & ! Use tau_N2_zm instead of tau_zm in wpxp_pr1 stability
+                                      ! correction
+      l_damp_wp2_using_em,          & ! In wp2 equation, use a dissipation formula of
+                                      ! -(2/3)*em/tau_zm, as in Bougeault (1981)
+      l_do_expldiff_rtm_thlm,       & ! Diffuse rtm and thlm explicitly
+      l_Lscale_plume_centered,      & ! Alternate that uses the PDF to compute the perturbed values
+      l_diag_Lscale_from_tau,       & ! First diagnose dissipation time tau, and then diagnose the
+                                      ! mixing length scale as Lscale = tau * tke
+      l_use_ice_latent,             & ! Includes the effects of ice latent heating in turbulence
+                                      ! terms
+      l_use_C7_Richardson,          & ! Parameterize C7 based on Richardson number
+      l_use_C11_Richardson,         & ! Parameterize C11 and C16 based on Richardson number
+      l_brunt_vaisala_freq_moist,   & ! Use a different formula for the Brunt-Vaisala frequency in
+                                      ! saturated atmospheres (from Durran and Klemp, 1982)
+      l_use_thvm_in_bv_freq,        & ! Use thvm in the calculation of Brunt-Vaisala frequency
+      l_rcm_supersat_adj,           & ! Add excess supersaturated vapor to cloud water
+      l_single_C2_Skw,              & ! Use a single Skewness dependent C2 for rtp2, thlp2, and
+                                      ! rtpthlp
+      l_damp_wp3_Skw_squared,       & ! Set damping on wp3 to use Skw^2 rather than Skw^4
+      l_prescribed_avg_deltaz         ! used in adj_low_res_nu. If .true., avg_deltaz = deltaz
+
+    logical, save :: first_call = .true.
+
+    if (first_call) then
+
+      call set_default_clubb_config_flags_api( l_use_precip_frac, & ! Out
+                                               l_predict_upwp_vpwp, & ! Out
+                                               l_min_wp2_from_corr_wx, & ! Out
+                                               l_min_xp2_from_corr_wx, & ! Out
+                                               l_C2_cloud_frac, & ! Out
+                                               l_diffuse_rtm_and_thlm, & ! Out
+                                               l_stability_correct_Kh_N2_zm, & ! Out
+                                               l_calc_thlp2_rad, & ! Out
+                                               l_upwind_wpxp_ta, & ! Out
+                                               l_upwind_xpyp_ta, & ! Out
+                                               l_upwind_xm_ma, & ! Out
+                                               l_uv_nudge, & ! Out
+                                               l_rtm_nudge, & ! Out
+                                               l_tke_aniso, & ! Out
+                                               l_vert_avg_closure, & ! Out
+                                               l_trapezoidal_rule_zt, & ! Out
+                                               l_trapezoidal_rule_zm, & ! Out
+                                               l_call_pdf_closure_twice, & ! Out
+                                               l_standard_term_ta, & ! Out
+                                               l_use_cloud_cover, & ! Out
+                                               l_diagnose_correlations, & ! Out
+                                               l_calc_w_corr, & ! Out
+                                               l_const_Nc_in_cloud, & ! Out
+                                               l_fix_w_chi_eta_correlations, & ! Out
+                                               l_stability_correct_tau_zm, & ! Out
+                                               l_damp_wp2_using_em, & ! Out
+                                               l_do_expldiff_rtm_thlm, & ! Out
+                                               l_Lscale_plume_centered, & ! Out
+                                               l_diag_Lscale_from_tau, & ! Out
+                                               l_use_ice_latent, & ! Out
+                                               l_use_C7_Richardson, & ! Out
+                                               l_use_C11_Richardson, & ! Out
+                                               l_brunt_vaisala_freq_moist, & ! Out
+                                               l_use_thvm_in_bv_freq, & ! Out
+                                               l_rcm_supersat_adj, & ! Out
+                                               l_single_C2_Skw, & ! Out
+                                               l_damp_wp3_Skw_squared, & ! Out
+                                               l_prescribed_avg_deltaz ) ! Out
+
+      call initialize_clubb_config_flags_type_api( l_use_precip_frac, & ! In
+                                                   l_predict_upwp_vpwp, & ! In
+                                                   l_min_wp2_from_corr_wx, & ! In
+                                                   l_min_xp2_from_corr_wx, & ! In
+                                                   l_C2_cloud_frac, & ! In
+                                                   l_diffuse_rtm_and_thlm, & ! In
+                                                   l_stability_correct_Kh_N2_zm, & ! In
+                                                   l_calc_thlp2_rad, & ! In
+                                                   l_upwind_wpxp_ta, & ! In
+                                                   l_upwind_xpyp_ta, & ! In
+                                                   l_upwind_xm_ma, & ! In
+                                                   l_uv_nudge, & ! In
+                                                   l_rtm_nudge, & ! In
+                                                   l_tke_aniso, & ! In
+                                                   l_vert_avg_closure, & ! In
+                                                   l_trapezoidal_rule_zt, & ! In
+                                                   l_trapezoidal_rule_zm, & ! In
+                                                   l_call_pdf_closure_twice, & ! In
+                                                   l_standard_term_ta, & ! In
+                                                   l_use_cloud_cover, & ! In
+                                                   l_diagnose_correlations, & ! In
+                                                   l_calc_w_corr, & ! In
+                                                   l_const_Nc_in_cloud, & ! In
+                                                   l_fix_w_chi_eta_correlations, & ! In
+                                                   l_stability_correct_tau_zm, & ! In
+                                                   l_damp_wp2_using_em, & ! In
+                                                   l_do_expldiff_rtm_thlm, & ! In
+                                                   l_Lscale_plume_centered, & ! In
+                                                   l_diag_Lscale_from_tau, & ! In
+                                                   l_use_ice_latent, & ! In
+                                                   l_use_C7_Richardson, & ! In
+                                                   l_use_C11_Richardson, & ! In
+                                                   l_brunt_vaisala_freq_moist, & ! In
+                                                   l_use_thvm_in_bv_freq, & ! In
+                                                   l_rcm_supersat_adj, & ! In
+                                                   l_single_C2_Skw, & ! In
+                                                   l_damp_wp3_Skw_squared, & ! In
+                                                   l_prescribed_avg_deltaz, & ! In
+                                                   clubb_config_flags_in ) ! Out
+
+      first_call = .false.
+
+    end if
+
+    return
+
+  end subroutine init_clubb_config_flags
 #endif
   
 end module clubb_intr

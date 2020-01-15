@@ -847,20 +847,20 @@ end subroutine clubb_init_cnst
        zi_g(k) = (k-1)*1000._r8            !  this is dummy garbage
     enddo
 
-    !clubb_params(iC14) = clubb_C14
-    clubb_params(iC14) = 1.0_core_rknd
+    ! The following parameters were hardwired to these values in CAM, but
+    ! the E3SM code as of this point does not have this hardwiring.
+    !clubb_params(iC14) = 1.0_core_rknd
 
     call init_clubb_config_flags( clubb_config_flags ) ! In/Out
     clubb_config_flags%l_uv_nudge = .false.
-    clubb_config_flags%l_use_C7_Richardson = .true.
-    clubb_config_flags%l_use_C11_Richardson = .true.
-    clubb_config_flags%l_brunt_vaisala_freq_moist = .true.
-    clubb_config_flags%l_use_thvm_in_bv_freq = .true.
-    clubb_config_flags%l_rcm_supersat_adj = .false.
-    clubb_config_flags%l_stability_correct_tau_zm = .false.
-    clubb_config_flags%l_do_expldiff_rtm_thlm = do_expldiff
-    clubb_config_flags%l_Lscale_plume_centered = clubb_l_lscale_plume_centered
-    clubb_config_flags%l_use_ice_latent = clubb_l_use_ice_latent
+    ! The following flags were hardwired to these values in CAM, but
+    ! the E3SM code as of this point does not have this hardwiring.
+    !clubb_config_flags%l_use_C7_Richardson = .true.
+    !clubb_config_flags%l_use_C11_Richardson = .true.
+    !clubb_config_flags%l_brunt_vaisala_freq_moist = .true.
+    !clubb_config_flags%l_use_thvm_in_bv_freq = .true.
+    !clubb_config_flags%l_rcm_supersat_adj = .false.
+    !clubb_config_flags%l_stability_correct_tau_zm = .false.
    
     !  Set up CLUBB core.  Note that some of these inputs are overwrote
     !  when clubb_tend_cam is called.  The reason is that heights can change

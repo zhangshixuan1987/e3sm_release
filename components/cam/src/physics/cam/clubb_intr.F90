@@ -1,4 +1,4 @@
-          module clubb_intr
+module clubb_intr
 
   !----------------------------------------------------------------------------------------------------- !
   ! Module to interface CAM with Cloud Layers Unified by Bi-normals (CLUBB), developed                   !

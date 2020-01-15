@@ -58,8 +58,9 @@ module subcol_SILHS
    ! Private module vars
    !-----
    ! Pbuf indicies
-   integer :: thlm_idx, num_subcols_idx, rcm_idx, rtm_idx, ice_supersat_idx, &
-              alst_idx, cld_idx, qrain_idx, qsnow_idx, nrain_idx, nsnow_idx, ztodt_idx, &
+   integer :: thlm_idx, num_subcols_idx, rcm_idx, rtm_idx, &
+              ice_supersat_idx, alst_idx, cld_idx, qrain_idx, qsnow_idx, &
+              nrain_idx, nsnow_idx, ztodt_idx, tke_idx, kvh_idx, &
               prec_pcw_idx, snow_pcw_idx, prec_str_idx, snow_str_idx, &
               qcsedten_idx, qrsedten_idx, qisedten_idx, qssedten_idx, &
               vtrmc_idx, umr_idx, vtrmi_idx, ums_idx, qcsevap_idx, qisevap_idx
@@ -380,6 +381,8 @@ contains
       alst_idx = pbuf_get_index('ALST')  ! SILHS expects clubb's cloud_frac liq stratus fraction
       ztodt_idx = pbuf_get_index('ZTODT')
       ice_supersat_idx = pbuf_get_index('ISS_FRAC')
+      tke_idx = pbuf_get_index('tke')
+      kvh_idx = pbuf_get_index('kvh')
       prec_pcw_idx = pbuf_get_index('PREC_PCW')
       snow_pcw_idx = pbuf_get_index('SNOW_PCW')
       prec_str_idx = pbuf_get_index('PREC_STR')
@@ -561,8 +564,6 @@ contains
       use time_manager,           only : is_first_step  ! Zhun
       use clubb_api_module,       only : hydromet_dim, &
 
-                                         Lscale, &
-
                                          setup_pdf_parameters_api, &
 
                                          l_stats_samp, &
@@ -577,7 +578,8 @@ contains
 
                                          core_rknd, &
 
-                                         w_tol_sqd, zero_threshold, cloud_frac_min, & ! rc_tol, &
+                                         w_tol_sqd, zero_threshold, &
+                                         em_min, cloud_frac_min, & ! rc_tol, &
 
                                          pdf_dim, &
                                          corr_array_n_cloud, &
@@ -585,7 +587,12 @@ contains
                                          iiPDF_chi, iiPDF_rr, &
                                          iiPDF_w, iiPDF_Nr, &
                                          iiPDF_ri, iiPDF_Ni, &
-                                         iiPDF_Ncn, iiPDF_rs, iiPDF_Ns
+                                         iiPDF_Ncn, iiPDF_rs, iiPDF_Ns, &
+
+                                         genrand_intg, genrand_init_api, &
+
+                                         nparams, ic_K, &
+                                         read_parameters_api
    
       use silhs_api_module, only :       generate_silhs_sample_api, & ! Ncn_to_Nc, &
                                          lh_clipped_variables_type, &
@@ -626,6 +633,14 @@ contains
       real(r8) :: msc, std, maxcldfrac, maxsccldfrac
       real(r8) :: scale = 1.0_r8
 
+      real(r8), dimension(nparams) :: clubb_params ! Adjustable CLUBB parameters
+
+      real(r8) :: c_K ! CLUBB parameter c_K (for eddy diffusivity)
+
+      integer( kind = genrand_intg ) :: &
+        lh_seed    ! Seed used in random number generator that will be different
+                   ! for each column, yet reproducible for a restart run
+
       !----------------
       ! Required for set_up_pdf_params_incl_hydromet
       !----------------
@@ -659,6 +674,12 @@ contains
       real(r8), dimension(pverp-top_lev+1,hydromet_dim) :: hydromet  ! Hydrometeor species
       real(r8), dimension(pverp-top_lev+1,hydromet_dim) :: wphydrometp  ! Hydrometeor flux
       real(r8), dimension(pverp-top_lev+1)              :: Ncm ! Mean cloud droplet concentration, <N_c>
+
+      real(r8), dimension(pverp-top_lev+1) :: tke       ! TKE
+      real(r8), dimension(pverp-top_lev+1) :: khzm      ! Eddy diffusivity coef
+      real(r8), dimension(pverp-top_lev+1) :: Lscale_zm ! CLUBB's length scale on momentum (zm) levels
+      real(r8), dimension(pverp-top_lev+1) :: Lscale    ! CLUBB's length scale
+
       logical, parameter :: &  
          l_calc_weights_all_levs = .false. ! .false. if all time steps use the same
                                           !   weights at all vertical grid levels 
@@ -777,6 +798,8 @@ contains
       real(r8), pointer, dimension(:,:) :: nrain     ! micro_mg rain num conc 
       real(r8), pointer, dimension(:,:) :: nsnow
 
+      real(r8), pointer, dimension(:,:) :: tke_in    ! TKE
+      real(r8), pointer, dimension(:,:) :: khzm_in   ! Eddy diffusivity coef
 
       if (.not. allocated(state_sc%lat)) then
          call endrun('subcol_gen error: state_sc must be allocated before calling subcol_gen')
@@ -809,6 +832,14 @@ contains
       call pbuf_get_field(pbuf, qsnow_idx, qsnow)
       call pbuf_get_field(pbuf, nrain_idx, nrain)
       call pbuf_get_field(pbuf, nsnow_idx, nsnow)
+      call pbuf_get_field(pbuf, tke_idx, tke_in)
+      call pbuf_get_field(pbuf, kvh_idx, khzm_in)
+
+      ! Read the clubb parameters in order to extract c_K.
+      call read_parameters_api( -99, "", clubb_params )
+
+      ! Pull c_K from clubb parameters.
+      c_K = clubb_params(ic_K)
 
       !----------------
       ! Copy state and populate numbers and values of sub-columns
@@ -1035,14 +1066,44 @@ contains
                                                  !   when the weights vary with height.   
                                                  !   Don't set to true until this is fixed!!
 
-         ! Lscale needs to be passed out of advance_clubb_core, saved to the
-         ! pbuf, and then pulled out of the pbuf for use here.
+         ! In order for Lscale to be used properly, it needs to be passed out of
+         ! advance_clubb_core, saved to the pbuf, and then pulled out of the
+         ! pbuf for use here.  The profile of Lscale is passed into subroutine
+         ! generate_silhs_sample_api for use in calculating the vertical
+         ! correlation coefficient.  Rather than output Lscale directly, its
+         ! value can be calculated from other fields that are already output to
+         ! pbuf.  The equation relating Lscale to eddy diffusivity is:
+         !
+         ! Kh = c_K * Lscale * sqrt( TKE ).
+         !
+         ! Both Kh and TKE are written to the pbuf, and c_K is easily extracted
+         ! from CLUBB's tunable parameters.  The equation for Lscale is:
+         !
+         ! Lscale = Kh / ( c_K * sqrt( TKE ) ).
+         !
+         ! Since Kh and TKE are output on momentum (interface) grid levels, the
+         ! resulting calculation of Lscale is also found on momentum levels.  It
+         ! needs to be interpolated back to thermodynamic (midpoint) grid levels
+         ! for further use.
+         do k = 1, pverp-top_lev+1
+            khzm(k) = khzm_in(i,pverp-k+1)
+            tke(k)  = tke_in(i,pverp-k+1)
+         enddo
+         Lscale_zm = khzm / ( c_K * sqrt( max( tke, em_min ) ) )
+
+         ! Interpolate Lscale_zm back to thermodynamic grid levels.
+         Lscale = max( zm2zt_api( Lscale_zm ), 0.01_r8 )
+
+         ! Set the seed to the random number generator based on a quantity that
+         ! will be reproducible for restarts.
+         lh_seed = int( 1.0e4_r8 * rtm(i,pver), kind = genrand_intg )
+         call genrand_init_api( put=lh_seed )
 
          ! Let's generate some subcolumns!!!!!
          call generate_silhs_sample_api &
               ( iter, pdf_dim, num_subcols, sequence_length, pverp-top_lev+1, & ! In
                 l_calc_weights_all_levs_itime, &                   ! In 
-                pdf_params, delta_zm, rcm_in, Lscale(1:pverp-top_lev+1), &      ! In
+                pdf_params, delta_zm, rcm_in, Lscale, &            ! In
                 rho_ds_zt, mu_x_1, mu_x_2, sigma_x_1, sigma_x_2, & ! In 
                 corr_cholesky_mtx_1, corr_cholesky_mtx_2, &        ! In
                 hydromet_pdf_params, silhs_config_flags, &         ! In

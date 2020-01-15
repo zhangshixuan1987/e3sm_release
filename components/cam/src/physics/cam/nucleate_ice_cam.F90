@@ -169,7 +169,8 @@ end subroutine nucleate_ice_cam_readnl
 
 subroutine nucleate_ice_cam_register()
 
-   call pbuf_add_field('NAAI',     'physpkg', dtype_r8, (/pcols,pver/), naai_idx)
+   ! global scope for NAAI needed when do_icesuper=.true.
+   call pbuf_add_field('NAAI',     'global', dtype_r8, (/pcols,pver/), naai_idx)
    call pbuf_add_field('NAAI_HOM', 'physpkg', dtype_r8, (/pcols,pver/), naai_hom_idx)
 
 end subroutine nucleate_ice_cam_register

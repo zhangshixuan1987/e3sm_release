@@ -1299,7 +1299,7 @@ contains
                   diff_mean = state%q(i,k,ixnumice)-tmp_mean
                endif
             enddo ! k = top_lev, pver
-         endif ! subcol_silhs_constrainm
+         endif ! subcol_SILHS_constrainmn
 
          ! Code to update the state variables for interactive runs
          ! Set state variables

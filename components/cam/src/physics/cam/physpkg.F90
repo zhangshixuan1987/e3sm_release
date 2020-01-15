@@ -874,7 +874,7 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, chunk_smry_2d, domain_smry_
        call stratiform_init()
     elseif( microp_scheme == 'MG' ) then 
        if (.not. do_clubb_sgs) call macrop_driver_init(pbuf2d)
-       call microp_aero_init()
+       call microp_aero_init(pbuf2d)
        call microp_driver_init(pbuf2d)
        call conv_water_init
     end if

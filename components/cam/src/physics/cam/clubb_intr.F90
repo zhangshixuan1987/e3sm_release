@@ -1806,6 +1806,13 @@ end subroutine clubb_init_cnst
      ! Ice Saturation Adjustment Computation  !
      ! -------------------------------------- !
 
+     ! Note:  The flag do_icesuper is the local name for the flag
+     !        ice_supersat, which is a MG flag that is initialized to .false.
+     !        in micro_mg_cam.F90, but then read in from the namelist.
+     !        The flag micro_do_icesupersat is a different flag, with a
+     !        similar name, that is read in from the CAM namelist.
+     !        Please note that these are not the same flag.
+
      lq2(:)  = .FALSE.
      lq2(1)  = .TRUE.
      lq2(ixcldice) = .TRUE.
@@ -1821,31 +1828,11 @@ end subroutine clubb_init_cnst
      initend(:ncol,:)=0._r8
 
      call t_startf('ice_macro_tend')
-     if ( ( .not. is_first_step() ) .or. micro_do_icesupersat ) then
-       ! The value of naai is calculated and output from subroutine
-       ! nucleate_ice_cam_calc, which is called by subroutine microp_aero_run.
-       ! When micro_do_icesupersat is enabled (set to .true.), microp_aero_run
-       ! is called before clubb_tend_cam is called from subroutine tphysbc.
-       ! This means the value of naai is available by this point in the code
-       ! on the first timestep.  When micro_do_icesupersat is disabled (set to
-       ! .false.), microp_aero_run is called after clubb_tend_cam is called from
-       ! subroutine tphysbc.  This means that naai is not available by this
-       ! point it the code on the first timestep (although it is saved and is
-       ! available on all subsequent timesteps).  This means that the call to
-       ! ice_macro_tend cannot be made here on the first timestep unless
-       ! micro_do_icesupersat is enabled.
-       ! Note:  The flag do_icesuper is the local name for the flag
-       !        ice_supersat, which is a MG flag that is initialized to .false.
-       !        in micro_mg_cam.F90, but then read in from the namelist.
-       !        The flag micro_do_icesupersat is a different flag, with a
-       !        similar name, that is read in from the CAM namelist.
-       !        Please note that these are not the same flag.
-       call ice_macro_tend(naai(:ncol,top_lev:pver),state1%t(:ncol,top_lev:pver), &
+     call ice_macro_tend(naai(:ncol,top_lev:pver),state1%t(:ncol,top_lev:pver), &
         state1%pmid(:ncol,top_lev:pver),state1%q(:ncol,top_lev:pver,1),state1%q(:ncol,top_lev:pver,ixcldice),&
         state1%q(:ncol,top_lev:pver,ixnumice),latsub,hdtime,&
         stend(:ncol,top_lev:pver),qvtend(:ncol,top_lev:pver),qitend(:ncol,top_lev:pver),&
         initend(:ncol,top_lev:pver))
-     endif ! ( .not. is_first_step() ) .or. micro_do_icesupersat
      call t_stopf('ice_macro_tend')
 
      ! update local copy of state with the tendencies

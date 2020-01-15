@@ -13,13 +13,14 @@ use ppgrid,         only: pcols, pver
 use physconst,      only: pi, rair, tmelt
 use constituents,   only: cnst_get_ind
 use physics_types,  only: physics_state
-use physics_buffer, only: physics_buffer_desc, pbuf_get_index, pbuf_old_tim_idx, pbuf_get_field
+use physics_buffer, only: physics_buffer_desc
 use phys_control,   only: use_hetfrz_classnuc
 use rad_constituents, only: rad_cnst_get_info, rad_cnst_get_aer_mmr, rad_cnst_get_aer_props, &
                             rad_cnst_get_mode_num, rad_cnst_get_mode_props
 
 use physics_buffer, only: pbuf_add_field, dtype_r8, pbuf_old_tim_idx, &
-                          pbuf_get_index, pbuf_get_field
+                          pbuf_get_index, pbuf_get_field, &
+                          pbuf_set_field
 use cam_history,    only: addfld, add_default, outfld
 
 use ref_pres,       only: top_lev => trop_cloud_top_lev
@@ -177,10 +178,14 @@ end subroutine nucleate_ice_cam_register
 
 !================================================================================================
 
-subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in)
+subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d)
+
+   use time_manager, only: is_first_step
 
    real(r8), intent(in) :: mincld_in
    real(r8), intent(in) :: bulk_scale_in
+
+   type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
    ! local variables
    integer  :: iaer
@@ -192,6 +197,11 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in)
 
    mincld     = mincld_in
    bulk_scale = bulk_scale_in
+
+   ! Initialize naai.
+   if (is_first_step()) then
+      call pbuf_set_field(pbuf2d, naai_idx, 0.0_r8)
+   end if
 
    call cnst_get_ind('CLDLIQ', cldliq_idx)
    call cnst_get_ind('CLDICE', cldice_idx)

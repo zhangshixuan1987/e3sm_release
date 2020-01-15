@@ -2198,6 +2198,28 @@ end subroutine clubb_init_cnst
          wpedsclrp_sfc(ixind) = 0._r8
       enddo 
 
+      !  Set stats output and increment equal to CLUBB and host dt
+      stats_tsamp = dtime
+      stats_tout  = hdtime
+ 
+      !  Heights need to be set at each timestep.  Therefore, recall 
+      !  setup_grid and setup_parameters for this.  
+     
+      !  Read in parameters for CLUBB.  Just read in default values 
+      call read_parameters_api( -99, "", clubb_params )
+ 
+      !  Set-up CLUBB core at each CLUBB call because heights can change
+      !  Important note:  do not make any calls that use CLUBB grid-height
+      !                   operators (such as zt2zm_api, etc.) until AFTER the
+      !                   call to setup_grid_heights_api.
+      call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), &
+         zi_g(1), zi_g, zt_g)
+
+      call setup_parameters_api( zi_g(2), clubb_params, pverp, grid_type, &
+                                 zi_g, zt_g, &
+                                 clubb_config_flags%l_prescribed_avg_deltaz, &
+                                 err_code )
+ 
       !  Define forcings from CAM to CLUBB as zero for momentum and thermo,
       !  forcings already applied through CAM
       thlm_forcing(1:pverp) = 0._r8
@@ -2226,25 +2248,6 @@ end subroutine clubb_init_cnst
       wprtp_mc_zt(i,:) = 0.0_r8
       wpthlp_mc_zt(i,:) = 0.0_r8
       rtpthlp_mc_zt(i,:) = 0.0_r8
- 
-      !  Set stats output and increment equal to CLUBB and host dt
-      stats_tsamp = dtime
-      stats_tout  = hdtime
- 
-      !  Heights need to be set at each timestep.  Therefore, recall 
-      !  setup_grid and setup_parameters for this.  
-     
-      !  Read in parameters for CLUBB.  Just read in default values 
-      call read_parameters_api( -99, "", clubb_params )
- 
-      !  Set-up CLUBB core at each CLUBB call because heights can change 
-      call setup_grid_heights_api(l_implemented, grid_type, zi_g(2), &
-         zi_g(1), zi_g, zt_g)
-
-      call setup_parameters_api( zi_g(2), clubb_params, pverp, grid_type, &
-                                 zi_g, zt_g, &
-                                 clubb_config_flags%l_prescribed_avg_deltaz, &
-                                 err_code )
  
       !  Compute some inputs from the thermodynamic grid
       !  to the momentum grid

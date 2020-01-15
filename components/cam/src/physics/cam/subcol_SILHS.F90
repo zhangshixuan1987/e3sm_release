@@ -490,18 +490,20 @@ contains
                   'inverse EXNER function from state in subcol_SILHS')
      call addfld('SILHS_ZTODT', horiz_only, 'I', 's', & 
                   'Length of Physics timestep (for debugging)')
-     call addfld('SILHS_MSC_CLDICE', (/ 'lev' /), 'A', 'kg/kg', &
-                  'Mean Cloud Ice across subcolumns')
-     call addfld('SILHS_STDSC_CLDICE', (/ 'lev' /), 'A', 'kg/kg', &
-                  'Standard deviation of Ice across subcolumns')
-     call addfld('SILHS_MSC_CLDLIQ', (/ 'lev' /), 'A', 'kg/kg', &
-                  'Mean Cloud Liquid across subcolumns')
-     call addfld('SILHS_STDSC_CLDLIQ', (/ 'lev' /), 'A', 'kg/kg', &
-                  'Standard deviation of Liquid across subcolumns')
-     call addfld('SILHS_MSC_Q', (/ 'lev' /), 'A', 'kg/kg', &
-                  'Mean water vapor across subcolumns')
-     call addfld('SILHS_STDSC_Q', (/ 'lev' /), 'A', 'kg/kg', &
-                  'Standard deviation of water vapor across subcolumns')
+     if ( subcol_SILHS_constrainmn ) then
+        call addfld('SILHS_MSC_CLDICE', (/ 'lev' /), 'A', 'kg/kg', &
+                    'Mean Cloud Ice across subcolumns')
+        call addfld('SILHS_STDSC_CLDICE', (/ 'lev' /), 'A', 'kg/kg', &
+                    'Standard deviation of Ice across subcolumns')
+        call addfld('SILHS_MSC_CLDLIQ', (/ 'lev' /), 'A', 'kg/kg', &
+                    'Mean Cloud Liquid across subcolumns')
+        call addfld('SILHS_STDSC_CLDLIQ', (/ 'lev' /), 'A', 'kg/kg', &
+                    'Standard deviation of Liquid across subcolumns')
+        call addfld('SILHS_MSC_Q', (/ 'lev' /), 'A', 'kg/kg', &
+                    'Mean water vapor across subcolumns')
+        call addfld('SILHS_STDSC_Q', (/ 'lev' /), 'A', 'kg/kg', &
+                    'Standard deviation of water vapor across subcolumns')
+     endif ! subcol_SILHS_constrainmn
      call addfld('SILHS_EFF_CLDFRAC', (/ 'lev' /), 'A', 'frac', &
                   'Calculated cloud fraction from subcolumn liq or ice') 
 
@@ -1428,12 +1430,14 @@ contains
       call outfld( 'AKM_LH_CLUBB', lh_AKm_out, pcols, lchnk )
       call outfld( 'INVS_EXNER', invs_exner, pcols, lchnk )
       call outfld( 'SILHS_ZTODT', ztodt_ptr, pcols, lchnk )
-      call outfld( 'SILHS_MSC_CLDICE', meansc_ice, pcols, lchnk )
-      call outfld( 'SILHS_STDSC_CLDICE', stdsc_ice, pcols, lchnk )
-      call outfld( 'SILHS_MSC_CLDLIQ', meansc_liq, pcols, lchnk )
-      call outfld( 'SILHS_STDSC_CLDLIQ', stdsc_liq, pcols, lchnk )
-      call outfld( 'SILHS_MSC_Q', meansc_vap, pcols, lchnk )
-      call outfld( 'SILHS_STDSC_Q', stdsc_vap, pcols, lchnk )
+      if ( subcol_SILHS_constrainmn ) then
+         call outfld( 'SILHS_MSC_CLDICE', meansc_ice, pcols, lchnk )
+         call outfld( 'SILHS_STDSC_CLDICE', stdsc_ice, pcols, lchnk )
+         call outfld( 'SILHS_MSC_CLDLIQ', meansc_liq, pcols, lchnk )
+         call outfld( 'SILHS_STDSC_CLDLIQ', stdsc_liq, pcols, lchnk )
+         call outfld( 'SILHS_MSC_Q', meansc_vap, pcols, lchnk )
+         call outfld( 'SILHS_STDSC_Q', stdsc_vap, pcols, lchnk )
+      endif ! subcol_SILHS_constrainmn
       call outfld( 'SILHS_EFF_CLDFRAC', eff_cldfrac, pcols, lchnk )
       call outfld( 'SILHS_CLUBB_PRECIP_FRAC', precip_frac_out, pcols, lchnk )
       call outfld( 'SILHS_CLUBB_ICE_SS_FRAC', ice_supersat_frac, pcols, lchnk )

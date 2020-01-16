@@ -1057,7 +1057,7 @@ micro_mg_berg_eff_factor = 1.0
 cldfrc2m_rhmini = 0.8
 cldfrc2m_rhmaxi = 1.05
 
-ice_supersat = .true.
+micro_do_icesupersat = .true.
 macrop_scheme = 'CLUBB_SGS'
 eddy_scheme = 'CLUBB_SGS'
 shallow_scheme = 'CLUBB_SGS'

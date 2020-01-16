@@ -1179,7 +1179,6 @@ end subroutine clubb_init_cnst
    use time_manager,   only: is_first_step, get_nstep
    use cam_abortutils, only: endrun
    use wv_saturation,  only: qsat
-   use micro_mg_cam,   only: micro_mg_version, do_icesuper
       
 #ifdef CLUBB_SGS
    use hb_diff,                   only: pblintd
@@ -1664,7 +1663,7 @@ end subroutine clubb_init_cnst
 
  !  Initialize physics tendency arrays, copy the state to state1 array to use in this routine
 
-   if (.not. do_icesuper) then    
+   if (.not. micro_do_icesupersat) then    
      call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_xxx', ls=.true., lu=.true., lv=.true., lq=lq)
    endif
 
@@ -1676,7 +1675,7 @@ end subroutine clubb_init_cnst
    call co2_cycle_set_cnst_type(cnst_type_loc, 'wet')
    call set_dry_to_wet(state1, cnst_type_loc)
 
-   if (do_icesuper) then
+   if (micro_do_icesupersat) then
      naai_idx      = pbuf_get_index('NAAI')
      call pbuf_get_field(pbuf, naai_idx, naai)
      call physics_ptend_init(ptend_all, state%psetcols, 'clubb_ice2')
@@ -1800,18 +1799,11 @@ end subroutine clubb_init_cnst
 
    ! Set the ztodt timestep in pbuf for SILHS
    ztodtptr(:) = 1.0_r8*hdtime
-   if (do_icesuper) then
+   if (micro_do_icesupersat) then
 
      ! -------------------------------------- !
      ! Ice Saturation Adjustment Computation  !
      ! -------------------------------------- !
-
-     ! Note:  The flag do_icesuper is the local name for the flag
-     !        ice_supersat, which is a MG flag that is initialized to .false.
-     !        in micro_mg_cam.F90, but then read in from the namelist.
-     !        The flag micro_do_icesupersat is a different flag, with a
-     !        similar name, that is read in from the CAM namelist.
-     !        Please note that these are not the same flag.
 
      lq2(:)  = .FALSE.
      lq2(1)  = .TRUE.
@@ -2075,7 +2067,7 @@ end subroutine clubb_init_cnst
        call t_stopf('compute_tms')
     endif
    
-   if ( do_icesuper ) then
+   if ( micro_do_icesupersat ) then
      call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_core', ls=.true., lu=.true., lv=.true., lq=lq)
    endif
 
@@ -2869,7 +2861,7 @@ end subroutine clubb_init_cnst
    call outfld( 'CMELIQ',        cmeliq, pcols, lchnk)
 
    !  Update physics tendencies     
-   if (.not. do_icesuper) then
+   if (.not. micro_do_icesupersat) then
       call physics_ptend_init(ptend_all, state%psetcols, trim(routine_name))
    endif
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
@@ -3131,7 +3123,7 @@ end subroutine clubb_init_cnst
    call t_startf('ice_cloud_frac_diag')
    do k=1,pver
       call aist_vector(state1%q(:,k,ixq),state1%t(:,k),state1%pmid(:,k),state1%q(:,k,ixcldice), &
-           state1%q(:,k,ixnumice),do_icesuper, cam_in%landfrac(:),cam_in%snowhland(:),aist(:,k),ncol)
+           state1%q(:,k,ixnumice),micro_do_icesupersat, cam_in%landfrac(:),cam_in%snowhland(:),aist(:,k),ncol)
    enddo
    call t_stopf('ice_cloud_frac_diag')
   

@@ -1032,7 +1032,7 @@ EOF
 
 cat <<EOF >> user_nl_cam 
 
-ice_supersat = .false.
+micro_do_icesupersat = .false.
 
 ! clubb_beta             = 2     ! 1.1160
 ! clubb_c1               = 2     ! 4.58330

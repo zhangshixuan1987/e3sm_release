@@ -564,8 +564,8 @@ end subroutine clubb_init_cnst
     end if
 
     if (clubb_stabcorrect) then
-     l_diffuse_rtm_and_thlm       = .true.   ! CLUBB flag set to true
-     l_stability_correct_Kh_N2_zm = .true.   ! CLUBB flag set to true
+     clubb_config_flags%l_diffuse_rtm_and_thlm       = .true.   ! CLUBB flag set to true
+     clubb_config_flags%l_stability_correct_Kh_N2_zm = .true.   ! CLUBB flag set to true
     endif
       
     ! read tunable parameters from namelist, handlings of masterproc vs others
@@ -686,7 +686,7 @@ end subroutine clubb_init_cnst
 
     !----- Begin Code -----
     !$OMP PARALLEL
-    l_do_expldiff_rtm_thlm = do_expldiff
+    clubb_config_flags%l_do_expldiff_rtm_thlm = do_expldiff
     !$OMP END PARALLEL
     
     allocate( &
@@ -2512,7 +2512,7 @@ end subroutine clubb_init_cnst
               rcm_inout, cloud_frac_inout, &                               ! intent(inout)
               wpthvp_inout, wp2thvp_inout, rtpthvp_inout, thlpthvp_inout, &! intent(inout)
               sclrpthvp_inout, &                                           ! intent(inout)
-              pdf_params_chnk(i,lchnk), pdf_params_zm(i,lchnk), &          ! intent(inout)
+              pdf_params_chnk(i,lchnk), pdf_params_zm_chnk(i,lchnk), &     ! intent(inout)
               pdf_implicit_coefs_terms_chnk(i,lchnk), &                    ! intent(inout)
               khzm_out, khzt_out, qclvar_out, thlprcp_out, &               ! intent(out)
               wprcp_out, ice_supersat_frac_out, &                          ! intent(out)

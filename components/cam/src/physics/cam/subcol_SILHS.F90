@@ -248,6 +248,7 @@ contains
                                          pdf_dim, &
                                          setup_corr_varnce_array_api, &
                                          init_pdf_hydromet_arrays_api, &
+                                         init_pdf_params_api, &
                                          Ncnp2_on_Ncnm2, &
                                          set_clubb_debug_level_api
 
@@ -1628,7 +1629,7 @@ contains
      use physics_buffer,          only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
      use ref_pres,                only: top_lev => trop_cloud_top_lev
      use subcol_utils,            only: subcol_unpack, subcol_get_nsubcol, subcol_get_weight
-     use clubb_api_module,        only: T_in_K2thlm_api, &
+     use clubb_api_module,        only: T_in_K2thlm_api
      use silhs_api_module,        only: lh_microphys_var_covar_driver_api
 
      implicit none
@@ -1678,7 +1679,7 @@ contains
        thlp2_mc_zt_idx,   &
        wprtp_mc_zt_idx,   &
        wpthlp_mc_zt_idx,  &
-       rtpthlp_mc_zt_idx, &
+       rtpthlp_mc_zt_idx
 
      !----- Begin Code -----
 

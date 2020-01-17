@@ -270,6 +270,18 @@ module latin_hypercube_driver_module
       end where
     end if
     
+    ! Assertion check for the vertical correlation
+    if ( clubb_at_least_debug_level( 1 ) ) then
+      if ( any( X_vert_corr > one ) .or. any( X_vert_corr < zero ) ) then
+        write(fstderr,*) "The vertical correlation in latin_hypercube_driver"// &
+          "is not in the correct range"
+        do k = 1, nz
+          write(fstderr,*) "k = ", k,  "Vert. correlation = ", X_vert_corr(k)
+        end do
+        stop "Fatal error in vertical_overlap_driver"
+      end if ! Some correlation isn't between [0,1]
+    end if ! clubb_at_least_debug_level 1
+    
     !$acc data create(rand_pool) &
     !$acc&     copyin(pdf_params,pdf_params%mixt_frac,pdf_params%cloud_frac_1, &
     !$acc&            pdf_params%cloud_frac_2, precip_frac_1,precip_frac_2, &
@@ -568,7 +580,7 @@ module latin_hypercube_driver_module
       core_rknd                   ! Precision
       
     use parameters_silhs, only: &
-      uniform_sample_thresh       ! Constant
+      single_prec_thresh       ! Constant
 
     use constants_clubb, only: &
       one, fstderr                ! Constant(s)
@@ -664,8 +676,8 @@ module latin_hypercube_driver_module
         !$acc parallel loop collapse(2) default(present) async(1)
         do i=1, pdf_dim+d_uniform_extra
           do sample=1, num_samples
-            X_u_all_levs(k_lh_start,sample,i) = max( uniform_sample_thresh, &
-                                                     min( one - uniform_sample_thresh, &
+            X_u_all_levs(k_lh_start,sample,i) = max( single_prec_thresh, &
+                                                     min( one - single_prec_thresh, &
                                                           rand_pool(k_lh_start,sample,i) ) )
           end do
         end do
@@ -679,11 +691,7 @@ module latin_hypercube_driver_module
         call generate_uniform_lh_sample( iter, num_samples, sequence_length, & ! Intent(in)
                                          pdf_dim+d_uniform_extra,            & ! Intent(in)
                                          X_u_all_levs(k_lh_start,:,:) )        ! Intent(out)
-                                
-        ! Clip uniform sample points to expected range                                 
-        X_u_all_levs(k_lh_start,:,:) = max( uniform_sample_thresh, &
-                              min( one - uniform_sample_thresh, X_u_all_levs(k_lh_start,:,:) ) )
-
+                              
         if ( l_lh_importance_sampling ) then
 
           if ( l_lh_old_cloud_weighted ) then
@@ -711,6 +719,11 @@ module latin_hypercube_driver_module
                    lh_sample_point_weights(k_lh_start,:) )                      ! Out
 
           end if ! l_lh_old_cloud_weighted
+          
+          ! Clip uniform sample points to expected range                                 
+          X_u_all_levs(k_lh_start,:,:) = max( single_prec_thresh, &
+                                min( one - single_prec_thresh, X_u_all_levs(k_lh_start,:,:) ) )
+
           
           do k = 1, nz
             lh_sample_point_weights(k,:) = lh_sample_point_weights(k_lh_start,:)
@@ -744,9 +757,9 @@ module latin_hypercube_driver_module
         do i = 1, pdf_dim+d_uniform_extra
           do sample = 1, num_samples
             do k = 1, nz
-              X_u_all_levs(k_lh_start,sample,i) = max( uniform_sample_thresh, &
-                                                       min( one - uniform_sample_thresh, &
-                                                            rand_pool(k_lh_start,sample,i) ) )
+              X_u_all_levs(k,sample,i) = max( single_prec_thresh, &
+                                              min( one - single_prec_thresh, &
+                                                   rand_pool(k,sample,i) ) )
             end do
           end do
         end do
@@ -762,10 +775,6 @@ module latin_hypercube_driver_module
           call generate_uniform_lh_sample( iter, num_samples, sequence_length, & ! Intent(in)
                                            pdf_dim+d_uniform_extra,            & ! Intent(in)
                                            X_u_all_levs(k,:,:) )                 ! Intent(out)
-                                  
-          ! Clip uniform sample points to expected range                                 
-          X_u_all_levs(k,:,:) = max( uniform_sample_thresh, &
-                                min( one - uniform_sample_thresh, X_u_all_levs(k,:,:) ) )
 
           if ( l_lh_importance_sampling ) then
 
@@ -801,6 +810,10 @@ module latin_hypercube_driver_module
             lh_sample_point_weights(k,:) = one
 
           end if ! l_lh_importance_sampling
+          
+          ! Clip uniform sample points to expected range                                 
+          X_u_all_levs(k,:,:) = max( single_prec_thresh, &
+                                min( one - single_prec_thresh, X_u_all_levs(k,:,:) ) )
         
         end do
 
@@ -1309,6 +1322,9 @@ module latin_hypercube_driver_module
     use constants_clubb, only: &
       one, &      ! Constant(s)
       fstderr
+      
+    use parameters_silhs, only: &
+      single_prec_thresh   ! Constant
 
     implicit none
 
@@ -1330,12 +1346,6 @@ module latin_hypercube_driver_module
     ! Output Variables
     logical, intent(out) :: &
       l_error                ! True if the assertion check fails
-
-    ! Local Constants
-    real( kind = core_rknd ), parameter :: &
-      error_threshold = 1000._core_rknd * epsilon( X_nl_chi ) ! A threshold to determine whether a
-                                                              ! rogue value triggers the assertion
-                                                              ! check.
 
     ! Local Variables
     real( kind = core_rknd ) :: &
@@ -1360,18 +1370,18 @@ module latin_hypercube_driver_module
       if ( X_u_chi(sample) < (one - cloud_frac_i) ) then
 
         ! The uniform sample is in clear air
-        if ( X_nl_chi(sample) > error_threshold ) then
+        if ( X_nl_chi(sample) > single_prec_thresh ) then
           l_error = .true.
-          write(fstderr,*) "X_nl_chi(", sample, ") > ", error_threshold
+          write(fstderr,*) "X_nl_chi(", sample, ") > ", single_prec_thresh
         end if
 
       else if ( X_u_chi(sample) >= (one - cloud_frac_i) .and. &
                 X_u_chi(sample) < one ) then
 
         ! The uniform sample is in cloud
-        if ( X_nl_chi(sample) <= -error_threshold ) then
+        if ( X_nl_chi(sample) <= -single_prec_thresh ) then
           l_error = .true.
-          write(fstderr,*) "X_nl_chi(", sample, ") <= ", -error_threshold
+          write(fstderr,*) "X_nl_chi(", sample, ") <= ", -single_prec_thresh
         end if
 
       else
@@ -1688,7 +1698,7 @@ module latin_hypercube_driver_module
       fstderr
       
     use parameters_silhs, only: &
-      uniform_sample_thresh
+      single_prec_thresh
 
     implicit none
 
@@ -1732,18 +1742,18 @@ module latin_hypercube_driver_module
            half_width = one - vert_corr(k+1)
            min_val = X_u_all_levs(k,sample,i) - half_width
 
-           offset = two * half_width * rand_pool(k,sample,i)
+           offset = two * half_width * rand_pool(k+1,sample,i)
 
            X_u_all_levs(k+1,sample,i) = min_val + offset
            
-           ! If unbounded_point lies outside [uniform_sample_thresh,1-uniform_sample_thresh],
+           ! If unbounded_point lies outside [single_prec_thresh,1-single_prec_thresh],
            ! fold it back so that it is between the valid range
-           if ( X_u_all_levs(k+1,sample,i) > one - uniform_sample_thresh ) then
+           if ( X_u_all_levs(k+1,sample,i) > one - single_prec_thresh ) then
              X_u_all_levs(k+1,sample,i) = two - X_u_all_levs(k+1,sample,i) &
-                                          - two * uniform_sample_thresh
-           else if ( X_u_all_levs(k+1,sample,i) < uniform_sample_thresh ) then
+                                          - two * single_prec_thresh
+           else if ( X_u_all_levs(k+1,sample,i) < single_prec_thresh ) then
              X_u_all_levs(k+1,sample,i) = - X_u_all_levs(k+1,sample,i) &
-                                            + two * uniform_sample_thresh
+                                            + two * single_prec_thresh
            end if
            
          end do ! k_lh_start..nz-1
@@ -1761,18 +1771,18 @@ module latin_hypercube_driver_module
            half_width = one - vert_corr(k-1)
            min_val = X_u_all_levs(k,sample,i) - half_width
 
-           offset = two * half_width * rand_pool(k,sample,i)
+           offset = two * half_width * rand_pool(k-1,sample,i)
 
            X_u_all_levs(k-1,sample,i) = min_val + offset
            
-           ! If unbounded_point lies outside [uniform_sample_thresh,1-uniform_sample_thresh],
+           ! If unbounded_point lies outside [single_prec_thresh,1-single_prec_thresh],
            ! fold it back so that it is between the valid range 
-           if ( X_u_all_levs(k-1,sample,i) > one - uniform_sample_thresh ) then
+           if ( X_u_all_levs(k-1,sample,i) > one - single_prec_thresh ) then
              X_u_all_levs(k-1,sample,i) = two - X_u_all_levs(k-1,sample,i) &
-                                          - two * uniform_sample_thresh
-           else if ( X_u_all_levs(k-1,sample,i) < uniform_sample_thresh ) then
+                                          - two * single_prec_thresh
+           else if ( X_u_all_levs(k-1,sample,i) < single_prec_thresh ) then
              X_u_all_levs(k-1,sample,i) = - X_u_all_levs(k-1,sample,i) &
-                                            + two * uniform_sample_thresh
+                                            + two * single_prec_thresh
            end if
 
          end do ! k_lh_start..2 decrementing

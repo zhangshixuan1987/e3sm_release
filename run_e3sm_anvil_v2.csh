@@ -16,7 +16,7 @@ set machine        = anvil-centos7
 setenv NUMSC 4
 setenv MGVER 2
 
-set walltime       = 6:00:00
+set walltime       = 11:00:00
 setenv project condo      
 setenv ntasks 960
 setenv nthrds 1

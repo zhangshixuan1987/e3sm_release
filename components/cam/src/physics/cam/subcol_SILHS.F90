@@ -1036,8 +1036,7 @@ contains
          ! simply be set to 0 to simplify matters.
          wphydrometp = 0.0_r8
 
-         call populate_pdf_params_silhs_col( pdf_params_chnk, i, lchnk, &
-                                             pdf_params )
+         call populate_pdf_params_silhs_col( i, lchnk )
 
          ! make the call
          call setup_pdf_parameters_api( pverp-top_lev+1, pdf_dim, ztodt, &                 ! In
@@ -1802,8 +1801,7 @@ contains
      do igrdcol=1, ngrdcol
        ns = nsubcol(igrdcol)
 
-       call populate_pdf_params_silhs_col( pdf_params_chnk, igrdcol, lchnk, &
-                                           pdf_params )
+       call populate_pdf_params_silhs_col( igrdcol, lchnk )
 
        ! This code assumes that the weights are height independent.
        ! It will have to change once the weights vary with altitude!
@@ -1845,8 +1843,7 @@ contains
    end subroutine subcol_SILHS_var_covar_driver
 
    ! =============================================================================== !
-   subroutine populate_pdf_params_silhs_col( pdf_params_chnk, icol, lchnk, &
-                                             pdf_params )
+   subroutine populate_pdf_params_silhs_col( icol, lchnk )
 
      ! Description:
      ! Populate local PDF parameter variable pdf_params, which has vertical size
@@ -1864,27 +1861,15 @@ contains
      ! References:
      !----------------------------------------------------------------------
 
-     use ppgrid, only : &
-         pcols, &
-         begchunk, &
-         endchunk
-
      use ref_pres, only : &
          top_lev => trop_cloud_top_lev
 
      implicit none
 
      ! Input Variables
-     type( pdf_parameter ), dimension(pcols,begchunk:endchunk), intent(in) :: &
-       pdf_params_chnk  ! PDF parameters (size pverp) for all columns and chunks
-
      integer, intent(in) :: &
        icol,  & ! Column index
        lchnk    ! Chunk index
-
-     ! Output Variable
-     type( pdf_parameter ), intent(out) :: &
-       pdf_params  ! Local PDF parameters (size pverp-top_lev+1)
 
      ! Local Variable
      integer :: k    ! Loop index

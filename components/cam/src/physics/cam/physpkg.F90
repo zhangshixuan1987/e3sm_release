@@ -2689,10 +2689,28 @@ end if
              call hydromet_conc_tend_lim( state, cld_macmic_ztodt, ptend )
 #endif
 
-             ! Copy ptend_aero field to one dimensioned by sub-columns before summing with ptend
-             call subcol_ptend_copy(ptend_aero, state_sc, ptend_aero_sc)
-             call physics_ptend_sum(ptend_aero_sc, ptend_sc, state_sc%ncol)
-             call physics_ptend_dealloc(ptend_aero_sc)
+             if ( .not. micro_do_icesupersat ) then
+
+                ! Brian:  I added this "if ( .not. micro_do_icesupersat )",
+                ! statement even though it is not found in the master, because
+                ! of a runtime error in the call to
+                ! subcol_ptend_copy(ptend_aero, state_sc, ptend_aero_sc)
+                ! that is found later in the code.  The runtime error
+                ! encountered is that ptend_aero%psetcols /= pcols.  When
+                ! micro_do_icesupersat is turned off, ptend_aero is initialized
+                ! in the call to microp_aero_run above.  However, when
+                ! micro_do_icesupersat is enabled, ptend_aero is not initialized
+                ! before it is used in the later call to subcol_ptend_copy.
+                ! Since all the other ptend_aero and ptend_aero_sc code is found
+                ! within "if ( .not. micro_do_icesupersat )" statements, I am
+                ! adding one here as well.
+
+                ! Copy ptend_aero field to one dimensioned by sub-columns before summing with ptend
+                call subcol_ptend_copy(ptend_aero, state_sc, ptend_aero_sc)
+                call physics_ptend_sum(ptend_aero_sc, ptend_sc, state_sc%ncol)
+                call physics_ptend_dealloc(ptend_aero_sc)
+
+             endif ! .not. micro_do_icesupersat
 
 !!!- KZ 201708 to prevent too much qneg3 errors from subcols  
 !!!             ! Have to scale and apply for full timestep to get tend right

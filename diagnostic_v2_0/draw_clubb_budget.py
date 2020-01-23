@@ -14,7 +14,7 @@ import os
 from subprocess import call
 
  
-def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir):
+def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname):
 
 # ncases, the number of models
 # cases, the name of models
@@ -37,11 +37,9 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
  ncdfs    = ["" for x in range(ncases)]
  nregions = nsite
 
- varis = [ "wp2","wp3","wprtp","wpthlp","rtp2","thlp2","up2","vp2","rtpthlp","um","vm","thlm","rtm"]
  varisobs = [ "CLOUD", "OMEGA","SHUM","CLWC_ISBL", "THATA","RELHUM"]
  nvaris = len(varis)
  cunits = ["%", "mba/day","g/kg","g/kg","K", "%", "mba/day", "K", "g/kg", "m/s", "m/s","K","m"]
- cscale = [1, 1, 1E3, 1, 1E6, 1, 1,1,1E3,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
  cscaleobs = [100., 100/86400., 1., 1000, 1., 1., 1, 1,1,1]
  obsdataset =["CCCM", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
 
@@ -52,8 +50,8 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          if not os.path.exists(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
              os.mkdir(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
 
-         plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/Budgets_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
-         plotbgt[im+ncases*ire] = 'Budgets_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+         plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/'+pname+'_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+         plotbgt[im+ncases*ire] = pname+'_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
 
          wks= Ngl.open_wks(ptype,plotname)
 
@@ -170,6 +168,9 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
                      varis_bgt= varis[iv]+budget_ends[it]
                      npoint=idx_cols[ire,n[subc]-1]-1
                      tmp=inptrs.variables[varis_bgt][0,:,npoint] #/n[ire]
+                     if (varis[iv] == "wprtp" ) :
+                         tmp [0:10] = 0.0
+
                      tmp=tmp*cscale[iv]
                      A_field[it,:] = (A_field[it,:]+tmp[:]/n[ire]).astype(np.float32 )
 
@@ -184,7 +185,7 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          pres.txFontHeightF = 0.02
          pres.txString   = casenames[im]+"  BUDGET at" +str(lons[ire])+"E,"+str(lats[ire])+"N"
 
-         Ngl.panel(wks,plot[:],[nvaris/3,3],pres)
+         Ngl.panel(wks,plot[:],[nvaris/2,2],pres)
          txres = Ngl.Resources()
          txres.txFontHeightF = 0.020
          Ngl.text_ndc(wks,casenames[im]+"  BUDGET at" +str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.95,txres)

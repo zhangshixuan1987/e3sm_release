@@ -15,7 +15,7 @@ import os
 from subprocess import call
 
 
-def pick_out(ncases, cases,years, nsite,lats, lons,area, filepath):
+def pick_out(ncases, cases,years, nsite,lats, lons,area, filepath,casedir):
 # ncases, the number of models
 # cases, the name of models
 # casename, the name of cases
@@ -27,8 +27,11 @@ def pick_out(ncases, cases,years, nsite,lats, lons,area, filepath):
  if not os.path.exists("data"):
         os.mkdir("data")
 
+
  for im in range(0,ncases):
+    
      infile=filepath[im]+cases[im]+'/run/'+cases[im]+'.cam.h0.'+years[im]+'-01.nc'
+
      print(infile)
      print(im)
      inptrs = Dataset(infile,'r')       # pointer to file1
@@ -41,6 +44,10 @@ def pick_out(ncases, cases,years, nsite,lats, lons,area, filepath):
 #     print(idx_cols)
      cols=[0,1,2,3,4]
      sits=np.linspace(0,nsite-1,nsite)
+
+     txtfile=filepath[im]+cases[im]+'/run/diff.*.asc'
+     os.system('mkdir '+ casedir+'/txt/')
+     os.system('cp -f '+ txtfile+ ' '+ casedir+'/txt/')
 
      os.system('rm -f ./data/'+cases[im]+'_site_location.nc')
      outf =Dataset('./data/'+cases[im]+'_site_location.nc','w')

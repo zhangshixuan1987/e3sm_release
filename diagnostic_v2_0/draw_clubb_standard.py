@@ -88,18 +88,38 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
 
      for iv in range (0, nvaris):   
          if(iv == nvaris-1):
-             res.pmLegendDisplayMode    = "ALWAYS"
-             res.xyExplicitLegendLabels = casenames[:]
-             res.pmLegendSide           = "top"             
-             res.pmLegendParallelPosF   = 0.6               
-             res.pmLegendOrthogonalPosF = -0.5                  
-             res.pmLegendWidthF         = 0.10              
-             res.pmLegendHeightF        = 0.10          
-             res.lgLabelFontHeightF     = .02               
-             res.lgLabelFontThicknessF  = 1.5
-             res.lgPerimOn              = False
+              res.pmLegendDisplayMode    = "ALWAYS"
+              res.xyExplicitLegendLabels = casenames[:]
+              res.pmLegendSide           = "top"             
+              res.pmLegendParallelPosF   = 0.6               
+              res.pmLegendOrthogonalPosF = -0.5                  
+              res.pmLegendWidthF         = 0.10              
+              res.pmLegendHeightF        = 0.10          
+              res.lgLabelFontHeightF     = .02               
+              res.lgLabelFontThicknessF  = 1.5
+              res.lgPerimOn              = False
+              res.tmYLLabelFont  = 12
+              res.tmXBLabelFont  = 12
+              res.tmXBLabelFontHeightF = 0.005
+              res.tmXBLabelFontThicknessF = 1.0
+              res.xyMarkLineMode      = "MarkLines"
+              res.xyLineThicknesses = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0,2.,2.,2.,2.,2,2,2,2,2,2,2]
+              res.xyLineColors      = np.arange(2,25,2)
+              res.xyDashPatterns    = np.arange(0,24,1)
+              res.xyMarkers         = np.arange(16,40,1)
+              res.xyMarkerSizeF       = 0.005
+              res.xyMarkerColors      = np.arange(2,25,2)
+              res.pmLegendDisplayMode    = "ALWAYS"
+              res.pmLegendSide           = "top"                 # Change location of
+              res.pmLegendParallelPosF   = 0.75                  # move units right
+              res.pmLegendOrthogonalPosF = -0.65                  # more neg = down
+              res.pmLegendWidthF         = 0.10                 # Change width and
+              res.pmLegendHeightF        = 0.15                  # height of legend.
+              res.lgLabelFontHeightF     = .01                   # change font height
+              res.lgLabelFontThicknessF  = 1.
+
          else:
-             res.pmLegendDisplayMode    = "NEVER"
+              res.pmLegendDisplayMode    = "NEVER"
 
 
 #         if(obsdataset[iv] =="CCCM"):

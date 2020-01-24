@@ -614,7 +614,8 @@ end subroutine clubb_init_cnst
                                 em_min, w_tol_sqd, rt_tol, thl_tol, &
                                 iC1, iC1b, iC2rt, iC2thl, iC2rtthl, ic_K_hm, igamma_coef, igamma_coefb, &
                                 imult_coef, ic_K10, &
-                                iC8, iC11, iC11b, iC4, iC14, iup2_vp2_factor, params_list, &
+                                iC8, iC8b, iC11, iC11b, iC4, iC14, &
+                                iup2_vp2_factor, iSkw_max_mag, params_list, &
                                 init_pdf_params_api, init_pdf_implicit_coefs_terms_api
 
     use units,                     only: getunit, freeunit
@@ -850,6 +851,11 @@ end subroutine clubb_init_cnst
     ! The following parameters were hardwired to these values in CAM, but
     ! the E3SM code as of this point does not have this hardwiring.
     !clubb_params(iC14) = 1.0_core_rknd
+    ! Brian:  these values were previously set in CLUBB's parameters_tunable.F90
+    clubb_params(iC8b) = 0.0_core_rknd
+    clubb_params(iC11) = 0.8_core_rknd
+    clubb_params(iC11b) = 0.35_core_rknd
+    clubb_params(iSkw_max_mag) = 4.5_core_rknd
 
     call init_clubb_config_flags( clubb_config_flags ) ! In/Out
     clubb_config_flags%l_uv_nudge = .false.
@@ -861,6 +867,11 @@ end subroutine clubb_init_cnst
     !clubb_config_flags%l_use_thvm_in_bv_freq = .true.
     !clubb_config_flags%l_rcm_supersat_adj = .false.
     !clubb_config_flags%l_stability_correct_tau_zm = .false.
+    ! Brian:  these flags were previously set in CLUBB's model_flags.F90
+    clubb_config_flags%l_predict_upwp_vpwp = .false.
+    clubb_config_flags%l_min_wp2_from_corr_wx = .false.
+    clubb_config_flags%l_min_xp2_from_corr_wx = .false.
+    clubb_config_flags%l_damp_wp3_Skw_squared = .false.
    
     !  Set up CLUBB core.  Note that some of these inputs are overwrote
     !  when clubb_tend_cam is called.  The reason is that heights can change

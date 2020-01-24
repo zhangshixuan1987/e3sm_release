@@ -14,7 +14,7 @@ import os
 from subprocess import call
 
  
-def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname):
+def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,dpsc):
 
 # ncases, the number of models
 # cases, the name of models
@@ -37,21 +37,23 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
  ncdfs    = ["" for x in range(ncases)]
  nregions = nsite
 
+ varis = [ "DCQ","DCCLDLIQ","DCCLDICE","PTEQ","PTTEND","DTCOND"]
  varisobs = [ "CLOUD", "OMEGA","SHUM","CLWC_ISBL", "THATA","RELHUM"]
  nvaris = len(varis)
  cunits = ["%", "mba/day","g/kg","g/kg","K", "%", "mba/day", "K", "g/kg", "m/s", "m/s","K","m"]
+ cscale = [1, 1, 1, 1, 1, 1, 1,1,1E3,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
  cscaleobs = [100., 100/86400., 1., 1000, 1., 1., 1, 1,1,1]
  obsdataset =["CCCM", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
 
- plotbgt=["" for x in range(nsite*ncases)] 
+ plote3smbgt=["" for x in range(nsite*ncases)] 
 
  for ire in range (0, nsite):
      for im in range (0,ncases):
          if not os.path.exists(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
              os.mkdir(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
 
-         plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/'+pname+'_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
-         plotbgt[im+ncases*ire] = pname+'_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+         plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/E3SM_Budgets_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+         plote3smbgt[im+ncases*ire] = 'E3SM_Budgets_'+casenames[im]+"_"+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
 
          wks= Ngl.open_wks(ptype,plotname)
 
@@ -83,9 +85,9 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          res.pmLegendSide           = "top"                 # Change location of
          res.pmLegendParallelPosF   = 0.75                  # move units right
          res.pmLegendOrthogonalPosF = -0.65                  # more neg = down
-         res.pmLegendWidthF         = 0.10                 # Change width and
-         res.pmLegendHeightF        = 0.15                  # height of legend.
-         res.lgLabelFontHeightF     = .01                   # change font height
+         res.pmLegendWidthF         = 0.1                  # Change width and
+         res.pmLegendHeightF        = 0.1                  # height of legend.
+         res.lgLabelFontHeightF     = 1.                   # change font height
          res.lgLabelFontThicknessF  = 1.
          res.lgPerimOn              = True
          res.tiYAxisString   = "PRESSURE"
@@ -110,39 +112,39 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
 
          for iv in range (0, nvaris):
 
-             if (varis[iv] == "rtp2" or varis[iv] == "thlp2"):
-                 budget_ends = ["_bt", "_ma", "_ta", "_tp", "_dp1", "_dp2", "_cl", "_pd", "_sf", "_forcing"]
+             if (varis[iv] == "DCQ" ):
+                if (dpsc[im] == "zm" ):
+                   budget_ends = ["MPDQ", "RVMTEND_CLUBB","ZMDQ", "EVAPQZM"]
+                else:
+                   budget_ends = ["MPDQ", "RVMTEND_CLUBB"]
+                nterms = len (budget_ends)
+             if (varis[iv] == "DTCOND" ):
+                if (dpsc[im] == "zm" ):
+                   budget_ends = ["STEND_CLUBB", "MPDT", "DPDLFT","ZMDT", "EVAPTZM", "ZMMTT"]
+                else:
+                   budget_ends = ["STEND_CLUBB", "MPDT", "DPDLFT"]
+                nterms = len (budget_ends)
+             if (varis[iv] == "PTTEND") :
+                 budget_ends = ["DTCOND", "QRS", "QRL",  "TTGW"]
                  nterms = len (budget_ends)
-             if (varis[iv] == "wprtp") :
-                 budget_ends = ["_bt", "_ma", "_ta", "_tp", "_ac","_bp","_pr1","_pr2", "_pr3","_dp1","_mfl", "_cl", "_sicl","_pd", "_forcing"]
+             if (varis[iv] == "PTEQ") :
+                 if (dpsc[im] == "zm" ):
+                    budget_ends = ["MPDQ", "RVMTEND_CLUBB","ZMDQ", "EVAPQZM"]
+                 else:
+                    budget_ends = ["MPDQ", "RVMTEND_CLUBB"]  
                  nterms = len (budget_ends)
-             if (varis[iv] == "wpthlp") :
-                 budget_ends = ["_bt", "_ma", "_ta", "_tp", "_ac","_bp","_pr1","_pr2", "_pr3","_dp1","_mfl", "_cl", "_sicl", "_forcing"]
+             if (varis[iv] == "DCCLDLIQ") :
+                 if (dpsc[im] == "zm" ):
+                    budget_ends = ["MPDLIQ", "RCMTEND_CLUBB", "DPDLFLIQ","ZMDLIQ"]
+                 else:
+                    budget_ends = ["MPDLIQ", "RCMTEND_CLUBB", "DPDLFLIQ"]
                  nterms = len (budget_ends)
-
-             if (varis[iv] == "rtpthlp") :
-                 budget_ends = ["_bt", "_ma", "_ta", "_tp1","_tp2","_dp1","_dp2", "_cl", "_sf", "_forcing"]
+             if (varis[iv] == "DCCLDICE") :
+                 if (dpsc[im] == "zm" ):
+                    budget_ends = ["MPDICE", "RIMTEND_CLUBB", "DPDLFICE","ZMDICE"]
+                 else:
+                    budget_ends = ["MPDICE", "RIMTEND_CLUBB", "DPDLFICE"]
                  nterms = len (budget_ends)
-             if (varis[iv] == "wp2") :
-                 budget_ends = ["_bt", "_ma", "_ta", "_ac","_bp","_pr1","_pr2", "_pr3","_dp1","_dp2", "_cl", "_pd", "_sf"]
-                 nterms = len (budget_ends)
-
-             if (varis[iv] == "wp3") :
-                 budget_ends = ["_bt", "_ma", "_ta", "_tp", "_ac","_bp1","_pr1","_pr2","_dp1", "_cl"]
-                 nterms = len (budget_ends)
-
-             if (varis[iv] == "up2" or varis[iv] == "vp2") :
-                 budget_ends = ["_bt", "_ma", "_ta", "_tp", "_dp1", "_dp2","_pr1","_pr2" ,"_cl", "_pd", "_sf"]
-                 nterms = len (budget_ends)
-
-             if (varis[iv] == "um" or varis[iv] == "vm") :
-                 budget_ends = ["_bt", "_ma","_ta","_gf",  "_f"]
-                 nterms = len (budget_ends)
-         
-             if (varis[iv] == "thlm" or varis[iv] == "rtm") :
-                 budget_ends = ["_bt", "_ma","_ta","_cl",  "_mc"]
-                 nterms = len (budget_ends)
-
 
 
              ncdfs[im]  = './data/'+cases[im]+'_site_location.nc'
@@ -152,26 +154,25 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
              nlat=len(lat)
              lon=inptrs.variables['lon'][:]
              nlon=len(lon)
-             ilev=inptrs.variables['ilev'][:]
+             ilev=inptrs.variables['lev'][:]
              nilev=len(ilev)
              ncdf= Dataset(ncdfs[im],'r')
              n   =ncdf.variables['n'][:]
              idx_cols=ncdf.variables['idx_cols'][:,:]
              ncdf.close()
              A_field = np.zeros((nterms,nilev),np.float32)
-             theunits=str(cscale[iv])+"x"+inptrs.variables[varis[iv]+'_bt'].units
+             theunits=str(cscale[iv])+"x"+inptrs.variables[varis[iv]].units
              res.tiMainString    =  varis[iv]+"  "+theunits 
 
 
              for it in range(0, nterms):
                  for subc in range( 0, n[ire]):
-                     varis_bgt= varis[iv]+budget_ends[it]
+                     varis_bgt= budget_ends[it]
                      npoint=idx_cols[ire,n[subc]-1]-1
                      tmp=inptrs.variables[varis_bgt][0,:,npoint] #/n[ire]
-                     if (varis[iv] == "wprtp" ) :
-                         tmp [0:10] = 0.0
-
                      tmp=tmp*cscale[iv]
+                     if (varis_bgt == "MPDT" or varis_bgt == "STEND_CLUBB" ):
+                        tmp=tmp/1004
                      A_field[it,:] = (A_field[it,:]+tmp[:]/n[ire]).astype(np.float32 )
 
              inptrs.close()
@@ -193,5 +194,5 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          Ngl.frame(wks)
          Ngl.destroy(wks) 
 
- return (plotbgt)
+ return (plote3smbgt)
 

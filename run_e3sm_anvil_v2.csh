@@ -1041,9 +1041,9 @@ cat <<EOF >> user_nl_cam
  clubb_beta = 1.0D0
  clubb_gamma_coef = 0.25D0
  clubb_gamma_coefb = 0.25D0
- clubb_c_K2 = 0.025D0
+ clubb_c_K2 = 0.125D0
  clubb_c_K10= 0.3D0
- clubb_nu2  = 1.0D0
+ clubb_nu2  = 5.0D0
  clubb_C14 = 1.0D0
  clubb_C15 = 0.0D0
  clubb_C8 = 0.5D0

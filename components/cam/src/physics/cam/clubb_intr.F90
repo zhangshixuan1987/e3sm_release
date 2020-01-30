@@ -138,7 +138,7 @@ module clubb_intr
 !  logical            :: clubb_interp_advtend=.true.
   logical            :: clubb_interp_advtend=.false.
   logical            :: clubb_do_deep
-  logical            :: micro_do_icesupersat
+  logical            :: clubb_do_icesuper
   logical            :: history_budget
   logical            :: use_sgv !PMA This flag controls tuning for tpert and gustiness
   integer            :: history_budget_histfile_num
@@ -288,7 +288,6 @@ module clubb_intr
                        do_tms_out                      = do_tms,      &
                        history_budget_out              = history_budget, &
                        history_budget_histfile_num_out = history_budget_histfile_num, &
-                       micro_do_icesupersat_out        = micro_do_icesupersat, &
                        micro_mg_accre_enhan_fac_out    = micro_mg_accre_enhan_fac)
 
     if (clubb_do_adv) then
@@ -489,7 +488,8 @@ end subroutine clubb_init_cnst
     namelist /clubbpbl_diff_nl/ clubb_cloudtop_cooling, clubb_rainevap_turb, clubb_expldiff, &
                                 clubb_do_adv, clubb_do_deep, clubb_timestep, clubb_stabcorrect, &
                                 clubb_rnevap_effic, clubb_liq_deep, clubb_liq_sh, clubb_ice_deep, &
-                                clubb_ice_sh, clubb_tk1, clubb_tk2, relvar_fix, clubb_use_sgv
+                                clubb_ice_sh, clubb_tk1, clubb_tk2, relvar_fix, clubb_use_sgv, &
+                                clubb_do_icesuper
 
     !----- Begin Code -----
 
@@ -550,6 +550,7 @@ end subroutine clubb_init_cnst
       call mpibcast(clubb_tk2,                1,   mpir8,   0, mpicom)
       call mpibcast(relvar_fix,               1,   mpilog,  0, mpicom)
       call mpibcast(clubb_use_sgv,            1,   mpilog,   0, mpicom)
+      call mpibcast(clubb_do_icesuper,        1,   mpilog,   0, mpicom)
 #endif
 
     !  Overwrite defaults if they are true
@@ -1662,7 +1663,7 @@ end subroutine clubb_init_cnst
 
  !  Initialize physics tendency arrays, copy the state to state1 array to use in this routine
 
-   if (.not. micro_do_icesupersat) then    
+   if (.not. clubb_do_icesuper) then    
      call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_xxx', ls=.true., lu=.true., lv=.true., lq=lq)
    endif
 
@@ -1674,7 +1675,7 @@ end subroutine clubb_init_cnst
    call co2_cycle_set_cnst_type(cnst_type_loc, 'wet')
    call set_dry_to_wet(state1, cnst_type_loc)
 
-   if (micro_do_icesupersat) then
+   if (clubb_do_icesuper) then
      naai_idx      = pbuf_get_index('NAAI')
      call pbuf_get_field(pbuf, naai_idx, naai)
      call physics_ptend_init(ptend_all, state%psetcols, 'clubb_ice2')
@@ -1798,7 +1799,7 @@ end subroutine clubb_init_cnst
 
    ! Set the ztodt timestep in pbuf for SILHS
    ztodtptr(:) = 1.0_r8*hdtime
-   if (micro_do_icesupersat) then
+   if (clubb_do_icesuper) then
 
      ! -------------------------------------- !
      ! Ice Saturation Adjustment Computation  !
@@ -2066,7 +2067,7 @@ end subroutine clubb_init_cnst
        call t_stopf('compute_tms')
     endif
    
-   if ( micro_do_icesupersat ) then
+   if ( clubb_do_icesuper ) then
      call physics_ptend_init(ptend_loc,state%psetcols, 'clubb_core', ls=.true., lu=.true., lv=.true., lq=lq)
    endif
 
@@ -2860,7 +2861,7 @@ end subroutine clubb_init_cnst
    call outfld( 'CMELIQ',        cmeliq, pcols, lchnk)
 
    !  Update physics tendencies     
-   if (.not. micro_do_icesupersat) then
+   if (.not. clubb_do_icesuper) then
       call physics_ptend_init(ptend_all, state%psetcols, trim(routine_name))
    endif
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
@@ -3122,7 +3123,7 @@ end subroutine clubb_init_cnst
    call t_startf('ice_cloud_frac_diag')
    do k=1,pver
       call aist_vector(state1%q(:,k,ixq),state1%t(:,k),state1%pmid(:,k),state1%q(:,k,ixcldice), &
-           state1%q(:,k,ixnumice),micro_do_icesupersat, cam_in%landfrac(:),cam_in%snowhland(:),aist(:,k),ncol)
+           state1%q(:,k,ixnumice),clubb_do_icesuper, cam_in%landfrac(:),cam_in%snowhland(:),aist(:,k),ncol)
    enddo
    call t_stopf('ice_cloud_frac_diag')
   

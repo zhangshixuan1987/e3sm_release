@@ -1101,7 +1101,7 @@ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
 'SL', 'Q', 'RHW', 'QRS', 'QRL', 'HR', 'FDL', 'SILHS_CLUBB_PRECIP_FRAC',
 'SILHS_CLUBB_ICE_SS_FRAC', 'T_ADJ_CLUBB'
 
-micro_do_icesupersat = .true.
+clubb_do_icesuper = .true.
 macrop_scheme = 'CLUBB_SGS'
 eddy_scheme = 'CLUBB_SGS'
 shallow_scheme = 'CLUBB_SGS'

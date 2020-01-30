@@ -906,9 +906,9 @@
 <do_clubb_sgs  clubb_sgs="1" > .true.  </do_clubb_sgs>
 
 <!-- CLUBB options -->
-<ice_supersat                > .true. </ice_supersat>
+<clubb_do_icesuper                                > .false.  </clubb_do_icesuper>
 <clubb_rainevap_turb                              > .false. </clubb_rainevap_turb>
-<clubb_rainevap_turb microphys="mg2" clubb_sgs="1"> .false.  </clubb_rainevap_turb>
+<clubb_rainevap_turb microphys="mg2" clubb_sgs="1"> .false. </clubb_rainevap_turb>
 <clubb_cloudtop_cooling                           > .false. </clubb_cloudtop_cooling>
 <clubb_expldiff                                   > .false. </clubb_expldiff>
 <clubb_expldiff     clubb_sgs="1"                 > .true.  </clubb_expldiff>

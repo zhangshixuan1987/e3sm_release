@@ -347,7 +347,7 @@ endif
 
 if ($init_aero_type == silhs) then
 cat <<EOF >> user_nl_cam
-  micro_do_icesupersat = .true.
+  clubb_do_icesuper = .true.
   macrop_scheme = 'CLUBB_SGS'
   eddy_scheme = 'CLUBB_SGS'
   shallow_scheme = 'CLUBB_SGS'

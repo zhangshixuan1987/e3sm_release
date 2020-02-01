@@ -289,7 +289,7 @@ cat <<EOF >> user_nl_cam
  clubb_history = .true.
  clubb_rad_history = .false.
 
- !micro_do_icesupersat = .true.
+ !clubb_do_icesuper = .true.
  macrop_scheme = 'CLUBB_SGS'
  eddy_scheme = 'CLUBB_SGS'
  shallow_scheme = 'CLUBB_SGS'

@@ -2361,7 +2361,7 @@ contains
      ! Calculate liquid precipitation rate (precl) from the total precipitation
      ! rate (prect) and the frozen preciptation rate (preci).  This should never
      ! be negative, but just to be safe, threshold at 0.
-     precl = max( prect - preci, 0.0_r8 )
+     precl(:ncol) = max( prect(:ncol) - preci(:ncol), 0.0_r8 )
 
      ! Perform total water and total energy conservation checks.
      if ( l_check_conservation ) then
@@ -2471,15 +2471,15 @@ contains
      ! rc_sed_evap, and the true sedimentation of cloud ice is the sum of
      ! ri_sed_tend and ri_sed_subl.  Subtract off only the true sedimentation
      ! rates, as evaporation and sublimation need to be included in the
-     ! local microphysics process rates.
-     rv_mc_tend = rv_tend
-     rc_mc_tend = rc_tend - ( rc_sed_tend + rc_sed_evap )
+     ! microphysics process rates.
+     rv_mc_tend(:ncol,:) = rv_tend(:ncol,:)
+     rc_mc_tend(:ncol,:) = rc_tend(:ncol,:) - ( rc_sed_tend(:ncol,:) + rc_sed_evap(:ncol,:) )
      if ( ixrain > 0 ) then
-        rr_mc_tend = rr_tend - rr_sed_tend
+        rr_mc_tend(:ncol,:) = rr_tend(:ncol,:) - rr_sed_tend(:ncol,:)
      endif
-     ri_mc_tend = ri_tend - ( ri_sed_tend + ri_sed_subl )
+     ri_mc_tend(:ncol,:) = ri_tend(:ncol,:) - ( ri_sed_tend(:ncol,:) + ri_sed_subl(:ncol,:) )
      if ( ixsnow > 0 ) then
-        rs_mc_tend = rs_tend - rs_sed_tend
+        rs_mc_tend(:ncol,:) = rs_tend(:ncol,:) - rs_sed_tend(:ncol,:)
      endif
 
      ! This section adjusts microphysics process rate tendencies so that the
@@ -2587,7 +2587,7 @@ contains
                  ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &
                  = min( mc_tend_correction &
-                        / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
+                        / max( total_mc_positive, 1.0e-30_r8 ), 1.0_r8 )
 
                  ! Adjust (decrease) the tendencies of all positive hydrometeor
                  ! mixing ratio tendencies to balance the adjustment (increase)
@@ -2690,7 +2690,7 @@ contains
                  ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &
                  = min( mc_tend_correction &
-                        / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
+                        / max( total_mc_positive, 1.0e-30_r8 ), 1.0_r8 )
 
                  ! Adjust (decrease) the tendencies of all positive hydrometeor
                  ! mixing ratio tendencies to balance the adjustment (increase)
@@ -2788,7 +2788,7 @@ contains
                  ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &
                  = min( mc_tend_correction &
-                        / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
+                        / max( total_mc_positive, 1.0e-30_r8 ), 1.0_r8 )
 
                  ! Adjust (decrease) the tendencies of all positive hydrometeor
                  ! mixing ratio tendencies to balance the adjustment (increase)
@@ -2886,7 +2886,7 @@ contains
                  ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &
                  = min( mc_tend_correction &
-                        / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
+                        / max( total_mc_positive, 1.0e-30_r8 ), 1.0_r8 )
 
                  ! Adjust (decrease) the tendencies of all positive hydrometeor
                  ! mixing ratio tendencies to balance the adjustment (increase)
@@ -2985,7 +2985,7 @@ contains
                  ! numerical round-off errors.  This is limited at 1 to be safe.
                  mc_correction_ratio &
                  = min( mc_tend_correction &
-                        / max( total_mc_positive, 1.0e-30 ), 1.0_r8 )
+                        / max( total_mc_positive, 1.0e-30_r8 ), 1.0_r8 )
 
                  ! Adjust (decrease) the tendencies of all positive hydrometeor
                  ! mixing ratio tendencies to balance the adjustment (increase)
@@ -3052,14 +3052,14 @@ contains
      ! added back on are the true sedimentation tendencies.  For cloud water,
      ! this is the sum of rc_sed_tend and rc_sed_evap, and for cloud ice, this
      ! is the sum of ri_sed_tend and ri_sed_subl.
-     rv_tend = rv_mc_tend
-     rc_tend = rc_mc_tend + ( rc_sed_tend + rc_sed_evap )
+     rv_tend(:ncol,:) = rv_mc_tend(:ncol,:)
+     rc_tend(:ncol,:) = rc_mc_tend(:ncol,:) + ( rc_sed_tend(:ncol,:) + rc_sed_evap(:ncol,:) )
      if ( ixrain > 0 ) then
-        rr_tend = rr_mc_tend + rr_sed_tend
+        rr_tend(:ncol,:) = rr_mc_tend(:ncol,:) + rr_sed_tend(:ncol,:)
      endif
-     ri_tend = ri_mc_tend + ( ri_sed_tend + ri_sed_subl )
+     ri_tend(:ncol,:) = ri_mc_tend(:ncol,:) + ( ri_sed_tend(:ncol,:) + ri_sed_subl(:ncol,:) )
      if ( ixsnow > 0 ) then
-        rs_tend = rs_mc_tend + rs_sed_tend
+        rs_tend(:ncol,:) = rs_mc_tend(:ncol,:) + rs_sed_tend(:ncol,:)
      endif
 
      ! Now that the original sedimentation tendency has been added to the
@@ -3152,15 +3152,15 @@ contains
         ! Update the total precipitation rate (prect) from the updated liquid
         ! precipitation rate (precl) and the updated frozen preciptation rate
         ! (preci).
-        prect = precl + preci
+        prect(:ncol) = precl(:ncol) + preci(:ncol)
 
         ! The MG code sets prec_str equal to prect (prec_pcw) and snow_str equal
         ! to preci (snow_pcw).  The prec_str and snow_str variables are used
         ! in the calculations for energy and water conservation.  Since prect
         ! and preci are adjusted here, when necessary, prec_str and snow_str
         ! also need to be adjusted.
-        prec_str = prect
-        snow_str = preci
+        prec_str(:ncol) = prect(:ncol)
+        snow_str(:ncol) = preci(:ncol)
 
      endif ! l_sed_hole_fill
 
@@ -3291,7 +3291,7 @@ contains
 
         ! Print an error message if any total water relative error is found to
         ! be greater than the threshold.
-        if ( any( tot_water_rel_err >= err_thresh ) ) then
+        if ( any( tot_water_rel_err(:ncol) >= err_thresh ) ) then
            print *, "Water conservation error reported in hole filling"
            do icol = 1, ncol
               if ( tot_water_rel_err(icol) >= err_thresh ) then
@@ -3307,7 +3307,7 @@ contains
 
         ! Print an error message if any total energy relative error is found to
         ! be greater than the threshold.
-        if ( any( tot_energy_rel_err >= err_thresh ) ) then
+        if ( any( tot_energy_rel_err(:ncol) >= err_thresh ) ) then
            print *, "Energy conservation error reported in hole filling"
            do icol = 1, ncol
               if ( tot_energy_rel_err(icol) >= err_thresh ) then
@@ -3627,7 +3627,7 @@ contains
                  ! should not exceed 1 except as a result of numerical round-off
                  ! errors.  Use thresholding to be safe.
                  hole_fillmass_ratio &
-                 = min( total_hole / max( total_fill_mass, 1.0e-30 ), &
+                 = min( total_hole / max( total_fill_mass, 1.0e-30_r8 ), &
                         1.0_r8 )
 
                  if ( k < pver ) then
@@ -3879,7 +3879,7 @@ contains
                  ! should not exceed 1 except as a result of numerical round-off
                  ! errors.  Use thresholding to be safe.
                  hole_fillmass_ratio &
-                 = min( total_hole / max( total_fill_mass, 1.0e-30 ), &
+                 = min( total_hole / max( total_fill_mass, 1.0e-30_r8 ), &
                         1.0_r8 )
 
                  ! Modify (reduce) the amount of the filler hydrometeor.

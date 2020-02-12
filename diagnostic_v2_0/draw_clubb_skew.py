@@ -10,6 +10,8 @@ import numpy as np
 import scipy as sp
 import pylab
 import os
+import Common_functions
+
 from subprocess import call
 
 
@@ -35,7 +37,7 @@ def clubb_skw_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
  ncdfs    = ["" for x in range(ncases)]
  nregions = nsite
 
- varis    = [ "C6rt_Skw_fnc","C11_Skw_fnc","C6thl_Skw_fnc","C1_Skw_fnc","C7_Skw_fnc","Lscale","Richardson_num","Kh_zm","tau_zm"]
+ varis    = [ "C6rt_Skw_fnc","C11_Skw_fnc","C1_Skw_fnc","C7_Skw_fnc","Lscale","Richardson_num","Kh_zm","tau_zm","Skw_velocity"]
  varisobs = ["CC_ISBL", "OMEGA","SHUM","CLWC_ISBL", "THETA","RELHUM","U","CIWC_ISBL","T" ]
  nvaris = len(varis)
  cunits = ["%","mba/day","g/kg","g/kg","K", "%", "m/s", "g/kg", "m/s", "m/s","K","m" ]
@@ -64,9 +66,9 @@ def clubb_skw_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      res.vpHeightF        = 0.30
      #res.vpXF             = 0.04
      # res.vpYF             = 0.30
-     res.tmYLLabelFont  = 12
-     res.tmXBLabelFont  = 12
-     res.tmXBLabelFontHeightF = 0.005
+     res.tmYLLabelFont  = _Font
+     res.tmXBLabelFont  = _Font 
+     res.tmXBLabelFontHeightF = 0.01
      res.tmXBLabelFontThicknessF = 1.0
 #     res.tmXBLabelAngleF = 45
      res.xyMarkLineMode      = "Lines"
@@ -80,14 +82,17 @@ def clubb_skw_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      pres            = Ngl.Resources()
 #     pres.nglMaximize = True
      pres.nglFrame = False
-     pres.txFont = 12
+     pres.txFont = _Font
      pres.nglPanelYWhiteSpacePercent = 5
      pres.nglPanelXWhiteSpacePercent = 5
-     pres.nglPanelTop = 0.93
+     pres.nglPanelTop = 0.88
+     pres.wkWidth = 2500
+     pres.wkHeight = 2500
+
 
      for iv in range (0, nvaris):   
          if(iv == nvaris-1):
-             res.pmLegendDisplayMode    = "ALWAYS"
+             res.pmLegendDisplayMode    = "NEVER"
              res.xyExplicitLegendLabels = casenames[:]
              res.pmLegendSide           = "top"             
              res.pmLegendParallelPosF   = 0.6               
@@ -170,7 +175,9 @@ def clubb_skw_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      pres.txString   = "Skewness Functions at"+ str(lons[ire])+"E,"+str(lats[ire])+"N"
      txres = Ngl.Resources()
      txres.txFontHeightF = 0.020
-     Ngl.text_ndc(wks,"Skewness Functions at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.95,txres)
+     Ngl.text_ndc(wks,"Skewness Functions at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.92+ncases*0.01,txres)
+     Common_functions.create_legend(wks,casenames,np.arange(2,20,1),0.1,0.89+ncases*0.01)
+
 
      Ngl.panel(wks,plot[:],[nvaris/3,3],pres)
      Ngl.frame(wks)

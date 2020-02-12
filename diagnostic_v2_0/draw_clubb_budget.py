@@ -68,8 +68,8 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
 #         res.txFontHeightF   = .01
          #  res.vpXF             = 0.04
          # res.vpYF             = 0.30
-         res.tmYLLabelFont  = 12
-         res.tmXBLabelFont  = 12
+         res.tmYLLabelFont  = _Font
+         res.tmXBLabelFont  = _Font
          res.tmXBLabelFontHeightF = 0.005
          res.tmXBLabelFontThicknessF = 1.0
          res.xyMarkLineMode      = "MarkLines"
@@ -100,10 +100,13 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          pres.wkHeight             = 2000
 
          pres.nglFrame = False
-         pres.txFont = 12
+         pres.txFont = _Font
          pres.nglPanelYWhiteSpacePercent = 5
          pres.nglPanelXWhiteSpacePercent = 5
          pres.nglPanelTop = 0.93
+         pres.wkWidth = 2500
+         pres.wkHeight = 2500
+
 
          txres               = Ngl.Resources()
 #         txres.txFontHeightF = 0.01

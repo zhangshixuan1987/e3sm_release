@@ -11,27 +11,31 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-casename="c7rvrs_n2p4_c81_clpf_fac1p5_a14_fnr" # A general case name
+casename="facc3_kmaxo3_fff4_11" # A general case name
 outdir="/lcrc/group/acme/zhun/plots/" # Location of plots
 
 filepath=["/lcrc/group/acme/zhun/E3SM_simulations/",\
 "/lcrc/group/acme/zhun/E3SM_simulations/",\
 "/lcrc/group/acme/zhun/E3SM_simulations/",\
+"/lcrc/group/acme/zhun/E3SM_simulations/",\
+"/lcrc/group/acme/zhun/E3SM_simulations/",\
+
           ]
 cases=[ \
-        "anvil-centos7.clubb_silhs_v2_tau.c7rvrs_n2p4_c81_clpf_fac1p5_dsc2k_a14_fnr.ne16_ne16",\
-        "anvil-centos7.clubb_silhs_v2_tau.c7rvrs_n2p4_c81_clpf_fac1p5_dsc2k.ne16_ne16", \
-        "anvil-centos7.master_20191113.gust_polun_run2.ne16_ne16" \
-              ]
+         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_fff4_berg2_2.ne16_ne16",\
+         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_2.ne16_ne16",\
+         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_fff4_berg2.ne16_ne16", \
+         "anvil-centos7.master_20191113.gust_polun_run2.ne16_ne16",\
+]
 # Give a short name for your experiment which will appears on plots
 
-casenames=['fnr_min','def','zm_gust']
+casenames=['newfff','new_no_fff','ice_c5=0_facc1_berg2','ZM']
 
 years=[\
-         "0001",  "0001","0001"]
+        "0001", "0001","0001",  "0001","0001"]
 dpsc=[\
-      "none","none","zm"]
-# NOTE, dpsc has to be "none", if silhs was turned on. 
+      "none","none","none","zm"]
+# NOTE, dpsc,deep scheme, has to be "none", if silhs is turned on. 
 
 # Observation Data
 #filepathobs="/global/project/projectdirs/m2689/zhun/amwg/obs_data_20140804/"
@@ -42,7 +46,7 @@ ptype="png"   # eps, pdf, ps... are supported by this package
 cseason="ANN" # Seasons, or others
 
 #------------------------------------------------------------------------
-calmean=False      # make mean states
+calmean=True       # make mean states
 findout=True       # pick out the locations of your sites
 draw2d=True        # This flag control 2D plots
 drawlarge= True    # profiles for large-scale variable on your sites 
@@ -64,9 +68,9 @@ area  = 1.
 # lats - area < lat(ncol) < lons + area .and. lons- area < lon(ncol) < lons + area
 #------------------------------------------------------------------------
 # Please give the lat and lon of sites here.
-# sites    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16
-lats = [  20,  27, -20, -20,  -5,  -1,  60,   2,   9,   56,  45,   0,  10,  20,   0,   5]
-lons = [ 190, 240, 275, 285, 355, 259,  180, 140, 229, 311, 180, 295,  90, 205, 325, 280]
+# sites    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16   17   18
+lats = [  20,  27, -20, -20,  -5,  -1,  60,   2,   9,   56,  45,   0,  10,  20,   0,   5,   9, -60]
+lons = [ 190, 240, 275, 285, 355, 259,  180, 140, 229, 311, 180, 295,  90, 205, 325, 280, 170, 340]
 
 #========================================================================
 
@@ -121,7 +125,29 @@ if drawlarge:
 
 if drawclubb:
     print("CLUBB standard variables on selected sites")
-    plotstd=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
+
+    pname = "std1"
+    varis    = [ 'wp2','up2','vp2','rtp2','thlp2','wp3']
+    cscale = [1, 1, 1, 1E6, 1, 1]
+    plotstd1=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
+
+    pname = "std2"
+    varis    = [ 'wprtp','wpthlp','wprcp','upwp','vpwp','wpthvp']
+    cscale   = [     1E3,       1,    1E3,   1,     1,     1] 
+    plotstd2=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
+
+
+    pname = "std3"
+    varis    = [ 'wp2thlp','wp2rtp','wpthlp2','wprtp2','rcp2', 'wp2rcp']
+    cscale   = [     1,       1E3,    1,   1E6,           1E6,    1E3] 
+    plotstd3=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
+
+    varis    = [ 'wpthvp','wp2thvp','rtpthvp','thlpthvp','wp4','wprtpthlp']
+    cscale   = [     1,           1,    1E3,       1,     1,     1E3] 
+    pname = "std4"
+    plotstd4=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
+
+
 
 if drawskw:
     print("CLUBB standard variables on selected sites")
@@ -136,8 +162,13 @@ if drawhf:
     plothf=draw_hollfiller.hollfiller_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 if drawrain:
-    print("Energy")
-    plotrain=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
+    varis=[ "AQRAIN","ANRAIN","ADRAIN","FREQR"]
+    pname = "Rain"
+    plotrain=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname)
+    pname = "Snow"
+    varis=[ "AQSNOW","ANSNOW","ADSNOW","FREQS"]
+    plotsnow=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname)
+
 
 if drawe3smbgt:
     print("e3sm_budget")
@@ -157,7 +188,6 @@ if drawbgt:
     cscale = [ 1, 1, 1, 1E3]
     pname = "Budget3"
     plotbgt3=draw_clubb_budget.draw_clubb_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)  
-    print(plotbgt3)
 
 if makeweb:
     print("Making webpages")
@@ -175,22 +205,32 @@ if makeweb:
          for ire in range (0, nsite):
              plotclb=[]
              plotclb.append(plotlgs[ire])
-             plotclb.append(plotstd[ire])
+             plotclb.append(plotstd1[ire])
+             plotclb.append(plotstd2[ire])
+             plotclb.append(plotstd3[ire])
+             plotclb.append(plotstd4[ire])
              plotclb.append(plotskw[ire])
 #             plotclb.append(plothf[ire])
              plotclb.append(plotrain[ire])
+             plotclb.append(plotsnow[ire])
              plotclb.append(plote3smbgt[ire*ncases])
              plotclb.append(plote3smbgt[ire*ncases+1])
              plotclb.append(plote3smbgt[ire*ncases+2])
+             plotclb.append(plote3smbgt[ire*ncases+3])
              plotclb.append(plotbgt1[ire*ncases])
              plotclb.append(plotbgt1[ire*ncases+1])
              plotclb.append(plotbgt1[ire*ncases+2])
+             plotclb.append(plotbgt1[ire*ncases+3])
              plotclb.append(plotbgt2[ire*ncases])        
              plotclb.append(plotbgt2[ire*ncases+1])
              plotclb.append(plotbgt2[ire*ncases+2])
+             plotclb.append(plotbgt2[ire*ncases+3])
              plotclb.append(plotbgt3[ire*ncases])         
              plotclb.append(plotbgt3[ire*ncases+1])
              plotclb.append(plotbgt3[ire*ncases+2])
+             plotclb.append(plotbgt3[ire*ncases+3])
+
+
              Diagnostic_webpage.sets_web(casename,casedir,plotclb,str(lons[ire])+'E_'+str(lats[ire])+'N',\
                                   "Profiles on "+str(lons[ire])+'E_'+str(lats[ire])+'N',"908","636")
 

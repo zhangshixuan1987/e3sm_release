@@ -10,10 +10,11 @@ import numpy as np
 import scipy as sp
 import pylab
 import os
+import Common_functions
 from subprocess import call
 
 
-def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir):
+def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname):
 
 # ncases, the number of models
 # cases, the name of models
@@ -35,11 +36,10 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
  ncdfs    = ["" for x in range(ncases)]
  nregions = nsite
 
- varis    = [ "AQRAIN","ANRAIN","ADRAIN","FREQR"]
  varisobs = ["CC_ISBL", "OMEGA","SHUM","CLWC_ISBL", "THETA","RELHUM","U","CIWC_ISBL","T" ]
  nvaris = len(varis)
  cunits = ["%","mba/day","g/kg","g/kg","K", "%", "m/s", "g/kg", "m/s", "m/s","K","m" ]
- cscale = [1, 1, 1, 1, 1., 1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+ cscale = [1E3, 1, 1, 1, 1., 1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
  cscaleobs = [100,        1,     1, 1000 , 1.,   1,     1,   1000,     1,1,1,1,1,1,1]
  obsdataset =["ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
  plotrain=["" for x in range(nsite)]
@@ -49,8 +49,8 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
      if not os.path.exists(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
          os.mkdir(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
 
-     plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/Energy_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
-     plotrain[ire] = 'Energy_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+     plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/'+pname+'_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+     plotrain[ire] = pname+'_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
      wks= Ngl.open_wks(ptype,plotname)
 
      Ngl.define_colormap(wks,"default")
@@ -58,15 +58,15 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
      res     = Ngl.Resources()
      res.nglDraw              = False
      res.nglFrame             = False
-     res.lgLabelFontHeightF     = .012                   # change font height
+     res.lgLabelFontHeightF     = .02                   # change font height
      res.lgPerimOn              = False                 # no box around
      res.vpWidthF         = 0.30                      # set width and height
      res.vpHeightF        = 0.30
      #res.vpXF             = 0.04
      # res.vpYF             = 0.30
-     res.tmYLLabelFont  = 12
-     res.tmXBLabelFont  = 12
-     res.tmXBLabelFontHeightF = 0.005
+     res.tmYLLabelFont  = _Font
+     res.tmXBLabelFont  = _Font
+     res.tmXBLabelFontHeightF = 0.015
      res.tmXBLabelFontThicknessF = 1.0
 #     res.tmXBLabelAngleF = 45
      res.xyMarkLineMode      = "Lines"
@@ -80,14 +80,17 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
      pres            = Ngl.Resources()
 #     pres.nglMaximize = True
      pres.nglFrame = False
-     pres.txFont = 12
+     pres.txFont = _Font
      pres.nglPanelYWhiteSpacePercent = 5
      pres.nglPanelXWhiteSpacePercent = 5
-     pres.nglPanelTop = 0.93
+     pres.nglPanelTop = 0.88
+     pres.wkWidth = 2500
+     pres.wkHeight = 2500
+
 
      for iv in range (0, nvaris):   
          if(iv == nvaris-1):
-             res.pmLegendDisplayMode    = "ALWAYS"
+             res.pmLegendDisplayMode    = "Never"
              res.xyExplicitLegendLabels = casenames[:]
              res.pmLegendSide           = "top"             
              res.pmLegendParallelPosF   = 0.6               
@@ -145,7 +148,9 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
      pres.txString   = "Rain at"+ str(lons[ire])+"E,"+str(lats[ire])+"N"
      txres = Ngl.Resources()
      txres.txFontHeightF = 0.020
-     Ngl.text_ndc(wks,"Rain at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.95,txres)
+     txres.txFont = _Font
+     Ngl.text_ndc(wks,"Rain at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.92+ncases*0.01,txres)
+     Common_functions.create_legend(wks,casenames,np.arange(2,20,1),0.1,0.89+ncases*0.01)
 
      Ngl.panel(wks,plot[:],[nvaris/2,2],pres)
      Ngl.frame(wks)

@@ -11,10 +11,11 @@ import numpy as np
 import scipy as sp
 import pylab
 import os
+import Common_functions
 from subprocess import call
 
 
-def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs, casedir):
+def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs, casedir,varis,cscale,pname):
 
 # ncases, the number of models
 # cases, the name of models
@@ -36,11 +37,9 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
  ncdfs    = ["" for x in range(ncases)]
  nregions = nsite
 
- varis    = [ 'wp2','wp3','wprtp','wpthlp','up2','vp2','rtp2','thlp2','upwp','vpwp','wp2thlp','wp2rtp','wprtpthlp','wpthvp','wp2thvp','thlpthvp','rtpthvp','wp4','wprtp2','wpthlp2']
  varisobs = ["CC_ISBL", "OMEGA","SHUM","CLWC_ISBL", "THETA","RELHUM","U","CIWC_ISBL","T" ]
  nvaris = len(varis)
  cunits = ["%","mba/day","g/kg","g/kg","K", "%", "m/s", "g/kg", "m/s", "m/s","K","m" ]
- cscale = [1, 1, 1000, 1, 1, 1, 1E6,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
  cscaleobs = [100,        1,     1, 1000 , 1.,   1,     1,   1000,     1,1,1,1,1,1,1]
  obsdataset =["ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
 
@@ -51,8 +50,8 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      if not os.path.exists(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
          os.mkdir(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
 
-     plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/CLUBB_standard_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
-     plotstd[ire] = 'CLUBB_standard_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+     plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/'+pname+'_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+     plotstd[ire] = pname+'_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
      wks= Ngl.open_wks(ptype,plotname)
 
      Ngl.define_colormap(wks,"default")
@@ -66,8 +65,8 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      res.vpHeightF        = 0.30
      #res.vpXF             = 0.04
      # res.vpYF             = 0.30
-     res.tmYLLabelFont  = 12
-     res.tmXBLabelFont  = 12
+     res.tmYLLabelFont  = _Font
+     res.tmXBLabelFont  = _Font 
      res.tmXBLabelFontHeightF = 0.02
      res.tmXBLabelFontThicknessF = 1.0
      res.xyMarkLineMode      = "Lines"
@@ -81,45 +80,28 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      pres            = Ngl.Resources()
      pres.nglMaximize = True
      pres.nglFrame = False
-     pres.txFont = 12
+     pres.txFont = _Font 
      pres.nglPanelYWhiteSpacePercent = 5
      pres.nglPanelXWhiteSpacePercent = 5
-     pres.nglPanelTop = 0.93
+     pres.nglPanelTop = 0.88
+     pres.wkWidth = 5000
+     pres.wkHeight = 5000
+
 
      for iv in range (0, nvaris):   
          if(iv == nvaris-1):
-              res.pmLegendDisplayMode    = "ALWAYS"
-              res.xyExplicitLegendLabels = casenames[:]
-              res.pmLegendSide           = "top"             
-              res.pmLegendParallelPosF   = 0.6               
-              res.pmLegendOrthogonalPosF = -0.5                  
-              res.pmLegendWidthF         = 0.10              
-              res.pmLegendHeightF        = 0.10          
-              res.lgLabelFontHeightF     = .02               
-              res.lgLabelFontThicknessF  = 1.5
-              res.lgPerimOn              = False
-              res.tmYLLabelFont  = 12
-              res.tmXBLabelFont  = 12
-              res.tmXBLabelFontHeightF = 0.005
-              res.tmXBLabelFontThicknessF = 1.0
-              res.xyMarkLineMode      = "MarkLines"
-              res.xyLineThicknesses = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0,2.,2.,2.,2.,2,2,2,2,2,2,2]
-              res.xyLineColors      = np.arange(2,25,2)
-              res.xyDashPatterns    = np.arange(0,24,1)
-              res.xyMarkers         = np.arange(16,40,1)
-              res.xyMarkerSizeF       = 0.005
-              res.xyMarkerColors      = np.arange(2,25,2)
-              res.pmLegendDisplayMode    = "ALWAYS"
-              res.pmLegendSide           = "top"                 # Change location of
-              res.pmLegendParallelPosF   = 0.75                  # move units right
-              res.pmLegendOrthogonalPosF = -0.65                  # more neg = down
-              res.pmLegendWidthF         = 0.10                 # Change width and
-              res.pmLegendHeightF        = 0.15                  # height of legend.
-              res.lgLabelFontHeightF     = .01                   # change font height
-              res.lgLabelFontThicknessF  = 1.
-
+             res.pmLegendDisplayMode    = "NEVER"
+             res.xyExplicitLegendLabels = casenames[:]
+             res.pmLegendSide           = "top"
+             res.pmLegendParallelPosF   = 0.6
+             res.pmLegendOrthogonalPosF = -0.5
+             res.pmLegendWidthF         = 0.10
+             res.pmLegendHeightF        = 0.10
+             res.lgLabelFontHeightF     = .02
+             res.lgLabelFontThicknessF  = 1.5
+             res.lgPerimOn              = True
          else:
-              res.pmLegendDisplayMode    = "NEVER"
+             res.pmLegendDisplayMode    = "NEVER"
 
 
 #         if(obsdataset[iv] =="CCCM"):
@@ -204,9 +186,10 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
 
      txres = Ngl.Resources()
      txres.txFontHeightF = 0.020
-     Ngl.text_ndc(wks,"CLUBB VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.95,txres)
+     Ngl.text_ndc(wks,"CLUBB VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.92+ncases*0.01,txres)
+     Common_functions.create_legend(wks,casenames,np.arange(2,20,1),0.1,0.89+ncases*0.01)
 
-     Ngl.panel(wks,plot[:],[nvaris/4,4],pres)
+     Ngl.panel(wks,plot[:],[nvaris/3,3],pres)
      Ngl.frame(wks)
      Ngl.destroy(wks)
 

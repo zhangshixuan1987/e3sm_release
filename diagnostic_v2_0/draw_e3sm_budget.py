@@ -72,7 +72,7 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
          # res.vpYF             = 0.30
          res.tmYLLabelFont  = 12
          res.tmXBLabelFont  = 12
-         res.tmXBLabelFontHeightF = 0.005
+         res.tmXBLabelFontHeightF = 0.015
          res.tmXBLabelFontThicknessF = 1.0
          res.xyMarkLineMode      = "MarkLines"
          res.xyLineThicknesses = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0,2.,2.,2.,2.,2,2,2,2,2,2,2]
@@ -83,12 +83,12 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
          res.xyMarkerColors      = np.arange(2,25,2)
          res.pmLegendDisplayMode    = "ALWAYS"
          res.pmLegendSide           = "top"                 # Change location of
-         res.pmLegendParallelPosF   = 0.75                  # move units right
-         res.pmLegendOrthogonalPosF = -0.65                  # more neg = down
-         res.pmLegendWidthF         = 0.1                  # Change width and
-         res.pmLegendHeightF        = 0.1                  # height of legend.
-         res.lgLabelFontHeightF     = 1.                   # change font height
-         res.lgLabelFontThicknessF  = 1.
+         res.pmLegendParallelPosF   = 0.6                  # move units right
+         res.pmLegendOrthogonalPosF = -0.55                  # more neg = down
+         res.pmLegendWidthF         = 0.2       # Decrease width
+         res.pmLegendHeightF        = 0.1       # Decrease height
+         res.lgBoxMinorExtentF      = 0.1       # Shorten the legend lines
+         res.lgLabelFontHeightF     = 0.015     # Change the font size
          res.lgPerimOn              = True
          res.tiYAxisString   = "PRESSURE"
      
@@ -184,6 +184,7 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
              yp=int(iv/2)
 
          pres.txFontHeightF = 0.02
+         pres.txFont = _Font
          pres.txString   = casenames[im]+"  BUDGET at" +str(lons[ire])+"E,"+str(lats[ire])+"N"
 
          Ngl.panel(wks,plot[:],[nvaris/2,2],pres)

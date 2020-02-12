@@ -62,8 +62,8 @@ def silhs_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filep
      res.txFontHeightF   = .01
      #res.vpXF             = 0.04
      # res.vpYF             = 0.30
-     res.tmYLLabelFont  = 12
-     res.tmXBLabelFont  = 12
+     res.tmYLLabelFont  = _Font 
+     res.tmXBLabelFont  = _Font 
      res.tmXBLabelFontHeightF = 0.005
      res.tmXBLabelFontThicknessF = 1.0
      res.tmXBLabelAngleF = 45
@@ -76,10 +76,10 @@ def silhs_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filep
 
 
      pres            = Ngl.Resources()
-#     pres.nglMaximize = True
+     pres.nglMaximize = True
 
      pres.txString   = str(lons[ire])+"E,"+str(lats[ire])+"N"
-     pres.txFont = 12
+     pres.txFont = _Font 
      pres.nglPanelYWhiteSpacePercent = 5
      pres.nglPanelXWhiteSpacePercent = 5
      pres.nglPanelTop = 0.93
@@ -168,7 +168,7 @@ def silhs_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filep
      Ngl.panel(wks,plot[:],[nvaris/3,3],pres)
      txres = Ngl.Resources()
      txres.txFontHeightF = 0.020
-     Ngl.text_ndc(wks,"SILHS VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.95,txres)
+     Ngl.text_ndc(wks,"SILHS VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.05,txres)
 
 
      Ngl.frame(wks)

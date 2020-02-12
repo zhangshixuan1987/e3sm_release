@@ -64,8 +64,8 @@ def hollfiller_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
      res.vpHeightF        = 0.30
      #res.vpXF             = 0.04
      # res.vpYF             = 0.30
-     res.tmYLLabelFont  = 12
-     res.tmXBLabelFont  = 12
+     res.tmYLLabelFont  = _Font
+     res.tmXBLabelFont  = _Font
      res.tmXBLabelFontHeightF = 0.005
      res.tmXBLabelFontThicknessF = 1.0
 #     res.tmXBLabelAngleF = 45
@@ -80,7 +80,7 @@ def hollfiller_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
      pres            = Ngl.Resources()
 #     pres.nglMaximize = True
      pres.nglFrame = False
-     pres.txFont = 12
+     pres.txFont = _Font
      pres.nglPanelYWhiteSpacePercent = 5
      pres.nglPanelXWhiteSpacePercent = 5
      pres.nglPanelTop = 0.93

@@ -10,11 +10,12 @@ from netCDF4 import Dataset
 import numpy as np
 import scipy as sp
 #import pylab
+import Common_functions
 import os
 from subprocess import call
 
-
 def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs, casedir):
+
 
 # ncases, the number of models
 # cases, the name of models
@@ -53,8 +54,8 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
 
      plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/Largescale_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
      plotlgs[ire] = 'Largescale_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
-     wks= Ngl.open_wks(ptype,plotname)
 
+     wks= Ngl.open_wks(ptype,plotname)
      Ngl.define_colormap(wks,"default")
      plot = []
 
@@ -64,12 +65,13 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
      res.lgPerimOn              = False                 # no box around
      res.vpWidthF         = 0.30                      # set width and height
      res.vpHeightF        = 0.30
+
 #     res.txFontHeightF   = .01
      #res.vpXF             = 0.04
      # res.vpYF             = 0.30
-     res.tmYLLabelFont  = 12
-     res.tmXBLabelFont  = 12
-     res.tmXBLabelFontHeightF = 0.005
+     res.tmYLLabelFont  = _Font
+     res.tmXBLabelFont  = _Font
+     res.tmXBLabelFontHeightF = 0.01
      res.tmXBLabelFontThicknessF = 1.0
 #     res.tmXBLabelAngleF = 45
      res.xyMarkLineMode      = "Lines"
@@ -84,15 +86,20 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
 #     pres.nglMaximize = True
      pres.nglFrame = False
      pres.txString   = "Large-scale VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N"
-     pres.txFont = 12
+     pres.txFont = _Font
      pres.nglPanelYWhiteSpacePercent = 5
      pres.nglPanelXWhiteSpacePercent = 5
-     pres.nglPanelTop = 0.93
+     pres.nglPanelTop = 0.88
+     pres.wkPaperWidthF  =  17  # in inches
+     pres.wkPaperHeightF = 28  # in inches
+
+     pres.wkWidth = 10000
+     pres.wkHeight = 10000
 
 
      for iv in range (0, nvaris):   
          if(iv == nvaris-1):
-             res.pmLegendDisplayMode    = "ALWAYS"
+             res.pmLegendDisplayMode    = "NEVER"
              res.xyExplicitLegendLabels = casenames[:]
              res.pmLegendSide           = "top"             
              res.pmLegendParallelPosF   = 0.6               
@@ -101,7 +108,7 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
              res.pmLegendHeightF        = 0.10          
              res.lgLabelFontHeightF     = .02               
              res.lgLabelFontThicknessF  = 1.5
-             res.lgPerimOn              = False
+             res.lgPerimOn              = True
          else:
              res.pmLegendDisplayMode    = "NEVER"
 
@@ -189,7 +196,7 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
          res.trXMinF = min(np.min(A_field[0, :]),np.min(B))
          res.trXMaxF = max(np.max(A_field[0, :]),np.max(B))
          if(varis[iv] == "THETA"):
-             res.trXMinF = 280.
+             res.trXMinF = 270.
              res.trXMaxF = 400.
          if(varis[iv] == "CLOUD" or varis[iv] =="RELHUM") :
              res.trXMinF = 0.
@@ -213,8 +220,10 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
 
      Ngl.panel(wks,plot[:],[nvaris/3,3],pres)
      txres = Ngl.Resources()
-     txres.txFontHeightF = 0.020
-     Ngl.text_ndc(wks,"Large-scale VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.95,txres)
+     txres.txFontHeightF = 0.02
+     txres.txFont        = _Font
+     Ngl.text_ndc(wks,"Large-scale VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.92+ncases*0.01,txres)
+     Common_functions.create_legend(wks,casenames,np.arange(2,20,1),0.1,0.89+ncases*0.01)
 
      Ngl.frame(wks)
      Ngl.destroy(wks)

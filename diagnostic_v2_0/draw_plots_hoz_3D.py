@@ -1,7 +1,7 @@
 
 '''
     Draw 2D plots at a selected layer
-    zhunguo 
+    Zhun Guo 
 '''
 import Ngl
 from netCDF4 import Dataset
@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 import pylab
+import math
 import os
 import Common_functions
 from subprocess import call
@@ -39,6 +40,7 @@ def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, l
  ncdfs    = ["" for x in range(ncases)] 
  varis    = ["T", "OMEGA","Z3"]
  varisobs = ["T", "OMEGA","Z3"]
+ alpha    = ["A","B","C","D","E","F"]
  nvaris = len(varis)
  cunits = [""]
  cscale    = [1,864,1,1, 1,  1]
@@ -96,19 +98,29 @@ def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, l
    Ngl.define_colormap(wks,"amwg256")
    plot = []
 
-   txres               = Ngl.Resources()
-   txres.txFontHeightF = 0.018
+   textres               = Ngl.Resources()
+   textres.txFontHeightF = 0.02   # Size of title.
+   textres.txFont        = _Font
+   Ngl.text_ndc(wks,varis[iv],0.1,.97,textres)
 
    pres            = Ngl.Resources()
 #   pres.nglMaximize = True
    pres.nglFrame = False
-
    pres.nglPanelYWhiteSpacePercent = 5
    pres.nglPanelXWhiteSpacePercent = 5
-   pres.nglPanelBottom = 0.02
+   pres.nglPanelBottom = 0.2
+   pres.nglPanelTop = 0.9
    pres.nglPanelLabelBar        = True
    pres.pmLabelBarWidthF        = 0.8
    pres.nglFrame         = False
+   pres.nglPanelLabelBar                 = True     # Turn on panel labelbar
+   pres.nglPanelLabelBarLabelFontHeightF = 0.015    # Labelbar font height
+   pres.nglPanelLabelBarHeightF          = 0.0750   # Height of labelbar
+   pres.nglPanelLabelBarWidthF           = 0.700    # Width of labelbar
+   pres.lbLabelFont                      = "helvetica-bold" # Labelbar font
+   pres.nglPanelTop                      = 0.93
+   pres.nglPanelFigureStrings            = alpha
+   pres.nglPanelFigureStringsJust        = "BottomRight"
 
 
    res = Ngl.Resources()
@@ -121,14 +133,14 @@ def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, l
    res.mpFillOn     = True
    res.mpCenterLonF = 180
    res.tiMainFont                     = _Font
-   res.tiMainFontHeightF              = 0.016
+   res.tiMainFontHeightF              = 0.025
    res.tiXAxisString                  = ""
    res.tiXAxisFont                    = _Font
-   res.tiXAxisFontHeightF             = 0.016
+   res.tiXAxisFontHeightF             = 0.025
    res.tiYAxisString                  = ""
    res.tiYAxisFont                    = _Font
    res.tiYAxisOffsetXF                = 0.0
-   res.tiYAxisFontHeightF             = 0.018        
+   res.tiYAxisFontHeightF             = 0.025       
    res.tmXBLabelFont = _Font
    res.tmYLLabelFont = _Font
    res.tiYAxisFont   = _Font
@@ -225,7 +237,9 @@ def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, l
        res.mpMinLonF    = min(lon) 
        res.mpMinLatF    = min(lat) 
        res.mpMaxLatF    = max(lat) 
-       res.tiMainString    =  casenames[im]+"  " +varis[iv] +" at "+str(clevel)+"  GLB="+str(np.sum(A_xy[:]*area[:]/np.sum(area)))
+       res.tiMainString    =  "GLB="+str(np.sum(A_xy[:]*area[:]/np.sum(area)))
+       textres.txFontHeightF = 0.015
+       Ngl.text_ndc(wks,alpha[im]+"  "+ casenames[im],0.3,.135-im*0.03,textres)
 
        p = Ngl.contour_map(wks,A_xy,res)
        plot.append(p)
@@ -234,10 +248,10 @@ def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, l
 #   res.nglLeftString = obsdataset[iv]
 #  res@lbLabelBarOn = True 
 #  res@lbOrientation        = "vertical"         # vertical label bars
-   res.lbLabelFont          = 12
+   res.lbLabelFont          = _Font
    res.tiYAxisOn  = True
    res.tiXAxisOn  = True
-   res.tiXAxisFont = 12
+   res.tiXAxisFont = _Font
    rad    = 4.0*np.arctan(1.0)/180.0
    re     = 6371220.0
    rr     = re*rad
@@ -260,14 +274,17 @@ def draw_3D_plot (ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, l
    res.mpMinLonF    = min(lonobs)
    res.mpMinLatF    = min(latobs)
    res.mpMaxLatF    = max(latobs)
-   res.tiMainString    =  obsdataset[iv]+"  " +varis[iv] +"at "+str(clevel)+"  GLB="+str(Common_functions.area_avg(B, area_wgt,is_SE))
+   res.tiMainString   =  "GLB="+str(Common_functions.area_avg(B, area_wgt,is_SE))
 
 
    p =Ngl.contour_map(wks,B,res)
    plot.append(p)
 
+   if(np.mod(ncases+1,2)==1):
+      Ngl.panel(wks,plot[:],[(ncases+1)/2+1,2],pres)
+   else:
+      Ngl.panel(wks,plot[:],[(ncases+1)/2,2],pres)
 
-   Ngl.panel(wks,plot[:],[ncases+1,1],pres) 
 
    Ngl.frame(wks)
    Ngl.destroy(wks)

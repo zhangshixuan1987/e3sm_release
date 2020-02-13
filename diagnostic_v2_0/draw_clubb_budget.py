@@ -60,8 +60,6 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          res     = Ngl.Resources()  
          res.nglDraw              = False
          res.nglFrame             = False
-         res.lgLabelFontHeightF     = .012                   # change font height
-         res.lgPerimOn              = False                 # no box around
          res.vpWidthF         = 0.30                      # set width and height
          res.vpHeightF        = 0.30
 
@@ -87,6 +85,7 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          res.pmLegendHeightF        = 0.15                  # height of legend.
          res.lgLabelFontHeightF     = .01                   # change font height
          res.lgLabelFontThicknessF  = 1.
+#         res.lgBoxMinorExtentF      = 0.2
          res.lgPerimOn              = True
          res.tiYAxisString   = "PRESSURE"
      

@@ -38,8 +38,8 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
  mkres.gsMarkerSizeF = 15.   
  infiles  = ["" for x in range(ncases)] 
  ncdfs    = ["" for x in range(ncases)] 
- varis    = ["CLDTOT",     "SWCF","LWCF","PRECT","LHFLX","U10","SHFLX","CLDLOW"    ,"CLDHGH"    ,"TMQ"   ,"TS","TGCLDLWP"]
- varisobs = ["CLDTOT_CAL", "SWCF","LWCF","PRECT","LHFLX","U10","SHFLX","CLDTOT_CAL","CLDTOT_CAL","PREH2O","TS","TGCLDLWP_OCEAN"]
+ varis    = ["CLDTOT",     "SWCF","LWCF","PRECT","LHFLX","SHFLX","U10", "CLDLOW"    ,"CLDHGH"    ,"TMQ"   ,"TS","TGCLDLWP"]
+ varisobs = ["CLDTOT_CAL", "SWCF","LWCF","PRECT","LHFLX","SHFLX","U10", "CLDTOT_CAL","CLDTOT_CAL","PREH2O","TS","TGCLDLWP_OCEAN"]
  alpha    = ["A","B","C","D","E","F"]
  nvaris = len(varis)
  cunits = [""]
@@ -48,7 +48,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
 # cntrs = [[0 for col in range(11)] for row in range(nvaris)]
  cntrs = np.zeros((nvaris,11),np.float32)
 
- obsdataset=  ["CALIPSOCOSP","CERES-EBAF","CERES-EBAF","GPCP","ERAI", "ERAI", "NCEP", "CALIPSOCOSP","CALIPSOCOSP","NCEP","NCEP","NVAP"]
+ obsdataset=  ["CALIPSOCOSP","CERES-EBAF","CERES-EBAF","GPCP","ERAI", "NCEP", "ERAI", "CALIPSOCOSP","CALIPSOCOSP","NCEP","NCEP","NVAP"]
  
  plot2d=["" for x in range(nvaris)]
  for iv in range(0, nvaris):
@@ -68,7 +68,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    if(varis[iv] == "SHFLX"):
        cntrs[iv,:] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
    if(varis[iv] == "U10"):
-       cntrs[iv,:] = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33]
+       cntrs[iv,:] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
    if(varis[iv] == "TMQ"):
        cntrs[iv,:] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
 
@@ -98,6 +98,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
       B1=inptrobs.variables["V10"][0,:,:]
       B=(B0*B0+B1*B1)
       B=B * cscaleobs[iv]
+      B=np.sqrt(B)
    else:
       B=inptrobs.variables[varisobs[iv]][0,:,:]
       B=B * cscaleobs[iv]
@@ -239,6 +240,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
 
        if (varis[iv] == 'U10'):
            A = inptrs.variables['U10'][0,:]*inptrs.variables['U10'][0,:]
+           A = np.sqrt(A)
        else:
            A = inptrs.variables[varis[iv]][0,:]
 

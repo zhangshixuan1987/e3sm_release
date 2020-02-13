@@ -11,7 +11,7 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-casename="facc3_kmaxo3_fff4_11" # A general case name
+casename="facc1_kmaxo3" # A general case name
 outdir="/lcrc/group/acme/zhun/plots/" # Location of plots
 
 filepath=["/lcrc/group/acme/zhun/E3SM_simulations/",\
@@ -22,19 +22,21 @@ filepath=["/lcrc/group/acme/zhun/E3SM_simulations/",\
 
           ]
 cases=[ \
-         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_fff4_berg2_2.ne16_ne16",\
-         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_2.ne16_ne16",\
-         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_fff4_berg2.ne16_ne16", \
-         "anvil-centos7.master_20191113.gust_polun_run2.ne16_ne16",\
+         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_fsp05.ne16_ne16",\
+         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_fs5.ne16_ne16",\
+         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_5.ne16_ne16", \
+         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_4.ne16_ne16", \
+#         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_fff4_berg2.ne16_ne16", \
+#         "anvil-centos7.master_20191113.gust_polun_run2.ne16_ne16",\
 ]
 # Give a short name for your experiment which will appears on plots
 
-casenames=['newfff','new_no_fff','ice_c5=0_facc1_berg2','ZM']
+casenames=['fallspead=0.05','fallspead=5','kmax3o3_new','ice_c5=0_facc1_berg2','ZM']
 
 years=[\
         "0001", "0001","0001",  "0001","0001"]
 dpsc=[\
-      "none","none","none","zm"]
+      "none","none","none","none","zm"]
 # NOTE, dpsc,deep scheme, has to be "none", if silhs is turned on. 
 
 # Observation Data
@@ -55,6 +57,7 @@ drawskw= True    # profiles for skewness functions
 drawrain = True
 drawbgt= True     # budgets of CLUBB prognostic Eqs 
 drawe3smbgt= True #
+drawmicrobgt= True
 # ONLY for SILHS
 drawhf= False     # Tendency of holl filler 
 drawsilhs=False    # profiles for silhs variables
@@ -96,6 +99,7 @@ import draw_clubb_standard
 import draw_clubb_budget
 import draw_hollfiller
 import draw_rain 
+import draw_micro_budget
 import draw_e3sm_budget
 import Common_functions
 import Diagnostic_webpage
@@ -136,7 +140,6 @@ if drawclubb:
     cscale   = [     1E3,       1,    1E3,   1,     1,     1] 
     plotstd2=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
 
-
     pname = "std3"
     varis    = [ 'wp2thlp','wp2rtp','wpthlp2','wprtp2','rcp2', 'wp2rcp']
     cscale   = [     1,       1E3,    1,   1E6,           1E6,    1E3] 
@@ -146,7 +149,6 @@ if drawclubb:
     cscale   = [     1,           1,    1E3,       1,     1,     1E3] 
     pname = "std4"
     plotstd4=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
-
 
 
 if drawskw:
@@ -169,10 +171,13 @@ if drawrain:
     varis=[ "AQSNOW","ANSNOW","ADSNOW","FREQS"]
     plotsnow=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname)
 
-
 if drawe3smbgt:
     print("e3sm_budget")
     plote3smbgt=draw_e3sm_budget.draw_e3sm_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,dpsc)
+
+if drawmicrobgt:
+    print("micro_budget")
+    plotmicrobgt=draw_micro_budget.draw_micro_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,dpsc)
 
 if drawbgt:
     print("CLUBB BUDGET on selected sites")
@@ -201,37 +206,49 @@ if makeweb:
         Diagnostic_webpage.sets_web(casename,casedir,plot2d,"2D",\
 				"Horizontal Plots","1000","1000")
 
-    if (drawlarge or drawclubb or drawskw or drawsilhs or drawbgt or drawrain or drawhf or drawe3sm_budget):
-         for ire in range (0, nsite):
-             plotclb=[]
-             plotclb.append(plotlgs[ire])
-             plotclb.append(plotstd1[ire])
-             plotclb.append(plotstd2[ire])
-             plotclb.append(plotstd3[ire])
-             plotclb.append(plotstd4[ire])
-             plotclb.append(plotskw[ire])
-#             plotclb.append(plothf[ire])
-             plotclb.append(plotrain[ire])
-             plotclb.append(plotsnow[ire])
-             plotclb.append(plote3smbgt[ire*ncases])
-             plotclb.append(plote3smbgt[ire*ncases+1])
-             plotclb.append(plote3smbgt[ire*ncases+2])
-             plotclb.append(plote3smbgt[ire*ncases+3])
-             plotclb.append(plotbgt1[ire*ncases])
-             plotclb.append(plotbgt1[ire*ncases+1])
-             plotclb.append(plotbgt1[ire*ncases+2])
-             plotclb.append(plotbgt1[ire*ncases+3])
-             plotclb.append(plotbgt2[ire*ncases])        
-             plotclb.append(plotbgt2[ire*ncases+1])
-             plotclb.append(plotbgt2[ire*ncases+2])
-             plotclb.append(plotbgt2[ire*ncases+3])
-             plotclb.append(plotbgt3[ire*ncases])         
-             plotclb.append(plotbgt3[ire*ncases+1])
-             plotclb.append(plotbgt3[ire*ncases+2])
-             plotclb.append(plotbgt3[ire*ncases+3])
+    for ire in range (0, nsite):
+        plotclb=[]
+        if (drawlarge):
+           plotclb.append(plotlgs[ire])
+        if (drawclubb):  
+           plotclb.append(plotstd1[ire])
+           plotclb.append(plotstd2[ire])
+           plotclb.append(plotstd3[ire])
+           plotclb.append(plotstd4[ire])
+        if (drawskw):
+           plotclb.append(plotskw[ire])
+        if (drawhf):
+           plotclb.append(plothf[ire])
+        if (drawrain):
+           plotclb.append(plotrain[ire])
+           plotclb.append(plotsnow[ire])
+
+        if (drawmicrobgt):
+           plotclb.append(plotmicrobgt[ire*ncases])
+           plotclb.append(plotmicrobgt[ire*ncases+1])
+           plotclb.append(plotmicrobgt[ire*ncases+2])
+#           plotclb.append(plotmicrobgt[ire*ncases+3])
+        if (drawe3smbgt):
+           plotclb.append(plote3smbgt[ire*ncases])
+           plotclb.append(plote3smbgt[ire*ncases+1])
+           plotclb.append(plote3smbgt[ire*ncases+2])
+#           plotclb.append(plote3smbgt[ire*ncases+3])
+        if (drawbgt):
+           plotclb.append(plotbgt1[ire*ncases])
+           plotclb.append(plotbgt1[ire*ncases+1])
+           plotclb.append(plotbgt1[ire*ncases+2])
+#           plotclb.append(plotbgt1[ire*ncases+3])
+           plotclb.append(plotbgt2[ire*ncases])        
+           plotclb.append(plotbgt2[ire*ncases+1])
+           plotclb.append(plotbgt2[ire*ncases+2])
+#           plotclb.append(plotbgt2[ire*ncases+3])
+           plotclb.append(plotbgt3[ire*ncases])         
+           plotclb.append(plotbgt3[ire*ncases+1])
+           plotclb.append(plotbgt3[ire*ncases+2])
+#           plotclb.append(plotbgt3[ire*ncases+3])
 
 
-             Diagnostic_webpage.sets_web(casename,casedir,plotclb,str(lons[ire])+'E_'+str(lats[ire])+'N',\
+    Diagnostic_webpage.sets_web(casename,casedir,plotclb,str(lons[ire])+'E_'+str(lats[ire])+'N',\
                                   "Profiles on "+str(lons[ire])+'E_'+str(lats[ire])+'N',"908","636")
 
 if maketar:

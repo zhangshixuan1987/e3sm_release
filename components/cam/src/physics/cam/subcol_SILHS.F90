@@ -1186,6 +1186,7 @@ contains
          enddo
 
          ! Pack precip_frac for output
+         precip_frac_out(:,:) = 0.0_r8
          do k = 2, pverp-top_lev+1
            precip_frac_out(i,pver-k+2) = hydromet_pdf_params(k)%precip_frac
          enddo

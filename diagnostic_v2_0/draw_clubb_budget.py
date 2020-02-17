@@ -14,7 +14,7 @@ import os
 from subprocess import call
 
  
-def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname):
+def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname):
 
 # ncases, the number of models
 # cases, the name of models
@@ -64,7 +64,7 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          res.vpHeightF        = 0.30
 
 #         res.txFontHeightF   = .01
-         #  res.vpXF             = 0.04
+         # res.vpXF             = 0.04
          # res.vpYF             = 0.30
          res.tmYLLabelFont  = _Font
          res.tmXBLabelFont  = _Font
@@ -89,26 +89,16 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          res.lgPerimOn              = True
          res.tiYAxisString   = "PRESSURE"
      
-#         res.nglLeftString     = varis[iv]
-#         res.nglRightString    = cunits[iv]
          res.trYReverse        = True
 
          pres            = Ngl.Resources() 
 #         pres.nglMaximize = True
-         pres.wkWidth              = 2000
-         pres.wkHeight             = 2000
-
          pres.nglFrame = False
          pres.txFont = _Font
          pres.nglPanelYWhiteSpacePercent = 5
          pres.nglPanelXWhiteSpacePercent = 5
          pres.nglPanelTop = 0.93
-         pres.wkWidth = 2500
-         pres.wkHeight = 2500
 
-
-         txres               = Ngl.Resources()
-#         txres.txFontHeightF = 0.01
 
          for iv in range (0, nvaris):
 
@@ -161,7 +151,7 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
              idx_cols=ncdf.variables['idx_cols'][:,:]
              ncdf.close()
              A_field = np.zeros((nterms,nilev),np.float32)
-             theunits=str(cscale[iv])+"x"+inptrs.variables[varis[iv]+'_bt'].units
+             theunits=str(chscale[iv])+"x"+inptrs.variables[varis[iv]+'_bt'].units
              res.tiMainString    =  varis[iv]+"  "+theunits 
 
 
@@ -184,14 +174,15 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
              xp=np.mod(iv,2)
              yp=int(iv/2)
 
-         pres.txFontHeightF = 0.02
-         pres.txString   = casenames[im]+"  BUDGET at" +str(lons[ire])+"E,"+str(lats[ire])+"N"
+#         pres.txFontHeightF = 0.02
+#         pres.txString   = casenames[im]+"  BUDGET at" +str(lons[ire])+"E,"+str(lats[ire])+"N"
 
          Ngl.panel(wks,plot[:],[nvaris/2,2],pres)
          txres = Ngl.Resources()
+         txres.txFont = _Font
          txres.txFontHeightF = 0.020
+         
          Ngl.text_ndc(wks,casenames[im]+"  BUDGET at" +str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.95,txres)
-
          Ngl.frame(wks)
          Ngl.destroy(wks) 
 

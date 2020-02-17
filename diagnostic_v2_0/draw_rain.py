@@ -66,6 +66,7 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
      # res.vpYF             = 0.30
      res.tmYLLabelFont  = _Font
      res.tmXBLabelFont  = _Font
+     res.tiMainFont     = _Font
      res.tmXBLabelFontHeightF = 0.015
      res.tmXBLabelFontThicknessF = 1.0
 #     res.tmXBLabelAngleF = 45

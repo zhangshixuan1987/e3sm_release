@@ -11,7 +11,7 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-casename="facc1_kmaxo3" # A general case name
+case="facc1_kmaxo3_dcs1h" # A general case name
 outdir="/lcrc/group/acme/zhun/plots/" # Location of plots
 
 filepath=["/lcrc/group/acme/zhun/E3SM_simulations/",\
@@ -19,24 +19,24 @@ filepath=["/lcrc/group/acme/zhun/E3SM_simulations/",\
 "/lcrc/group/acme/zhun/E3SM_simulations/",\
 "/lcrc/group/acme/zhun/E3SM_simulations/",\
 "/lcrc/group/acme/zhun/E3SM_simulations/",\
+"/lcrc/group/acme/zhun/E3SM_simulations/",\
 
           ]
 cases=[ \
-         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_fsp05.ne16_ne16",\
-         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_fs5.ne16_ne16",\
-         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_5.ne16_ne16", \
+       "anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs1h_accrate2.ne16_ne16",\
+"anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs1h.ne16_ne16",\
+"anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h.ne16_ne16",\
          "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_4.ne16_ne16", \
-#         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_fff4_berg2.ne16_ne16", \
-#         "anvil-centos7.master_20191113.gust_polun_run2.ne16_ne16",\
+         "anvil-centos7.master_20191113.gust_polun_run3.ne16_ne16",\
 ]
 # Give a short name for your experiment which will appears on plots
 
-casenames=['fallspead=0.05','fallspead=5','kmax3o3_new','ice_c5=0_facc1_berg2','ZM']
+casenames=['dcs1h_accrete2','dcs1h','dcs4h','ice_c5=0_facc1_berg2','ZM']
 
 years=[\
-        "0001", "0001","0001",  "0001","0001"]
+        "0001", "0001","0001", "0001","0001","0001"]
 dpsc=[\
-      "none","none","none","none","zm"]
+      "none","none","none","none","none","zm"]
 # NOTE, dpsc,deep scheme, has to be "none", if silhs is turned on. 
 
 # Observation Data
@@ -46,9 +46,10 @@ filepathobs="/blues/gpfs/home/zhun/amwg_diag_20140804/obs_data_20140804/"
 # Setting of plots.
 ptype="png"   # eps, pdf, ps... are supported by this package
 cseason="ANN" # Seasons, or others
+casename=case+"_"+cseason
 
 #------------------------------------------------------------------------
-calmean=True       # make mean states
+calmean=False     # make mean states
 findout=True       # pick out the locations of your sites
 draw2d=True        # This flag control 2D plots
 drawlarge= True    # profiles for large-scale variable on your sites 
@@ -181,18 +182,23 @@ if drawmicrobgt:
 
 if drawbgt:
     print("CLUBB BUDGET on selected sites")
-    varis = [ "wp2","wp3","up2","vp2"]
-    cscale = [1, 1, 1,1]
+    varis   = [ 'wp2','wp3','up2','vp2']
+    cscale  = [     1,    1,    1,    1]
+    chscale = [    '1', '1',  '1',  '1']
     pname = "Budget1"
-    plotbgt1=draw_clubb_budget.draw_clubb_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
-    varis = [ "wprtp","wpthlp","rtp2","thlp2"]
-    cscale = [ 1E3, 1, 1E6, 1]
+    plotbgt1=draw_clubb_budget.draw_clubb_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
+    varis    = [ "wprtp","wpthlp",  "rtp2", "thlp2"]
+    cscale   = [     1E7,     1E4,   1E11,     1E4]
+    chscale  = [  '1E-7',  '1E-4', '1E-11',  '1E-4']
+
     pname = "Budget2"
-    plotbgt2=draw_clubb_budget.draw_clubb_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)   
-    varis = [ "um","vm","thlm","rtm"]
-    cscale = [ 1, 1, 1, 1E3]
+    plotbgt2=draw_clubb_budget.draw_clubb_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)   
+    varis   = [  "um",   "vm",  "thlm",   "rtm"]
+    cscale  = [   1E4,    1E4,     1E5,     1E8]
+    chscale = ['1E-4', '1E-4',  '1E-5',  '1E-8']
+
     pname = "Budget3"
-    plotbgt3=draw_clubb_budget.draw_clubb_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)  
+    plotbgt3=draw_clubb_budget.draw_clubb_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)  
 
 if makeweb:
     print("Making webpages")
@@ -224,31 +230,22 @@ if makeweb:
            plotclb.append(plotsnow[ire])
 
         if (drawmicrobgt):
-           plotclb.append(plotmicrobgt[ire*ncases])
-           plotclb.append(plotmicrobgt[ire*ncases+1])
-           plotclb.append(plotmicrobgt[ire*ncases+2])
-#           plotclb.append(plotmicrobgt[ire*ncases+3])
+           for im in range (0, ncases ):
+               plotclb.append(plotmicrobgt[ire*ncases+im])
+
         if (drawe3smbgt):
-           plotclb.append(plote3smbgt[ire*ncases])
-           plotclb.append(plote3smbgt[ire*ncases+1])
-           plotclb.append(plote3smbgt[ire*ncases+2])
-#           plotclb.append(plote3smbgt[ire*ncases+3])
+           for im in range (0, ncases ):
+               plotclb.append(plote3smbgt[ire*ncases+im])
+
         if (drawbgt):
-           plotclb.append(plotbgt1[ire*ncases])
-           plotclb.append(plotbgt1[ire*ncases+1])
-           plotclb.append(plotbgt1[ire*ncases+2])
-#           plotclb.append(plotbgt1[ire*ncases+3])
-           plotclb.append(plotbgt2[ire*ncases])        
-           plotclb.append(plotbgt2[ire*ncases+1])
-           plotclb.append(plotbgt2[ire*ncases+2])
-#           plotclb.append(plotbgt2[ire*ncases+3])
-           plotclb.append(plotbgt3[ire*ncases])         
-           plotclb.append(plotbgt3[ire*ncases+1])
-           plotclb.append(plotbgt3[ire*ncases+2])
-#           plotclb.append(plotbgt3[ire*ncases+3])
+           for im in range (0, ncases ):
+               plotclb.append(plotbgt1[ire*ncases+im])
+           for im in range (0, ncases ):
+               plotclb.append(plotbgt2[ire*ncases+im])
+           for im in range (0, ncases ):
+               plotclb.append(plotbgt3[ire*ncases+im])
 
-
-    Diagnostic_webpage.sets_web(casename,casedir,plotclb,str(lons[ire])+'E_'+str(lats[ire])+'N',\
+        Diagnostic_webpage.sets_web(casename,casedir,plotclb,str(lons[ire])+'E_'+str(lats[ire])+'N',\
                                   "Profiles on "+str(lons[ire])+'E_'+str(lats[ire])+'N',"908","636")
 
 if maketar:

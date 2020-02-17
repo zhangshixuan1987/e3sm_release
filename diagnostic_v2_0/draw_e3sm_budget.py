@@ -41,7 +41,8 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
  varisobs = [ "CLOUD", "OMEGA","SHUM","CLWC_ISBL", "THATA","RELHUM"]
  nvaris = len(varis)
  cunits = ["%", "mba/day","g/kg","g/kg","K", "%", "mba/day", "K", "g/kg", "m/s", "m/s","K","m"]
- cscale = [1, 1, 1, 1, 1, 1, 1,1,1E3,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+ cscale = [1E8, 1E8, 1E8, 1E8, 1E4, 1E4, 1,1,1E3,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+ chscale = ['1E-8', '1E-8', '1E-8', '1E-8', '1E-4', '1E-4', 1,1,1E3,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
  cscaleobs = [100., 100/86400., 1., 1000, 1., 1., 1, 1,1,1]
  obsdataset =["CCCM", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
 
@@ -72,7 +73,7 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
          # res.vpYF             = 0.30
          res.tmYLLabelFont  = 12
          res.tmXBLabelFont  = 12
-         res.tmXBLabelFontHeightF = 0.015
+         res.tmXBLabelFontHeightF = 0.01
          res.tmXBLabelFontThicknessF = 1.0
          res.xyMarkLineMode      = "MarkLines"
          res.xyLineThicknesses = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0,2.,2.,2.,2.,2,2,2,2,2,2,2]
@@ -91,13 +92,10 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
          res.lgLabelFontHeightF     = 0.015     # Change the font size
          res.lgPerimOn              = True
          res.tiYAxisString   = "PRESSURE"
-     
-#         res.nglLeftString     = varis[iv]
-#         res.nglRightString    = cunits[iv]
          res.trYReverse        = True
 
          pres            = Ngl.Resources() 
-#         pres.nglMaximize = True
+         pres.nglMaximize = True
          pres.wkWidth              = 2000
          pres.wkHeight             = 2000
 
@@ -107,8 +105,6 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
          pres.nglPanelXWhiteSpacePercent = 5
          pres.nglPanelTop = 0.93
 
-         txres               = Ngl.Resources()
-#         txres.txFontHeightF = 0.01
 
          for iv in range (0, nvaris):
 
@@ -161,7 +157,7 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
              idx_cols=ncdf.variables['idx_cols'][:,:]
              ncdf.close()
              A_field = np.zeros((nterms,nilev),np.float32)
-             theunits=str(cscale[iv])+"x"+inptrs.variables[varis[iv]].units
+             theunits=str(chscale[iv])+"x"+inptrs.variables[varis[iv]].units
              res.tiMainString    =  varis[iv]+"  "+theunits 
 
 
@@ -183,12 +179,11 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
              xp=np.mod(iv,2)
              yp=int(iv/2)
 
-         pres.txFontHeightF = 0.02
-         pres.txFont = _Font
-         pres.txString   = casenames[im]+"  BUDGET at" +str(lons[ire])+"E,"+str(lats[ire])+"N"
 
          Ngl.panel(wks,plot[:],[nvaris/2,2],pres)
+
          txres = Ngl.Resources()
+         txres.txFont = _Font
          txres.txFontHeightF = 0.020
          Ngl.text_ndc(wks,casenames[im]+"  BUDGET at" +str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.95,txres)
 

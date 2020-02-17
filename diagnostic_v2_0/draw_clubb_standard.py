@@ -66,8 +66,8 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      #res.vpXF             = 0.04
      # res.vpYF             = 0.30
      res.tmYLLabelFont  = _Font
-     res.tmXBLabelFont  = _Font 
-     res.tmXBLabelFontHeightF = 0.02
+     res.tmXBLabelFont  = _Font
+     res.tmXBLabelFontHeightF = 0.01
      res.tmXBLabelFontThicknessF = 1.0
      res.xyMarkLineMode      = "Lines"
      res.xyLineThicknesses = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0,2.,2.,2.,2.,2,2,2,2,2,2,2]
@@ -185,7 +185,8 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      pres.txString   = "CLUBB VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N"
 
      txres = Ngl.Resources()
-     txres.txFontHeightF = 0.020
+     txres.txFontHeightF = 0.02
+     txres.txFont        = _Font
      Ngl.text_ndc(wks,"CLUBB VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.92+ncases*0.01,txres)
      Common_functions.create_legend(wks,casenames,np.arange(2,20,1),0.1,0.89+ncases*0.01)
 

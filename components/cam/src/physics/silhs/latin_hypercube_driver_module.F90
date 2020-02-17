@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------
-! $Id$
+! $Id$ 
 !===============================================================================
 module latin_hypercube_driver_module
 
@@ -14,19 +14,6 @@ module latin_hypercube_driver_module
     l_output_2D_uniform_dist     = .false.    ! Output a 2D netCDF file of the uniform distribution
 
   private ! Default scope
-
-  type lh_clipped_variables_type
-
-    real( kind = core_rknd ) :: &
-      rt,      & ! Total water mixing ratio            [kg/kg]
-      thl,     & ! Liquid potential temperature        [K]
-      rc,      & ! Cloud water mixing ratio            [kg/kg]
-      rv,      & ! Vapor water mixing ratio            [kg/kg]
-      Nc         ! Cloud droplet number concentration  [#/kg]
-
-  end type lh_clipped_variables_type
-
-  public :: lh_clipped_variables_type
 
 #ifdef SILHS
   public :: latin_hypercube_2D_output, &
@@ -98,6 +85,9 @@ module latin_hypercube_driver_module
       
     use grid_class, only: &
       gr
+      
+    use stats_variables, only: &
+      l_stats_samp      ! Variable(s)
 
     implicit none
 
@@ -282,12 +272,8 @@ module latin_hypercube_driver_module
       end if ! Some correlation isn't between [0,1]
     end if ! clubb_at_least_debug_level 1
     
-    !$acc data create(rand_pool) &
-    !$acc&     copyin(pdf_params,pdf_params%mixt_frac,pdf_params%cloud_frac_1, &
-    !$acc&            pdf_params%cloud_frac_2, precip_frac_1,precip_frac_2, &
-    !$acc&            Sigma_Cholesky1, Sigma_Cholesky2, mu1, mu2, X_vert_corr ) &
-    !$acc&     copyout(X_mixt_comp_all_levs, X_u_all_levs,cloud_frac, l_in_precip, &
-    !$acc&             X_nl_all_levs) &
+    !$acc data create( rand_pool, X_u_all_levs ) &
+    !$acc&     copyin( X_vert_corr ) &
     !$acc& async(1)
 
     ! Generate pool of random numbers
@@ -311,7 +297,12 @@ module latin_hypercube_driver_module
            l_calc_weights_all_levs_itime,                                & ! Intent(in)
            X_u_all_levs(:,:,:), lh_sample_point_weights(:,:) )             ! Intent(out)
     
-    !$acc parallel loop collapse(2) default(present) async(1)
+    !$acc data create( cloud_frac, l_in_precip ) &
+    !$acc&     copyin( pdf_params,pdf_params%mixt_frac,pdf_params%cloud_frac_1, &
+    !$acc&             pdf_params%cloud_frac_2, precip_frac_1,precip_frac_2 ) &
+    !$acc& async(3)
+    
+    !$acc parallel loop collapse(2) default(present) async(1) wait(3)
     do sample = 1, num_samples 
       do k = 1, nz
             
@@ -361,15 +352,18 @@ module latin_hypercube_driver_module
            X_u_all_levs(:,:,:), cloud_frac(:,:), & ! In
            l_in_precip(:,:), & ! In
            X_nl_all_levs(:,:,:) ) ! Out
-        
-    !$acc end data
-    !$acc wait(1)
            
-    call stats_accumulate_uniform_lh( nz, num_samples, l_in_precip, X_mixt_comp_all_levs, &
-                                      X_u_all_levs(:,:,iiPDF_chi), pdf_params, &
-                                      lh_sample_point_weights, k_lh_start )
+    
+    if ( l_stats_samp ) then
+      !$acc update host(X_u_all_levs,l_in_precip,lh_sample_point_weights) wait
+      call stats_accumulate_uniform_lh( nz, num_samples, l_in_precip, X_mixt_comp_all_levs, &
+                                        X_u_all_levs(:,:,iiPDF_chi), pdf_params, &
+                                        lh_sample_point_weights, k_lh_start )
+    end if
 
     if ( l_output_2D_lognormal_dist ) then
+      !$acc update host(X_nl_all_levs) wait
+      
       ! Eric Raut removed lh_rt and lh_thl from call to output_2D_lognormal_dist_file
       ! because they are no longer generated in generate_silhs_sample.
       call output_2D_lognormal_dist_file( nz, num_samples, pdf_dim, &
@@ -379,7 +373,9 @@ module latin_hypercube_driver_module
                                           l_standard_term_ta, &
                                           l_single_C2_Skw )
     end if
+    
     if ( l_output_2D_uniform_dist ) then
+      !$acc update host(X_u_all_levs,X_mixt_comp_all_levs,lh_sample_point_weights) wait
       call output_2D_uniform_dist_file( nz, num_samples, pdf_dim+2, &
                                         X_u_all_levs, &
                                         X_mixt_comp_all_levs, &
@@ -392,6 +388,8 @@ module latin_hypercube_driver_module
 
     ! Various nefarious assertion checks
     if ( clubb_at_least_debug_level( 2 ) ) then
+      
+      !$acc update host(X_u_all_levs,X_mixt_comp_all_levs,X_nl_all_levs) wait
 
       ! Simple assertion check to ensure uniform variates are in the appropriate
       ! range
@@ -420,6 +418,9 @@ module latin_hypercube_driver_module
       end do ! k=2, nz
 
     end if ! clubb_at_least_debug_level( 2 )
+    
+    !$acc end data
+    !$acc end data
 
     ! Stop the run if an error occurred
     if ( l_error ) then
@@ -682,8 +683,13 @@ module latin_hypercube_driver_module
           end do
         end do
 
-        ! Importance sampling is not performed, so all sample points have the same weight!!
-        lh_sample_point_weights(:,:)  =  one
+        !$acc parallel loop collapse(2) default(present) async(1)
+        do sample = 1, num_samples
+          do k = 1, nz
+            ! Importance sampling is not performed, so all sample points have the same weight!!
+            lh_sample_point_weights(k,sample) = one
+          end do
+        end do
 
       else ! .not. l_lh_straight_mc
       
@@ -787,7 +793,7 @@ module latin_hypercube_driver_module
                      mixt_frac(k),                                     & ! In
                      X_u_all_levs(k,:,iiPDF_chi),                      & ! In/Out
                      X_u_all_levs(k,:,pdf_dim+1),                      & ! In/Out
-                     lh_sample_point_weights )                           ! Out
+                     lh_sample_point_weights(k,:) )                      ! Out
 
             else ! .not. l_lh_old_cloud_weighted
 
@@ -800,7 +806,7 @@ module latin_hypercube_driver_module
                      X_u_all_levs(k,:,iiPDF_chi),                               & ! In/Out
                      X_u_all_levs(k,:,pdf_dim+1),                               & ! In/Out
                      X_u_all_levs(k,:,pdf_dim+2),                               & ! In/Out
-                     lh_sample_point_weights )                                    ! Out
+                     lh_sample_point_weights(k,:) )                               ! Out
 
             end if ! l_lh_old_cloud_weighted
 
@@ -925,12 +931,14 @@ module latin_hypercube_driver_module
 !-----------------------------------------------------------------------
 
 !-----------------------------------------------------------------------
-  subroutine clip_transform_silhs_output( nz, num_samples, &             ! In
-                                          pdf_dim, hydromet_dim, &       ! In
-                                          X_mixt_comp_all_levs, &        ! In
-                                          X_nl_all_levs, &               ! In
-                                          pdf_params, l_use_Ncn_to_Nc, & ! In
-                                          lh_clipped_vars )              ! Out
+  subroutine clip_transform_silhs_output( nz, num_samples,                & ! In
+                                          pdf_dim, hydromet_dim,          & ! In
+                                          X_mixt_comp_all_levs,           & ! In
+                                          X_nl_all_levs,                  & ! Inout
+                                          pdf_params, l_use_Ncn_to_Nc,    & ! In
+                                          lh_rt_clipped, lh_thl_clipped,  & ! Out
+                                          lh_rc_clipped, lh_rv_clipped,   & ! Out
+                                          lh_Nc_clipped                   ) ! Out
 
   ! Description:
   !   Derives from the SILHS sampling structure X_nl_all_levs the variables
@@ -992,8 +1000,12 @@ module latin_hypercube_driver_module
       X_nl_all_levs    ! SILHS sample points    [units vary]
 
     ! ------------------- Output Variables -------------------
-    type(lh_clipped_variables_type), dimension(nz,num_samples), intent(out) :: &
-      lh_clipped_vars        ! SILHS clipped and transformed variables
+    real( kind = core_rknd ), dimension(nz,num_samples), intent(out) :: &
+      lh_rt_clipped,  & ! rt generated from silhs sample points
+      lh_thl_clipped, & ! thl generated from silhs sample points
+      lh_rc_clipped,  & ! rc generated from silhs sample points
+      lh_rv_clipped,  & ! rv generated from silhs sample points
+      lh_Nc_clipped     ! Nc generated from silhs sample points
 
     ! ------------------- Local Variables -------------------
 
@@ -1015,49 +1027,52 @@ module latin_hypercube_driver_module
         
     ! Compute lh_rt and lh_thl
     call chi_eta_2_rtthl( nz, num_samples, &
-                          pdf_params%rt_1(:), pdf_params%thl_1(:),          & ! Intent(in)
-                          pdf_params%rt_2(:), pdf_params%thl_2(:),          & ! Intent(in)
-                          pdf_params%crt_1(:), pdf_params%cthl_1(:),        & ! Intent(in)
-                          pdf_params%crt_2(:), pdf_params%cthl_2(:),        & ! Intent(in)
-                          pdf_params%chi_1(:), pdf_params%chi_2(:),         & ! Intent(in)
-                          X_nl_all_levs(:,:,iiPDF_chi),                     & ! Intent(in) 
-                          X_nl_all_levs(:,:,iiPDF_eta),                     & ! Intent(in)
-                          X_mixt_comp_all_levs(:,:),                        & ! Intent(in)
-                          lh_clipped_vars(:,:)%rt, lh_clipped_vars(:,:)%thl ) ! Intent(out)
+                          pdf_params%rt_1(:), pdf_params%thl_1(:),    & ! Intent(in)
+                          pdf_params%rt_2(:), pdf_params%thl_2(:),    & ! Intent(in)
+                          pdf_params%crt_1(:), pdf_params%cthl_1(:),  & ! Intent(in)
+                          pdf_params%crt_2(:), pdf_params%cthl_2(:),  & ! Intent(in)
+                          pdf_params%chi_1(:), pdf_params%chi_2(:),   & ! Intent(in)
+                          X_nl_all_levs(:,:,iiPDF_chi),               & ! Intent(in) 
+                          X_nl_all_levs(:,:,iiPDF_eta),               & ! Intent(in)
+                          X_mixt_comp_all_levs(:,:),                  & ! Intent(in)
+                          lh_rt_clipped, lh_thl_clipped               ) ! Intent(out)
     
+    !$acc parallel loop default(present) async(1)
+    do sample = 1, num_samples
+      ! These parameters are not computed at the model lower level.
+      lh_rt_clipped(1,sample)  = zero
+      lh_thl_clipped(1,sample) = zero
+      lh_rc_clipped(1,sample)  = zero
+      lh_rv_clipped(1,sample)  = zero
+      lh_Nc_clipped(1,sample)  = zero
+    end do
     
-    ! These parameters are not computed at the model lower level.
-    lh_clipped_vars(1,:)%rt = zero
-    lh_clipped_vars(1,:)%thl = zero
-    lh_clipped_vars(1,:)%rc = zero
-    lh_clipped_vars(1,:)%rv = zero
-    lh_clipped_vars(1,:)%Nc = zero
-    
+    !$acc parallel loop collapse(2) default(present) async(1)
     do sample = 1, num_samples
       do k = 2, nz
     
         ! If necessary, clip rt      
-        lh_clipped_vars(k,sample)%rt = max( lh_clipped_vars(k,sample)%rt, rt_tol )
+        lh_rt_clipped(k,sample) = max( lh_rt_clipped(k,sample), rt_tol )
         
         ! Compute lh_rc, rc = chi * H(chi), where H(x) is the Heaviside step function
-        lh_clipped_vars(k,sample)%rc = max( X_nl_all_levs(k,sample,iiPDF_chi), zero )
+        lh_rc_clipped(k,sample) = max( X_nl_all_levs(k,sample,iiPDF_chi), zero )
         
         ! Clip lh_rc.
-        lh_clipped_vars(k,sample)%rc = min( lh_clipped_vars(k,sample)%rc, &
-                                            lh_clipped_vars(k,sample)%rt - rt_tol )
+        lh_rc_clipped(k,sample) = min( lh_rc_clipped(k,sample), &
+                                            lh_rt_clipped(k,sample) - rt_tol )
         
         ! Compute lh_rv
-        lh_clipped_vars(k,sample)%rv = lh_clipped_vars(k,sample)%rt - lh_clipped_vars(k,sample)%rc
+        lh_rv_clipped(k,sample) = lh_rt_clipped(k,sample) - lh_rc_clipped(k,sample)
         
         if ( l_use_Ncn_to_Nc ) then
            ! Compute lh_Nc, Nc = Ncn * H(chi), where H(x) is the Heaviside step function
            if ( X_nl_all_levs(k,sample,iiPDF_chi) > zero ) then
-             lh_clipped_vars(k,sample)%Nc = X_nl_all_levs(k,sample,iiPDF_Ncn)
+             lh_Nc_clipped(k,sample) = X_nl_all_levs(k,sample,iiPDF_Ncn)
            else
-             lh_clipped_vars(k,sample)%Nc = zero
+             lh_Nc_clipped(k,sample) = zero
            end if
         else
-           lh_clipped_vars(k,sample)%Nc = X_nl_all_levs(k,sample,iiPDF_Ncn)
+           lh_Nc_clipped(k,sample) = X_nl_all_levs(k,sample,iiPDF_Ncn)
         endif ! l_use_Ncn_to_Nc
         
       end do ! sample = 1, num_samples
@@ -1066,7 +1081,10 @@ module latin_hypercube_driver_module
 
     ! Clip the SILHS sample point values of hydrometeor concentrations.
     if ( l_clip_hydromet_samples ) then
-
+      
+#ifdef _OPENACC
+       stop "CLUBB ERROR: Running SILHS with OpenACC requires l_clip_hydromet_samples=false"
+#endif
        ! Loop over all sample columns.
        do sample = 1, num_samples, 1
 
@@ -1370,7 +1388,7 @@ module latin_hypercube_driver_module
       if ( X_u_chi(sample) < (one - cloud_frac_i) ) then
 
         ! The uniform sample is in clear air
-        if ( X_nl_chi(sample) > single_prec_thresh ) then
+        if ( X_nl_chi(sample) > 1000._core_rknd * single_prec_thresh ) then
           l_error = .true.
           write(fstderr,*) "X_nl_chi(", sample, ") > ", single_prec_thresh
         end if
@@ -1379,7 +1397,7 @@ module latin_hypercube_driver_module
                 X_u_chi(sample) < one ) then
 
         ! The uniform sample is in cloud
-        if ( X_nl_chi(sample) <= -single_prec_thresh ) then
+        if ( X_nl_chi(sample) <= - 1000._core_rknd * single_prec_thresh ) then
           l_error = .true.
           write(fstderr,*) "X_nl_chi(", sample, ") <= ", -single_prec_thresh
         end if
@@ -1724,37 +1742,39 @@ module latin_hypercube_driver_module
                    ! in this array and will be used to fill in the other levels.
 
     ! ---------------- Local Variables ----------------
-    real(kind=core_rknd) :: min_val, half_width, offset
+    real(kind=core_rknd) :: min_val, half_width, offset, unbounded_point
 
     integer :: k, sample, i ! Loop iterators
 
     ! ---------------- Begin Code ----------------
     
-    !$acc wait(1)
+    !$acc wait(1) async(2)
 
     ! Recompute from k_lh_start to nz-1 for all samples and variates, upward loop
     !$acc parallel loop collapse(2) default(present) async(1)
     do i = 1, pdf_dim + d_uniform_extra                         
       do sample = 1, num_samples
         
+        unbounded_point = X_u_all_levs(k_lh_start,sample,i)
+        
          do k = k_lh_start, nz-1
            
            half_width = one - vert_corr(k+1)
-           min_val = X_u_all_levs(k,sample,i) - half_width
+           min_val = unbounded_point - half_width
 
            offset = two * half_width * rand_pool(k+1,sample,i)
 
-           X_u_all_levs(k+1,sample,i) = min_val + offset
+           unbounded_point = min_val + offset
            
            ! If unbounded_point lies outside [single_prec_thresh,1-single_prec_thresh],
            ! fold it back so that it is between the valid range
-           if ( X_u_all_levs(k+1,sample,i) > one - single_prec_thresh ) then
-             X_u_all_levs(k+1,sample,i) = two - X_u_all_levs(k+1,sample,i) &
-                                          - two * single_prec_thresh
-           else if ( X_u_all_levs(k+1,sample,i) < single_prec_thresh ) then
-             X_u_all_levs(k+1,sample,i) = - X_u_all_levs(k+1,sample,i) &
-                                            + two * single_prec_thresh
+           if ( unbounded_point > one - single_prec_thresh ) then
+             unbounded_point = two - unbounded_point - two * single_prec_thresh
+           else if ( unbounded_point < single_prec_thresh ) then
+             unbounded_point = - unbounded_point + two * single_prec_thresh
            end if
+           
+           X_u_all_levs(k+1,sample,i) = unbounded_point
            
          end do ! k_lh_start..nz-1
       end do ! 1..num_samples
@@ -1766,30 +1786,32 @@ module latin_hypercube_driver_module
     do i = 1, pdf_dim + d_uniform_extra                        
       do sample = 1, num_samples
         
+        unbounded_point = X_u_all_levs(k_lh_start,sample,i)
+        
          do k = k_lh_start, 2, -1
 
            half_width = one - vert_corr(k-1)
-           min_val = X_u_all_levs(k,sample,i) - half_width
+           min_val = unbounded_point - half_width
 
            offset = two * half_width * rand_pool(k-1,sample,i)
 
-           X_u_all_levs(k-1,sample,i) = min_val + offset
+           unbounded_point = min_val + offset
            
            ! If unbounded_point lies outside [single_prec_thresh,1-single_prec_thresh],
            ! fold it back so that it is between the valid range 
-           if ( X_u_all_levs(k-1,sample,i) > one - single_prec_thresh ) then
-             X_u_all_levs(k-1,sample,i) = two - X_u_all_levs(k-1,sample,i) &
-                                          - two * single_prec_thresh
-           else if ( X_u_all_levs(k-1,sample,i) < single_prec_thresh ) then
-             X_u_all_levs(k-1,sample,i) = - X_u_all_levs(k-1,sample,i) &
-                                            + two * single_prec_thresh
+           if ( unbounded_point > one - single_prec_thresh ) then
+             unbounded_point = two - unbounded_point - two * single_prec_thresh
+           else if ( unbounded_point < single_prec_thresh ) then
+             unbounded_point = - unbounded_point + two * single_prec_thresh
            end if
+           
+           X_u_all_levs(k-1,sample,i) = unbounded_point
 
          end do ! k_lh_start..2 decrementing
       end do ! 1..num_samples
     end do ! 1..pdf_dim
     
-    !$acc wait(2)
+    !$acc wait(2) async(1)
 
     return
   end subroutine compute_arb_overlap
@@ -1798,7 +1820,9 @@ module latin_hypercube_driver_module
   subroutine stats_accumulate_lh &
              ( nz, num_samples, pdf_dim, rho_ds_zt, &
                lh_sample_point_weights, X_nl_all_levs, &
-               lh_clipped_vars )
+               lh_rt_clipped, lh_thl_clipped, & 
+               lh_rc_clipped, lh_rv_clipped, & 
+               lh_Nc_clipped )
 
 ! Description:
 !   Clip subcolumns from latin hypercube and create stats for diagnostic
@@ -1898,16 +1922,17 @@ module latin_hypercube_driver_module
 
     real( kind = core_rknd ), intent(in), dimension(nz,num_samples,pdf_dim) :: &
       X_nl_all_levs ! Sample that is transformed ultimately to normal-lognormal
-
-    type(lh_clipped_variables_type), dimension(nz,num_samples), intent(in) :: &
-      lh_clipped_vars   ! SILHS variables
+      
+    real( kind = core_rknd ), dimension(nz,num_samples), intent(in) :: &
+      lh_rt_clipped,  & ! rt generated from silhs sample points
+      lh_thl_clipped, & ! thl generated from silhs sample points
+      lh_rc_clipped,  & ! rc generated from silhs sample points
+      lh_rv_clipped,  & ! rv generated from silhs sample points
+      lh_Nc_clipped     ! Nc generated from silhs sample points
 
     ! Local variables
     real( kind = core_rknd ), dimension(nz,num_samples) :: &
-      rc_all_points,  & ! Cloud water mixing ratio for all levels        [kg/kg]
-      Nc_all_points,  & ! Cloud droplet conc. for all levels              [#/kg]
-      Ncn_all_points, & ! Cloud nuclei conc. for all levs.; Nc=Ncn*H(chi) [#/kg]
-      rv_all_points     ! Vapor mixing ratio for all levels              [kg/kg]
+      Ncn_all_points ! Cloud nuclei conc. for all levs.; Nc=Ncn*H(chi) [#/kg]
 
     real( kind = core_rknd ), dimension(nz,num_samples,hydromet_dim) :: &
       hydromet_all_points ! Hydrometeor species    [units vary]
@@ -1942,8 +1967,6 @@ module latin_hypercube_driver_module
 
     ! ---- Begin Code ----
 
-    rc_all_points = lh_clipped_vars%rc
-
     if ( l_stats_samp ) then
 
       ! For all cases where l_lh_importance_sampling is false, the weights
@@ -1951,7 +1974,7 @@ module latin_hypercube_driver_module
 
       if ( ilh_rcm + ilh_rcp2_zt + ilh_lwp > 0 ) then
         lh_rcm = compute_sample_mean( nz, num_samples, lh_sample_point_weights, &
-                                      rc_all_points )
+                                      lh_rc_clipped )
         call stat_update_var( ilh_rcm, lh_rcm, stats_lh_zt )
 
         if ( ilh_lwp > 0 ) then
@@ -1976,14 +1999,13 @@ module latin_hypercube_driver_module
         
       if ( ilh_thlm + ilh_thlp2_zt > 0 ) then
         lh_thlm = compute_sample_mean( nz, num_samples, lh_sample_point_weights, &
-                                       real( lh_clipped_vars%thl, kind = core_rknd ) )
+                                       real( lh_thl_clipped, kind = core_rknd ) )
         call stat_update_var( ilh_thlm, lh_thlm, stats_lh_zt )
       end if
 
       if ( ilh_rvm + ilh_rtp2_zt > 0 ) then
-        rv_all_points = lh_clipped_vars(:,:)%rv
         lh_rvm = compute_sample_mean( nz, num_samples, lh_sample_point_weights, &
-                                      rv_all_points )
+                                      lh_rv_clipped )
         call stat_update_var( ilh_rvm, lh_rvm, stats_lh_zt )
         if ( ilh_vwp > 0 ) then
           xtmp &
@@ -2011,8 +2033,6 @@ module latin_hypercube_driver_module
                                       hydromet_all_points, &  ! Out
                                       Ncn_all_points ) ! Out
 
-        Nc_all_points = lh_clipped_vars%Nc
-
         ! Get rid of an annoying compiler warning.
         ivar = 1
         ivar = ivar
@@ -2032,7 +2052,7 @@ module latin_hypercube_driver_module
 
       if ( ilh_Ncm > 0 ) then
         lh_Ncm = compute_sample_mean( nz, num_samples, lh_sample_point_weights, &
-                                      Nc_all_points(:,:) )
+                                      lh_Nc_clipped(:,:) )
         call stat_update_var( ilh_Ncm, lh_Ncm, stats_lh_zt )
       end if
 
@@ -2099,7 +2119,7 @@ module latin_hypercube_driver_module
       if ( ilh_rcp2_zt  > 0 ) then
         ! Compute the variance of cloud water mixing ratio
         lh_rcp2_zt = compute_sample_variance &
-                     ( nz, num_samples, rc_all_points, &
+                     ( nz, num_samples, lh_rc_clipped, &
                        lh_sample_point_weights, lh_rcm )
         call stat_update_var( ilh_rcp2_zt, lh_rcp2_zt, stats_lh_zt )
       end if
@@ -2108,7 +2128,7 @@ module latin_hypercube_driver_module
         ! Compute the variance of total water
         lh_rtp2_zt = compute_sample_variance &
                      ( nz, num_samples, &
-                       lh_clipped_vars%rt, lh_sample_point_weights, &
+                       lh_rt_clipped, lh_sample_point_weights, &
                        lh_rvm+lh_rcm )
         call stat_update_var( ilh_rtp2_zt, lh_rtp2_zt, stats_lh_zt )
       end if
@@ -2116,7 +2136,7 @@ module latin_hypercube_driver_module
       if ( ilh_thlp2_zt > 0 ) then
         ! Compute the variance of liquid potential temperature
         lh_thlp2_zt = compute_sample_variance( nz, num_samples, &
-                        lh_clipped_vars%thl, lh_sample_point_weights, &
+                        lh_thl_clipped, lh_sample_point_weights, &
                         lh_thlm )
         call stat_update_var( ilh_thlp2_zt, lh_thlp2_zt, stats_lh_zt )
       end if
@@ -2140,7 +2160,7 @@ module latin_hypercube_driver_module
       ! Compute the variance of cloud droplet concentration
       if ( ilh_Ncp2_zt > 0 ) then
         lh_Ncp2_zt = compute_sample_variance &
-                     ( nz, num_samples, Nc_all_points(:,:), &
+                     ( nz, num_samples, lh_Nc_clipped(:,:), &
                        lh_sample_point_weights, lh_Ncm(:) )
         call stat_update_var( ilh_Ncp2_zt, lh_Ncp2_zt, stats_lh_zt )
       end if
@@ -2205,8 +2225,7 @@ module latin_hypercube_driver_module
       stat_update_var_pt
 
     use stats_variables, only: &
-      l_stats_samp, &      ! Variable(s)
-      ilh_precip_frac, &
+      ilh_precip_frac, &  ! Variable(s)
       ilh_mixt_frac, &
       ilh_precip_frac_unweighted, &
       ilh_mixt_frac_unweighted, &
@@ -2290,115 +2309,113 @@ module latin_hypercube_driver_module
   !-----------------------------------------------------------------------
 
     !----- Begin Code -----
-    if ( l_stats_samp ) then
-      ! Estimate of lh_precip_frac
-      if ( ilh_precip_frac > 0 ) then
-        where ( l_in_precip_all_levs )
-          int_in_precip = 1.0_core_rknd
-        else where
-          int_in_precip = 0.0_core_rknd
-        end where
-        lh_precip_frac(:) = compute_sample_mean( nz, num_samples, lh_sample_point_weights, &
-                                                 int_in_precip )
-        call stat_update_var( ilh_precip_frac, lh_precip_frac, stats_lh_zt )
-      end if
+    
+    ! Estimate of lh_precip_frac
+    if ( ilh_precip_frac > 0 ) then
+      where ( l_in_precip_all_levs )
+        int_in_precip = 1.0_core_rknd
+      else where
+        int_in_precip = 0.0_core_rknd
+      end where
+      lh_precip_frac(:) = compute_sample_mean( nz, num_samples, lh_sample_point_weights, &
+                                               int_in_precip )
+      call stat_update_var( ilh_precip_frac, lh_precip_frac, stats_lh_zt )
+    end if
 
-      ! Unweighted estimate of lh_precip_frac
-      if ( ilh_precip_frac_unweighted > 0 ) then
-        where ( l_in_precip_all_levs )
-          int_in_precip = 1.0_core_rknd
-        else where
-          int_in_precip = 0.0_core_rknd
-        end where
-        one_weights = one
-        lh_precip_frac(:) = compute_sample_mean( nz, num_samples, one_weights, &
-                                                 int_in_precip )
-        call stat_update_var( ilh_precip_frac_unweighted, lh_precip_frac, stats_lh_zt )
-      end if
+    ! Unweighted estimate of lh_precip_frac
+    if ( ilh_precip_frac_unweighted > 0 ) then
+      where ( l_in_precip_all_levs )
+        int_in_precip = 1.0_core_rknd
+      else where
+        int_in_precip = 0.0_core_rknd
+      end where
+      one_weights = one
+      lh_precip_frac(:) = compute_sample_mean( nz, num_samples, one_weights, &
+                                               int_in_precip )
+      call stat_update_var( ilh_precip_frac_unweighted, lh_precip_frac, stats_lh_zt )
+    end if
 
-      ! Estimate of lh_mixt_frac
-      if ( ilh_mixt_frac > 0 ) then
-        where ( X_mixt_comp_all_levs == 1 )
-          int_mixt_comp = 1.0_core_rknd
-        else where
-          int_mixt_comp = 0.0_core_rknd
-        end where
-        lh_mixt_frac(:) = compute_sample_mean( nz, num_samples, lh_sample_point_weights, &
-                                               int_mixt_comp )
-        call stat_update_var( ilh_mixt_frac, lh_mixt_frac, stats_lh_zt )
-      end if
+    ! Estimate of lh_mixt_frac
+    if ( ilh_mixt_frac > 0 ) then
+      where ( X_mixt_comp_all_levs == 1 )
+        int_mixt_comp = 1.0_core_rknd
+      else where
+        int_mixt_comp = 0.0_core_rknd
+      end where
+      lh_mixt_frac(:) = compute_sample_mean( nz, num_samples, lh_sample_point_weights, &
+                                             int_mixt_comp )
+      call stat_update_var( ilh_mixt_frac, lh_mixt_frac, stats_lh_zt )
+    end if
 
-      ! Unweighted estimate of lh_mixt_frac
-      if ( ilh_mixt_frac_unweighted > 0 ) then
-        where ( X_mixt_comp_all_levs == 1 )
-          int_mixt_comp = 1.0_core_rknd
-        else where
-          int_mixt_comp = 0.0_core_rknd
-        end where
-        one_weights = one
-        lh_mixt_frac(:) = compute_sample_mean( nz, num_samples, one_weights, &
-                                               int_mixt_comp )
-        call stat_update_var( ilh_mixt_frac_unweighted, lh_mixt_frac, stats_lh_zt )
-      end if
+    ! Unweighted estimate of lh_mixt_frac
+    if ( ilh_mixt_frac_unweighted > 0 ) then
+      where ( X_mixt_comp_all_levs == 1 )
+        int_mixt_comp = 1.0_core_rknd
+      else where
+        int_mixt_comp = 0.0_core_rknd
+      end where
+      one_weights = one
+      lh_mixt_frac(:) = compute_sample_mean( nz, num_samples, one_weights, &
+                                             int_mixt_comp )
+      call stat_update_var( ilh_mixt_frac_unweighted, lh_mixt_frac, stats_lh_zt )
+    end if
 
-      ! k_lh_start is an integer, so it would be more appropriate to sample it
-      ! as an integer, but as far as I can tell our current sampling
-      ! infrastructure mainly supports sampling real numbers.
-      call stat_update_var_pt( ik_lh_start, 1, real( k_lh_start, kind=core_rknd ), stats_lh_sfc )
+    ! k_lh_start is an integer, so it would be more appropriate to sample it
+    ! as an integer, but as far as I can tell our current sampling
+    ! infrastructure mainly supports sampling real numbers.
+    call stat_update_var_pt( ik_lh_start, 1, real( k_lh_start, kind=core_rknd ), stats_lh_sfc )
 
-      if ( allocated( ilh_samp_frac_category ) ) then
-        if ( ilh_samp_frac_category(1) > 0 ) then
+    if ( allocated( ilh_samp_frac_category ) ) then
+      if ( ilh_samp_frac_category(1) > 0 ) then
 
-          importance_categories = define_importance_categories( )
+        importance_categories = define_importance_categories( )
 
-          do k=1, nz
-            category_counts(:) = 0
+        do k=1, nz
+          category_counts(:) = 0
 
-            do isample=1, num_samples
+          do isample=1, num_samples
 
-              if ( X_mixt_comp_all_levs(k,isample) == 1 ) then
-                l_in_comp_1 = .true.
-                cloud_frac_i = pdf_params%cloud_frac_1(k)
-              else
-                l_in_comp_1 = .false.
-                cloud_frac_i = pdf_params%cloud_frac_2(k)
-              end if
+            if ( X_mixt_comp_all_levs(k,isample) == 1 ) then
+              l_in_comp_1 = .true.
+              cloud_frac_i = pdf_params%cloud_frac_1(k)
+            else
+              l_in_comp_1 = .false.
+              cloud_frac_i = pdf_params%cloud_frac_2(k)
+            end if
 
-              l_in_cloud = X_u_chi_all_levs(k,isample) > (one - cloud_frac_i)
-
-              do icategory=1, num_importance_categories
-                if ( (l_in_cloud .eqv. importance_categories(icategory)%l_in_cloud) .and. &
-                     (l_in_precip_all_levs(k,isample) .eqv. importance_categories(icategory)%&
-                                                           l_in_precip) .and. &
-                     (l_in_comp_1 .eqv. importance_categories(icategory)%l_in_component_1) ) then
-
-                  category_counts(icategory) = category_counts(icategory) + 1
-                  exit
-
-                end if
-              end do
-
-            end do ! isample=1, num_samples
+            l_in_cloud = X_u_chi_all_levs(k,isample) > (one - cloud_frac_i)
 
             do icategory=1, num_importance_categories
-              lh_samp_frac(k,icategory) = real( category_counts(icategory), kind=core_rknd ) / &
-                                          real( num_samples, kind=core_rknd )
+              if ( (l_in_cloud .eqv. importance_categories(icategory)%l_in_cloud) .and. &
+                   (l_in_precip_all_levs(k,isample) .eqv. importance_categories(icategory)%&
+                                                         l_in_precip) .and. &
+                   (l_in_comp_1 .eqv. importance_categories(icategory)%l_in_component_1) ) then
+
+                category_counts(icategory) = category_counts(icategory) + 1
+                exit
+
+              end if
             end do
 
-          end do ! k=2, nz
-
-          ! Microphysics is not run at lower level
-          lh_samp_frac(1,:) = zero
+          end do ! isample=1, num_samples
 
           do icategory=1, num_importance_categories
-            call stat_update_var( ilh_samp_frac_category(icategory), lh_samp_frac(:,icategory), &
-                                  stats_lh_zt )
-          end do ! icategory=1, num_importance_categories
+            lh_samp_frac(k,icategory) = real( category_counts(icategory), kind=core_rknd ) / &
+                                        real( num_samples, kind=core_rknd )
+          end do
 
-        end if ! ilh_samp_frac_category(1) > 0
-      end if ! allocated( ilh_samp_frac_category )
+        end do ! k=2, nz
 
-    end if ! l_stats_samp
+        ! Microphysics is not run at lower level
+        lh_samp_frac(1,:) = zero
+
+        do icategory=1, num_importance_categories
+          call stat_update_var( ilh_samp_frac_category(icategory), lh_samp_frac(:,icategory), &
+                                stats_lh_zt )
+        end do ! icategory=1, num_importance_categories
+
+      end if ! ilh_samp_frac_category(1) > 0
+    end if ! allocated( ilh_samp_frac_category )
 
     return
   end subroutine stats_accumulate_uniform_lh

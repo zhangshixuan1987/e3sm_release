@@ -858,6 +858,7 @@ end subroutine clubb_init_cnst
 
     call init_clubb_config_flags( clubb_config_flags ) ! In/Out
     clubb_config_flags%l_uv_nudge = .false.
+    clubb_config_flags%l_update_pressure = .false.
     ! Brian:  these flags were previously set in CLUBB's model_flags.F90
     clubb_config_flags%l_predict_upwp_vpwp = .false.
     clubb_config_flags%l_diag_Lscale_from_tau = .true.
@@ -4739,7 +4740,8 @@ end function diag_ustar
       l_single_C2_Skw,              & ! Use a single Skewness dependent C2 for rtp2, thlp2, and
                                       ! rtpthlp
       l_damp_wp3_Skw_squared,       & ! Set damping on wp3 to use Skw^2 rather than Skw^4
-      l_prescribed_avg_deltaz         ! used in adj_low_res_nu. If .true., avg_deltaz = deltaz
+      l_prescribed_avg_deltaz,      & ! used in adj_low_res_nu. If .true., avg_deltaz = deltaz
+      l_update_pressure               ! Flag for having CLUBB update pressure and exner
 
     logical, save :: first_call = .true.
 
@@ -4782,7 +4784,8 @@ end function diag_ustar
                                                l_rcm_supersat_adj, & ! Out
                                                l_single_C2_Skw, & ! Out
                                                l_damp_wp3_Skw_squared, & ! Out
-                                               l_prescribed_avg_deltaz ) ! Out
+                                               l_prescribed_avg_deltaz, & ! Out
+                                               l_update_pressure ) ! Out
 
       call initialize_clubb_config_flags_type_api( l_use_precip_frac, & ! In
                                                    l_predict_upwp_vpwp, & ! In
@@ -4822,6 +4825,7 @@ end function diag_ustar
                                                    l_single_C2_Skw, & ! In
                                                    l_damp_wp3_Skw_squared, & ! In
                                                    l_prescribed_avg_deltaz, & ! In
+                                                   l_update_pressure, & ! In
                                                    clubb_config_flags_in ) ! Out
 
       first_call = .false.

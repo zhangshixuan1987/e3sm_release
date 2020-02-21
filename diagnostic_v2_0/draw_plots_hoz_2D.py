@@ -163,11 +163,6 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    res.vpXF             = 0.04
    res.vpYF             = 0.30
 
- 
-#   res.nglStringFont                  = _Font
-#   res.nglStringFontHeightF           = 0.04
-#   res.nglRightString                 = ""#"Cloud Fraction"
-#   res.nglScalarContour     = True         
    res.cnInfoLabelOn                  = False  
    res.cnFillOn                       = True
    res.cnLinesOn                      = False
@@ -292,7 +287,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    rr     = re*rad
 
    dlon   = abs(lonobs[2]-lonobs[1])*rr
-   dx     = dlon* np.arccos(latobs*rad)
+   dx     = dlon* np.cos(latobs*rad)
    jlat   = len(latobs )
    dy     = np.zeros(jlat,dtype=float)
                                                             # close enough
@@ -302,6 +297,16 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    area_wgt   = dx*dy  # 
    is_SE= False
 
+   sum1 = 0 
+   sum2 = 0 
+
+   for j in range(0, jlat-1):
+      for i in range(0, len(lonobs)-1):
+        if (np.isnan(B[j][i]) != "--"):
+           sum1= sum1+area_wgt[j]*B[j][i]
+           sum2= sum2+area_wgt[j]
+   
+   glb=sum1/sum2
    res.sfXArray     = lonobs
    res.sfYArray     = latobs
    res.mpLimitMode  = "LatLon"
@@ -309,7 +314,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    res.mpMinLonF    = min(lonobs)
    res.mpMinLatF    = min(latobs)
    res.mpMaxLatF    = max(latobs)
-   res.tiMainString   =  "GLB="+str(Common_functions.area_avg(B, area_wgt,is_SE))
+   res.tiMainString   =  "GLB="+str(glb)
 
 
    p =Ngl.contour_map(wks,B,res)

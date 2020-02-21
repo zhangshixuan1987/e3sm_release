@@ -45,7 +45,7 @@ def pick_out(ncases, cases,years, nsite,lats, lons,area, filepath,casedir):
      cols=[0,1,2,3,4]
      sits=np.linspace(0,nsite-1,nsite)
 
-     txtfile=filepath[im]+cases[im]+'/run/diff.*.asc'
+     txtfile=filepath[im]+cases[im]+'/run/diff*.asc'
      os.system('mkdir '+ casedir+'/txt/')
      os.system('cp -f '+ txtfile+ ' '+ casedir+'/txt/')
 

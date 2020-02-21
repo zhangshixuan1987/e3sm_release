@@ -25,7 +25,6 @@ def area_avg(data_orig, weight, is_SE):
         a = np.average(data, weights=weight)
     else: #FV
         #a = wgt_areaave(data, weight, 1.0, 1)
-        #weights are for lat
         a_lat = np.average(data,axis=0, weights=weight)
         a = np.average(a_lat)
     return a

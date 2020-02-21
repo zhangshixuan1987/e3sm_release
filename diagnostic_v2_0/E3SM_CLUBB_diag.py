@@ -11,7 +11,7 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-case="facc1_kmaxo3_dcs1h" # A general case name
+case="facc1_kmaxo3_dcs4h_prc_new" # A general case name
 outdir="/lcrc/group/acme/zhun/plots/" # Location of plots
 
 filepath=["/lcrc/group/acme/zhun/E3SM_simulations/",\
@@ -23,20 +23,22 @@ filepath=["/lcrc/group/acme/zhun/E3SM_simulations/",\
 
           ]
 cases=[ \
-       "anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs1h_accrate2.ne16_ne16",\
-"anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs1h.ne16_ne16",\
-"anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h.ne16_ne16",\
-         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_4.ne16_ne16", \
+       "anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_prc_try7.ne16_ne16",\
+       "anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_prc_try6.ne16_ne16",\
+       "anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_prc_try2.ne16_ne16", \
+       "anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_prc.ne16_ne16",\
+#       "anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_test4.ne16_ne16",\
+#         "anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_4.ne16_ne16", \
          "anvil-centos7.master_20191113.gust_polun_run3.ne16_ne16",\
 ]
 # Give a short name for your experiment which will appears on plots
 
-casenames=['dcs1h_accrete2','dcs1h','dcs4h','ice_c5=0_facc1_berg2','ZM']
+casenames=['dcs4h_prce2p4','dcs4h_prce2_1e-4','dcs4h_prc2p5','dcs4h_prc2p','ZM']
 
 years=[\
         "0001", "0001","0001", "0001","0001","0001"]
 dpsc=[\
-      "none","none","none","none","none","zm"]
+      "none","none","none","none","zm"]
 # NOTE, dpsc,deep scheme, has to be "none", if silhs is turned on. 
 
 # Observation Data
@@ -49,8 +51,8 @@ cseason="ANN" # Seasons, or others
 casename=case+"_"+cseason
 
 #------------------------------------------------------------------------
-calmean=False     # make mean states
-findout=True       # pick out the locations of your sites
+calmean=False      # make mean states
+findout=False       # pick out the locations of your sites
 draw2d=True        # This flag control 2D plots
 drawlarge= True    # profiles for large-scale variable on your sites 
 drawclubb= True    # profiles for standard clubb output
@@ -142,8 +144,8 @@ if drawclubb:
     plotstd2=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
 
     pname = "std3"
-    varis    = [ 'wp2thlp','wp2rtp','wpthlp2','wprtp2','rcp2', 'wp2rcp']
-    cscale   = [     1,       1E3,    1,   1E6,           1E6,    1E3] 
+    varis    = [ 'wp2thlp','wp2thlp','wpthlp2','wprtp2','rcp2', 'wp2rcp']
+    cscale   = [     1,       1,    1,   1E6,           1E6,    1E3] 
     plotstd3=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
 
     varis    = [ 'wpthvp','wp2thvp','rtpthvp','thlpthvp','wp4','wprtpthlp']

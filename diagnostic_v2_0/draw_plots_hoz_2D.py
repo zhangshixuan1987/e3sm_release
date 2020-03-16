@@ -43,7 +43,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
  alpha    = ["A","B","C","D","E","F"]
  nvaris = len(varis)
  cunits = [""]
- cscale = [100,1,1,86400000, 1,  1,1,100,100,1,1,1,1,1,1,1]
+ cscale = [100,1,1,86400000, 1,  1,1,100,100,1,1,1000,1,1,1,1]
  cscaleobs =  [1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 # cntrs = [[0 for col in range(11)] for row in range(nvaris)]
  cntrs = np.zeros((nvaris,11),np.float32)
@@ -71,6 +71,10 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
        cntrs[iv,:] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
    if(varis[iv] == "TMQ"):
        cntrs[iv,:] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+   if(varis[iv] == "TGCLDLWP"):
+       cntrs[iv,:] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
+
+
 
 
 
@@ -216,7 +220,6 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
        area=inptrs.variables['area'][:]
 
        area_wgt = np.zeros(nlat)
-#       area_wgt[:] = gw[:]
 
        sits=np.linspace(0,nsite-1,nsite)
        ncdf= Dataset(ncdfs[im],'r')
@@ -231,7 +234,6 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
            A = inptrs.variables['FLUT'][0,:]-inptrs.variables['FLNS'][0,:]
        else:
            A = inptrs.variables[varis[iv]][0,:]
-
 
        if (varis[iv] == 'U10'):
            A = inptrs.variables['U10'][0,:]*inptrs.variables['U10'][0,:]

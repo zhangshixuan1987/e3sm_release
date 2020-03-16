@@ -192,7 +192,8 @@ module advance_xp2_xpyp_module
       l_clip_large_rtp2 = .true. ! Clip rtp2 to be < rtm^2 * coef
 
     real( kind = core_rknd ), parameter :: &
-      rtp2_clip_coef = one_half ! Coefficient appled the clipping threshold on rtp2 [-]
+     ! rtp2_clip_coef = one_half ! Coefficient appled the clipping threshold on rtp2 [-]
+      rtp2_clip_coef= 10
 
     ! Input variables
     real( kind = core_rknd ), intent(in), dimension(gr%nz) ::  & 

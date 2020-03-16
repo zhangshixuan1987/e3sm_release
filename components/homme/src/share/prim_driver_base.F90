@@ -1476,10 +1476,16 @@ contains
    endif
 
    ! Qdp(np1) was updated by forcing - update Q(np1)
-   do q=1,qsize
-      elem%state%Q(:,:,:,q) = elem%state%Qdp(:,:,:,q,np1_qdp)/elem%state%dp3d(:,:,:,np1)
-   enddo
+   ! need to check Zhun
    
+! Qdp(np1) was updated by forcing - update Q(np1)
+   do q=1,qsize
+      where (elem%state%dp3d(:,:,:,np1) /= 0.)
+        elem%state%Q(:,:,:,q) = elem%state%Qdp(:,:,:,q,np1_qdp)/elem%state%dp3d(:,:,:,np1)
+      elsewhere
+        elem%state%Q(:,:,:,q) = 0.
+      end where
+   enddo
 
 #ifdef MODEL_THETA_L
    if (use_moisture) then

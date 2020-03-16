@@ -1156,7 +1156,7 @@ elemental subroutine accrete_cloud_water_rain(microp_uniform, qric, qcic, &
   if (.not. microp_uniform) then
      pra_coef = accre_enhan * var_coef(relvar, 1.15_r8)
   else
-     pra_coef = 1._r8
+     pra_coef = 4._r8
   end if
 
   if (qric >= qsmall .and. qcic >= qsmall) then

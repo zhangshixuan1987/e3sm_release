@@ -368,7 +368,7 @@ subroutine phys_inidat( cam_out, pbuf2d )
     logical :: found=.false., found2=.false.
     integer :: ierr
     character(len=8) :: dim1name, dim2name
-    integer :: ixcldice, ixcldliq
+    integer :: ixcldice, ixcldliq, ixrain
     integer                   :: grid_id  ! grid ID for data mapping
     nullify(tptr,tptr3d,tptr3d_2,cldptr,convptr_3d)
 
@@ -557,6 +557,8 @@ subroutine phys_inidat( cam_out, pbuf2d )
           allocate(tptr3d_2(pcols,pver,begchunk:endchunk))     
           call cnst_get_ind('CLDICE', ixcldice)
           call cnst_get_ind('CLDLIQ', ixcldliq)
+          call cnst_get_ind('RAINQM', ixrain)
+
           call infld('CLDICE',fh_ini,dim1name, 'lev', dim2name, 1, pcols, 1, pver, begchunk, endchunk, &
                tptr3d, found, gridname='physgrid')
           call infld('CLDLIQ',fh_ini,dim1name, 'lev', dim2name, 1, pcols, 1, pver, begchunk, endchunk, &
@@ -1425,6 +1427,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     use unicon_cam,         only: unicon_cam_org_diags
     use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
+    use cam_logfile,     only: iulog
 
     implicit none
 
@@ -1458,7 +1461,7 @@ subroutine tphysac (ztodt,   cam_in,  &
     integer :: ncol                                 ! number of atmospheric columns
     integer i,k,m                 ! Longitude, level indices
     integer :: yr, mon, day, tod       ! components of a date
-    integer :: ixcldice, ixcldliq      ! constituent indices for cloud liquid and ice water.
+    integer :: ixcldice, ixcldliq,ixrain      ! constituent indices 
 
     logical :: labort                            ! abort flag
 
@@ -2009,7 +2012,7 @@ subroutine tphysbc (ztodt,               &
     integer ierr
 
     integer  i,k,m,ihist                       ! Longitude, level, constituent indices
-    integer :: ixcldice, ixcldliq,ixq              ! constituent indices for cloud liquid and ice water.
+    integer :: ixcldice, ixcldliq,ixq,ixrain   ! constituent indices for cloud liquid and ice water.
     ! for macro/micro co-substepping
     integer :: macmic_it                       ! iteration variables
     real(r8) :: cld_macmic_ztodt               ! modified timestep
@@ -2117,6 +2120,11 @@ subroutine tphysbc (ztodt,               &
     real(r8), pointer, dimension(:) :: static_ener_ac_2d ! Vertically integrated static energy
     real(r8), pointer, dimension(:) :: water_vap_ac_2d   ! Vertically integrated water vapor
     real(r8) :: CIDiff(pcols)            ! Difference in vertically integrated static energy
+    real(r8) :: tmp1 
+    real(r8) ::tmp2
+    real(r8) ::tmp3
+    real(r8) ::tmp4
+
 
     !HuiWan (2014/15): added for a short-term time step convergence test ++ 
     logical :: l_bc_energy_fix
@@ -2242,6 +2250,7 @@ subroutine tphysbc (ztodt,               &
     !
     call cnst_get_ind('CLDLIQ', ixcldliq)
     call cnst_get_ind('CLDICE', ixcldice)
+    call cnst_get_ind('RAINQM', ixrain)
     call cnst_get_ind('Q', ixq)
 
 !!== KZ_WCON

@@ -452,10 +452,10 @@ module advance_helper_module
     ! Constant Parameters
     real( kind = core_rknd ), parameter :: &
       Richardson_num_divisor_threshold = 1.0e-6_core_rknd, &
-      Richardson_num_min = one_fourth, &
+      Richardson_num_min = 100._core_rknd, &
       Richardson_num_max = 400._core_rknd,       &
-      Cx_min            = one_third,   &
-      Cx_max            = 0.95_core_rknd,         &
+      Cx_min            = 0.95_core_rknd,& !one_third,   &
+      Cx_max            = 0.4_core_rknd,         &
       Cx_fnc_Richardson_below_ground_value = one
 
     logical, parameter :: &
@@ -551,7 +551,7 @@ module advance_helper_module
       if ( l_stats_samp ) &
         call stat_update_var( ishear_sqd, shear_sqd, stats_zm )
     else
-      Richardson_num = brunt_vaisala_freq_sqd * invrs_num_div_thresh
+      Richardson_num = brunt_vaisala_freq_sqd_mixed * invrs_num_div_thresh
     end if
 
     if ( l_Richardson_vert_avg ) then

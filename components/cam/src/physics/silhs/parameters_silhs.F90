@@ -72,7 +72,7 @@ module parameters_silhs
   real( kind = core_rknd ), public :: &
     importance_prob_thresh = 1.0e-8_core_rknd, & ! Minimum PDF probability of category for
                                                  ! importance sampling
-    vert_decorr_coef       = 0.03_core_rknd      ! Empirically defined de-correlation constant [-]
+    vert_decorr_coef       = 0.001_core_rknd      ! Empirically defined de-correlation constant [-]
 
   !$omp threadprivate( importance_prob_thresh, vert_decorr_coef )
   

@@ -1223,6 +1223,8 @@ module advance_clubb_core_module
         tau_wpxp_zt  = zm2zt( tau_wpxp_zm )
         tau_wp3_zt   = zm2zt( tau_wp3_zm )
         
+     
+!        write(fstderr,*) "Zhun tau_zt=",tau_zt
 
 !        invrs_tau_N2_zm = invrs_tau_zm  &
 !                          + C_invrs_tau_N2 * sqrt( max( zero_threshold, brunt_vaisala_freq_sqd ) )

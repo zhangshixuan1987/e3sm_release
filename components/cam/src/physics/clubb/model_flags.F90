@@ -422,9 +422,9 @@ module model_flags
     ! Begin code
 
     l_use_precip_frac = .true.
-    l_predict_upwp_vpwp = .true.
-    l_min_wp2_from_corr_wx = .true.
-    l_min_xp2_from_corr_wx = .true.
+    l_predict_upwp_vpwp = .false.
+    l_min_wp2_from_corr_wx = .false.
+    l_min_xp2_from_corr_wx = .false.
     l_C2_cloud_frac = .false.
     l_diffuse_rtm_and_thlm = .false.
     l_stability_correct_Kh_N2_zm = .false.
@@ -449,7 +449,7 @@ module model_flags
     l_damp_wp2_using_em = .true.
     l_do_expldiff_rtm_thlm = .false.
     l_Lscale_plume_centered = .false.
-    l_diag_Lscale_from_tau = .false.
+    l_diag_Lscale_from_tau = .true.
     l_use_ice_latent = .false.
     l_use_C7_Richardson = .true.
     l_use_C11_Richardson = .false.

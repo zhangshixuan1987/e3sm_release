@@ -67,6 +67,9 @@ module precipitation_fraction
         err_code, &                     ! Error Indicator
         clubb_fatal_error               ! Constant
 
+    use grid_class, only:  & ! gr%weights_zm2zt
+        gr    ! Variable Type
+
     implicit none
 
     ! Input Variables
@@ -138,11 +141,19 @@ module precipitation_fraction
        if ( k < nz ) then
           if ( any( l_frozen_hm ) ) then
              ! Ice microphysics included.
-             precip_frac(k) = max( precip_frac(k+1), cloud_frac(k), &
-                                   ice_supersat_frac(k) )
+!             precip_frac(k) = max( precip_frac(k+1), cloud_frac(k), &
+!                                   ice_supersat_frac(k) )
+             precip_frac(k) = max( precip_frac(k+1)*exp(-gr%dzm(k+1)/1000.), & 
+                                    cloud_frac(k), &
+                                    ice_supersat_frac(k) )
+
           else
              ! Warm microphysics.
              precip_frac(k) = max( precip_frac(k+1), cloud_frac(k) )
+             precip_frac(k) = max(precip_frac(k+1)*exp(-gr%dzm(k+1)/1000.), &
+                                    cloud_frac(k), &
+                                    ice_supersat_frac(k) )
+
           endif
        else  ! k = nz
           if ( any( l_frozen_hm ) ) then

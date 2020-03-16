@@ -670,7 +670,7 @@ end subroutine clubb_init_cnst
     integer :: ntop_eddy                        ! Top    interface level to which eddy vertical diffusion is applied ( = 1 )
     integer :: nbot_eddy                        ! Bottom interface level to which eddy vertical diffusion is applied ( = pver )
     integer :: nmodes, nspec, pmam_ncnst, m
-    integer :: ixnumliq
+    integer :: ixnumliq,ixrain,ixnumrain,ixsnow,ixnumsnow
     integer :: lptr
 
 #ifndef SILHS
@@ -733,6 +733,20 @@ end subroutine clubb_init_cnst
           lq(lptr)=.false.
           edsclr_dim = edsclr_dim-1
  
+!       call cnst_get_ind('RAINQM',ixrain)
+!       lq(ixrain) = .false.
+!       edsclr_dim = edsclr_dim-1
+!       call cnst_get_ind('NUMRAI',ixnumrain)
+!       lq(ixnumrain) = .false.
+!       edsclr_dim = edsclr_dim-1
+!       call cnst_get_ind('SNOWQM',ixsnow)
+!       lq(ixrain) = .false.
+!       edsclr_dim = edsclr_dim-1
+!       call cnst_get_ind('NUMSNO',ixnumsnow)
+!       lq(ixnumrain) = .false.
+!       edsclr_dim = edsclr_dim-1
+
+
           call rad_cnst_get_info(0, m, nspec=nspec)
           do l = 1, nspec
              call rad_cnst_get_mam_mmr_idx(m, l, lptr)
@@ -1208,6 +1222,12 @@ end subroutine clubb_init_cnst
                                         sat_mixrat_liq_api
     
    use parameters_tunable,        only: mu
+   use infnan,                    only: inf, assignment(=)
+   use clubb_api_module, only: &    ! Zhun
+       clubb_fatal_error,   & ! Error code value to indicate a fatal error
+       fstderr
+   USE, INTRINSIC :: IEEE_ARITHMETIC
+
 #endif
 
    implicit none
@@ -1581,7 +1601,7 @@ end subroutine clubb_init_cnst
    real(r8) :: umb(pcols), vmb(pcols),up2b(pcols),vp2b(pcols)
    real(r8),parameter :: gust_facl = 1.2_r8 !gust fac for land
    real(r8),parameter :: gust_faco = 0.9_r8 !gust fac for ocean
-   real(r8),parameter :: gust_facc = 1.5_r8 !gust fac for clubb
+   real(r8),parameter :: gust_facc = 1.0_r8 !gust fac for clubb
 
 ! ZM gustiness equation below from Redelsperger et al. (2000)
 ! numbers are coefficients of the empirical equation
@@ -2520,6 +2540,12 @@ end subroutine clubb_init_cnst
               rcm_in_layer_out, cloud_cover_out)                           ! intent(out)
          call t_stopf('advance_clubb_core')
 
+         if ( err_code == clubb_fatal_error ) then
+             write(fstderr,*) "Fatal error in CLUBB: at timestep ", get_nstep(), "LAT: ", state1%lat(i), " LON: ", state1%lon(i)
+             call endrun('clubb_tend_cam:  Fatal error in CLUBB library')
+         end if
+
+
          if (do_rainturb) then
             rvm_in = rtm_in - rcm_inout 
             call update_xp2_mc_api(pverp, dtime, cloud_frac_inout, &
@@ -2726,7 +2752,7 @@ end subroutine clubb_init_cnst
 
       ! Calculate the updated absolute temperature.
       T_after_CLUBB &
-      = thlm(i,:) / inv_exner_clubb(i,:) + ( latvap / cpair ) * rcm(i,:)
+      = thlm(i,:pver) / inv_exner_clubb(i,:pver) + ( latvap / cpair ) * rcm(i,:pver)
 
       ! Calculate the amount of adjustment needed to T in order to achieve
       ! energy conservation.
@@ -2823,6 +2849,12 @@ end subroutine clubb_init_cnst
                    (ixind /= ixwprtp)   .and. (ixind /= ixwp2)    .and.&
                    (ixind /= ixwp3)     .and. (ixind /= ixup2)    .and. (ixind /= ixvp2) ) then
                        ptend_loc%q(i,k,ixind) = (edsclr_out(k,icnt)-state1%q(i,k,ixind))*invrs_hdtime ! transported constituents 
+
+         if (.not. ieee_is_finite(ptend_loc%q(i,k,ixind)) .and. ixind == ixcldice) then
+           ! Try ieee_is_finite ieee_is_nan 
+            write(*,*) "i=",i, "k=",k,edsclr_out(k,icnt)-state1%q(i,k,ixind)
+         end if
+
                end if
             end if
          enddo

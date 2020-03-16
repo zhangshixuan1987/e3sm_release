@@ -9,7 +9,7 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = silhson_sample484_try7 
+set job_name       = LBAbest_level0_run2 
 set compset        = FC5CLBMG2BCL72 
 #set compset        = FAMIPC5 
 set resolution     = ne16_ne16
@@ -27,16 +27,16 @@ setenv init_aero_type none # keep this as none for REPLAY option
 ### SOURCE CODE OPTIONS
 set fetch_code     = false       # flag to toggle cloning source code
 set e3sm_tag       = maint-1.0   # github tag or hash
-set tag_name       = clubb_silhs_v2_tau
+set tag_name       = new_zhun
 
-set clubb_vars_zt_list = "'thlm', 'thvm', 'rtm', 'rcm', 'rvm', 'um', 'vm', 'um_ref','vm_ref','ug', 'vg', 'cloud_frac', 'cloud_cover', 'rcm_in_layer', 'rcm_in_cloud', 'p_in_Pa', 'exner', 'rho_ds_zt', 'thv_ds_zt', 'Lscale', 'Lscale_pert_1', 'Lscale_pert_2', 'T_in_K', 'rel_humidity', 'wp3', 'wpthlp2', 'wp2thlp', 'wprtp2', 'wp2rtp', 'Lscale_up', 'Lscale_down', 'tau_zt', 'Kh_zt', 'wp2thvp', 'wp2rcp', 'wprtpthlp', 'sigma_sqd_w_zt', 'rho', 'radht', 'radht_LW', 'radht_SW', 'Ncm', 'Nc_in_cloud', 'Nc_activated', 'snowslope', 'sed_rcm', 'rsat', 'rsati', 'diam', 'mass_ice_cryst', 'rcm_icedfs', 'u_T_cm', 'rtm_bt', 'rtm_ma', 'rtm_ta', 'rtm_mfl', 'rtm_tacl', 'rtm_cl', 'rtm_forcing', 'rtm_sdmp','rtm_mc', 'rtm_pd', 'rvm_mc', 'rcm_mc', 'rcm_sd_mg_morr', 'thlm_bt', 'thlm_ma', 'thlm_ta', 'thlm_mfl', 'thlm_tacl', 'thlm_cl', 'thlm_forcing', 'thlm_sdmp','thlm_mc', 'thlm_old', 'thlm_without_ta', 'thlm_mfl_min', 'thlm_mfl_max', 'thlm_enter_mfl', 'thlm_exit_mfl', 'rtm_old', 'rtm_without_ta', 'rtm_mfl_min', 'rtm_mfl_max', 'rtm_enter_mfl', 'rtm_exit_mfl', 'um_bt', 'um_ma', 'um_gf', 'um_cf', 'um_ta', 'um_f', 'um_sdmp', 'um_ndg', 'vm_bt', 'vm_ma', 'vm_gf', 'vm_cf', 'vm_ta', 'vm_f', 'vm_sdmp', 'vm_ndg', 'wp3_bt', 'wp3_ma', 'wp3_ta', 'wp3_tp', 'wp3_ac', 'wp3_bp1', 'wp3_bp2', 'wp3_pr1', 'wp3_pr2', 'wp3_dp1', 'wp3_cl', 'mixt_frac', 'w_1', 'w_2', 'varnce_w_1', 'varnce_w_2', 'thl_1', 'thl_2', 'varnce_thl_1', 'varnce_thl_2', 'rt_1', 'rt_2', 'varnce_rt_1', 'varnce_rt_2', 'rc_1', 'rc_2', 'rsatl_1', 'rsatl_2', 'cloud_frac_1', 'cloud_frac_2', 'a3_coef_zt', 'wp3_on_wp2_zt', 'chi_1', 'chi_2', 'stdev_chi_1', 'stdev_chi_2', 'stdev_eta_1', 'stdev_eta_2', 'covar_chi_eta_1', 'covar_chi_eta_2', 'corr_chi_eta_1', 'corr_chi_eta_2', 'corr_rt_thl_1', 'crt_1', 'crt_2', 'cthl_1', 'cthl_2', 'precip_frac', 'precip_frac_1', 'precip_frac_2', 'Ncnm', 'wp2_zt', 'thlp2_zt', 'wpthlp_zt', 'wprtp_zt', 'rtp2_zt', 'rtpthlp_zt', 'up2_zt', 'vp2_zt', 'upwp_zt', 'vpwp_zt', 'C11_Skw_fnc'"
+set clubb_vars_zt_list = "'thlm', 'thvm', 'rtm', 'rcm', 'rvm', 'um', 'vm', 'um_ref','vm_ref','ug', 'vg', 'cloud_frac', 'cloud_cover', 'rcm_in_layer', 'rcm_in_cloud', 'p_in_Pa', 'exner', 'rho_ds_zt', 'thv_ds_zt', 'Lscale', 'Lscale_pert_1', 'Lscale_pert_2', 'T_in_K', 'rel_humidity', 'wp3', 'wpthlp2', 'wp2thlp', 'wprtp2','wp2rtp', 'Lscale_up', 'Lscale_down', 'Kh_zt', 'wp2thvp', 'wp2rcp', 'wprtpthlp', 'sigma_sqd_w_zt', 'rho', 'radht', 'radht_LW', 'radht_SW', 'Ncm', 'Nc_in_cloud', 'Nc_activated', 'snowslope', 'sed_rcm', 'rsat', 'rsati', 'diam', 'mass_ice_cryst', 'rcm_icedfs', 'u_T_cm', 'rtm_bt', 'rtm_ma', 'rtm_ta', 'rtm_mfl', 'rtm_tacl', 'rtm_cl', 'rtm_forcing', 'rtm_sdmp','rtm_mc', 'rtm_pd', 'rvm_mc', 'rcm_mc', 'rcm_sd_mg_morr', 'thlm_bt', 'thlm_ma', 'thlm_ta', 'thlm_mfl', 'thlm_tacl', 'thlm_cl', 'thlm_forcing', 'thlm_sdmp','thlm_mc', 'thlm_old', 'thlm_without_ta', 'thlm_mfl_min', 'thlm_mfl_max', 'thlm_enter_mfl', 'thlm_exit_mfl', 'rtm_old', 'rtm_without_ta', 'rtm_mfl_min', 'rtm_mfl_max', 'rtm_enter_mfl', 'rtm_exit_mfl', 'um_bt', 'um_ma', 'um_gf', 'um_cf', 'um_ta', 'um_f', 'um_sdmp', 'um_ndg', 'vm_bt', 'vm_ma', 'vm_gf', 'vm_cf', 'vm_ta', 'vm_f', 'vm_sdmp', 'vm_ndg', 'wp3_bt', 'wp3_ma', 'wp3_ta', 'wp3_tp', 'wp3_ac', 'wp3_bp1', 'wp3_bp2', 'wp3_pr1', 'wp3_pr2', 'wp3_dp1', 'wp3_cl', 'mixt_frac', 'w_1', 'w_2', 'varnce_w_1', 'varnce_w_2', 'thl_1', 'thl_2', 'varnce_thl_1', 'varnce_thl_2', 'rt_1', 'rt_2', 'varnce_rt_1', 'varnce_rt_2', 'rc_1', 'rc_2', 'rsatl_1', 'rsatl_2', 'cloud_frac_1', 'cloud_frac_2', 'a3_coef_zt', 'wp3_on_wp2_zt', 'chi_1', 'chi_2', 'stdev_chi_1', 'stdev_chi_2', 'stdev_eta_1', 'stdev_eta_2', 'covar_chi_eta_1', 'covar_chi_eta_2', 'corr_chi_eta_1', 'corr_chi_eta_2', 'corr_rt_thl_1', 'crt_1', 'crt_2', 'cthl_1', 'cthl_2', 'precip_frac', 'precip_frac_1', 'precip_frac_2', 'Ncnm', 'wp2_zt', 'thlp2_zt', 'wpthlp_zt', 'wprtp_zt', 'rtp2_zt', 'rtpthlp_zt', 'up2_zt', 'vp2_zt', 'upwp_zt', 'vpwp_zt', 'C11_Skw_fnc'"
 set clubb_vars_zm_list = "'wp2', 'rtp2', 'thlp2', 'rtpthlp', 'wprtp', 'wpthlp', 'wp4', 'up2', 'vp2', 'wpthvp', 'rtpthvp', 'thlpthvp', 'tau_zm', 'Kh_zm', 'wprcp', 'wm_zm', 'thlprcp', 'rtprcp', 'rcp2', 'upwp', 'vpwp', 'rho_zm', 'sigma_sqd_w', 'Skw_velocity', 'gamma_Skw_fnc', 'C6rt_Skw_fnc', 'C6thl_Skw_fnc', 'C7_Skw_fnc', 'C1_Skw_fnc', 'a3_coef', 'wp3_on_wp2', 'rcm_zm', 'rtm_zm', 'thlm_zm', 'cloud_frac_zm', 'rho_ds_zm', 'thv_ds_zm', 'em', 'mean_w_up', 'mean_w_down', 'shear', 'wp3_zm', 'Frad', 'Frad_LW', 'Frad_SW', 'Frad_LW_up', 'Frad_SW_up', 'Frad_LW_down', 'Frad_SW_down', 'Fprec', 'Fcsed', 'wp2_bt', 'wp2_ma', 'wp2_ta', 'wp2_ac', 'wp2_bp', 'wp2_pr1', 'wp2_pr2', 'wp2_pr3', 'wp2_dp1', 'wp2_dp2', 'wp2_cl', 'wp2_pd', 'wp2_sf', 'vp2_bt', 'vp2_ma', 'vp2_ta', 'vp2_tp', 'vp2_dp1', 'vp2_dp2', 'vp2_pr1', 'vp2_pr2', 'vp2_cl', 'vp2_pd', 'vp2_sf', 'up2_bt', 'up2_ma', 'up2_ta', 'up2_tp', 'up2_dp1', 'up2_dp2', 'up2_pr1', 'up2_pr2', 'up2_cl', 'up2_pd', 'up2_sf', 'wprtp_bt', 'wprtp_ma', 'wprtp_ta', 'wprtp_tp', 'wprtp_ac', 'wprtp_bp', 'wprtp_pr1', 'wprtp_pr2', 'wprtp_pr3', 'wprtp_dp1', 'wprtp_mfl', 'wprtp_cl', 'wprtp_sicl', 'wprtp_pd', 'wprtp_forcing', 'wprtp_mc', 'wpthlp_bt', 'wpthlp_ma', 'wpthlp_ta', 'wpthlp_tp', 'wpthlp_ac', 'wpthlp_bp', 'wpthlp_pr1', 'wpthlp_pr2', 'wpthlp_pr3', 'wpthlp_dp1', 'wpthlp_mfl', 'wpthlp_cl', 'wpthlp_sicl', 'wpthlp_forcing', 'wpthlp_mc', 'rtp2_bt', 'rtp2_ma', 'rtp2_ta', 'rtp2_tp', 'rtp2_dp1', 'rtp2_dp2', 'rtp2_cl', 'rtp2_pd', 'rtp2_sf', 'rtp2_forcing', 'rtp2_mc', 'thlp2_bt', 'thlp2_ma', 'thlp2_ta', 'thlp2_tp', 'thlp2_dp1', 'thlp2_dp2', 'thlp2_cl', 'thlp2_pd', 'thlp2_sf', 'thlp2_forcing', 'thlp2_mc', 'rtpthlp_bt', 'rtpthlp_ma', 'rtpthlp_ta', 'rtpthlp_tp1', 'rtpthlp_tp2', 'rtpthlp_dp1', 'rtpthlp_dp2', 'rtpthlp_cl', 'rtpthlp_sf', 'rtpthlp_forcing', 'rtpthlp_mc', 'wpthlp_entermfl', 'wpthlp_exit_mfl', 'wprtp_enter_mfl', 'wprtp_exit_mfl', 'wpthlp_mfl_min', 'wpthlp_mfl_max', 'wprtp_mfl_min', 'wprtp_mfl_max', 'Richardson_num', 'shear_sqd'"
 
 ### CUSTOM CASE_NAME
 set case_name = ${machine}.${tag_name}.${job_name}.${resolution}
 
 ### BUILD OPTIONS
-set debug_compile  = false
+set debug_compile  = False
 set old_executable = false
 
 ### AUTOMATIC DELETION OPTIONS
@@ -46,7 +46,7 @@ set seconds_before_delete_bld_dir    = -1
 set seconds_before_delete_run_dir    = -1
 
 ### SUBMIT OPTIONS
-set submit_run       = true
+set submit_run       = True
 set debug_queue      = False
 
 ### PROCESSOR CONFIGURATION
@@ -67,7 +67,7 @@ set restart_files_dir = none
 set stop_units                  = nmonths
 set stop_num                    = 14
 set restart_units               = $stop_units
-set restart_num                 = $stop_num
+set restart_num                 = 5 # $stop_num
 set num_resubmits               = 0
 set do_short_term_archiving     = false
 
@@ -438,6 +438,15 @@ endif
 
 set case_scripts_dir = ${e3sm_simulations_dir}/${case_name}/case_scripts
 
+cd $code_root_dir/$tag_name 
+set DATE = `date +%F | sed 's/-//g'``date +%T | sed 's/://g'`
+git diff  components/ > diff.$job_name.$DATE.asc
+git diff  *.csh > diff_script.$job_name.$DATE.asc
+git log > log.$job_name.$DATE.asc
+cd components/clm/src/external_models/mpp
+git diff  > $code_root_dir/$tag_name/diff_clm.$job_name.$DATE.asc
+cd $code_root_dir/$tag_name
+
 if ( -d $case_scripts_dir ) then
   if ( ${seconds_before_delete_case_dir} >= 0 ) then
     set num_seconds_until_delete = $seconds_before_delete_case_dir
@@ -714,6 +723,13 @@ set script_provenance_dir  = $case_scripts_dir/run_script_provenance
 set script_provenance_name = $this_script_name.`date +%F_%T_%Z`
 mkdir -p $script_provenance_dir
 cp -f $this_script_path $script_provenance_dir/$script_provenance_name
+mv $code_root_dir/$tag_name/diff.$job_name.$DATE.asc $case_run_dir/.
+mv $code_root_dir/$tag_name/diff_script.$job_name.$DATE.asc $case_run_dir/.
+mv $code_root_dir/$tag_name/diff_clm.$job_name.$DATE.asc $case_run_dir/.
+mv $code_root_dir/$tag_name/log.$job_name.$DATE.asc $case_run_dir/.
+
+
+
 
 #=============================================
 # CUSTOMIZE PROCESSOR CONFIGURATION
@@ -887,7 +903,9 @@ endif
 
  set  CAM_CONFIG_OPTS="-dyn se -phys cam5 "
 
-$xmlchange_exe --id CAM_CONFIG_OPTS --append --val="-nadv 40  -clubb_sgs -rad rrtmg -chem linoz_mam4_resus_mom_soag -rain_evap_to_coarse_aero -bc_dep_to_snow_updates -microphys mg$MGVER  -psubcols $NUMSC -cppdefs '-DUWM_MISC -DSILHS'"
+#$xmlchange_exe --id CAM_CONFIG_OPTS --append --val="-nadv 40  -clubb_sgs -rad rrtmg -chem linoz_mam4_resus_mom_soag -rain_evap_to_coarse_aero -bc_dep_to_snow_updates -microphys mg$MGVER  -psubcols $NUMSC -cppdefs '-DUWM_MISC -DSILHS'"
+
+$xmlchange_exe --id CAM_CONFIG_OPTS --append --val="-nadv 40  -clubb_sgs -rad rrtmg -chem linoz_mam4_resus_mom_soag -rain_evap_to_coarse_aero -microphys mg$MGVER  -psubcols $NUMSC -cppdefs '-DUWM_MISC -DSILHS'"
 
 #===========================
 # SET THE PARTITION OF NODES
@@ -1032,7 +1050,8 @@ EOF
 
 cat <<EOF >> user_nl_cam 
 
-clubb_do_icesuper = .false.
+state_debug_checks=.true.
+ice_supersat = .true.
 
 ! clubb_beta             = 2     ! 1.1160
 ! clubb_c1               = 2     ! 4.58330
@@ -1053,18 +1072,18 @@ clubb_do_icesuper = .false.
 ! clubb_c_invrs_tau_bkgnd                = 1.1  ! 1.38
 ! clubb_c_invrs_tau_n2                   = .1   ! 0.07
 ! clubb_c_invrs_tau_n2_clear_wp3         = 1.   ! 1.1
-! clubb_c_invrs_tau_n2_wp2               = .6   ! 0.37
+! clubb_c_invrs_tau_n2_wp2               = .4   ! 0.37
 ! clubb_c_invrs_tau_n2_wpxp              = 1.   ! 1.4
 ! clubb_c_invrs_tau_n2_xp2               = 1.   ! 0.02
-! clubb_c_invrs_tau_sfc          = .07          ! 0.2
-! clubb_c_invrs_tau_shear                = .002 ! 0.04
+! clubb_c_invrs_tau_sfc          = .2           ! 0.2
+! clubb_c_invrs_tau_shear                = .03  ! 0.04
 ! clubb_c_k10            = 0.3                  ! 0.14
 ! clubb_c_k2             = 0.2                  ! 0.1
 ! clubb_c_wp2_splat              = .7           ! 1.6
 ! clubb_gamma_coef               = .3           ! 0.57
 ! clubb_gamma_coefb              = .3
 ! clubb_nu2              = 1
-! clubb_wpxp_l_thresh            = 60.0D0
+! clubb_wpxp_l_thresh            = 100.0D0
 
 ! clubb_beta             = 1.
 ! clubb_c1               = 2.
@@ -1098,37 +1117,45 @@ clubb_do_icesuper = .false.
  clubb_c11              = .5
  clubb_c11b             = .5
  clubb_c11c             = 0.85
- clubb_c14              = 2
+ clubb_c14              = 2.
  clubb_c15              = 0
- clubb_c1b              = 2
+ clubb_c1b              = 2.
  clubb_c1c              = 0.75
- clubb_c2rt             = 1.6
- clubb_c2rtthl          = 1.6
- clubb_c2thl            = 1.6
+ clubb_c2rt             = 1.5
+ clubb_c2rtthl          = 1.5
+ clubb_c2thl            = 1.5
  clubb_c4               = 2
- clubb_c5               = 0.4
- clubb_c6rt             = 2.
- clubb_c6rtb            = 2.
+ clubb_c5               = 0
+ clubb_c6rt             = 2
+ clubb_c6rtb            = 2
  clubb_c6rtc            = 0.50
- clubb_c6thlb           = 2.
+ clubb_c6thlb           = 2
  clubb_c6thlc           = 0.50
+ clubb_c7               = 0.7
+ clubb_c7b              = 0.7
  clubb_c8               = 1.
+
  clubb_c_invrs_tau_bkgnd                = 1.1
  clubb_c_invrs_tau_n2           = 0.4
- clubb_c_invrs_tau_n2_clear_wp3         = 0.1
+ clubb_c_invrs_tau_n2_clear_wp3         = 1
  clubb_c_invrs_tau_n2_wp2               = 0.1
- clubb_c_invrs_tau_n2_wpxp              = 1.0
+ clubb_c_invrs_tau_n2_wpxp              = 1
  clubb_c_invrs_tau_n2_xp2               = 0.03
  clubb_c_invrs_tau_sfc          = 0.2
  clubb_c_invrs_tau_shear                = 0.03
+
+ clubb_c_k1             = 2
  clubb_c_k10            = 0.3
  clubb_c_k2             = 0.1
- clubb_c_wp2_splat              = 1.
+ clubb_c_k8             = 10
+ clubb_c_wp2_splat              = 0.
  clubb_gamma_coef               = 0.3
  clubb_gamma_coefb              = 0.3
  clubb_gamma_coefc              = 1.2
  clubb_mu               = 0.0005
+ clubb_nu1              = 60
  clubb_nu2              = 1
+ clubb_nu8              = 60
  clubb_wpxp_l_thresh            = 100.0D0
 
 
@@ -1159,7 +1186,10 @@ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
 'MPDICE:A','INEGCLPTEND', 'LNEGCLPTEND', 'VNEGCLPTEND',
 'QCRAT:A', 'QVHFTEN', 'QCHFTEN', 'QRHFTEN', 'QIHFTEN', 'QSHFTEN', 'THFTEN',
 'SL', 'Q', 'RHW', 'QRS', 'QRL', 'HR', 'FDL', 'SILHS_CLUBB_PRECIP_FRAC',
-'SILHS_CLUBB_ICE_SS_FRAC', 'T_ADJ_CLUBB'
+'SILHS_CLUBB_ICE_SS_FRAC', 'T_ADJ_CLUBB','VMAGGUST','VMAGDP','VMAGCL',
+'QCSEVAP', 'QISEVAP', 'QVRES', 'CMEIOUT', 'VTRMC', 'VTRMI', 'QCSEDTEN','QISEDTEN',
+'PRAO',  'PRCO',  'MNUCCCO', 'MNUCCTO', 'MNUCCDO', 'MNUCCDOhet','MSACWIO', 'PSACWSO',
+'BERGSO','BERGO', 'MELTO','HOMOO','QCRESO','PRCIO', 'PRAIO', 'QIRESO','MNUCCRO','PRACSO','MELTSDT','FRZRDT' 
 
 macrop_scheme = 'CLUBB_SGS'
 eddy_scheme = 'CLUBB_SGS'
@@ -1170,7 +1200,7 @@ clubb_expldiff = .false.
 clubb_rainevap_turb = .false.
 clubb_cloudtop_cooling = .false.
 
-clubb_use_sgv = .true.
+clubb_use_sgv = .false.
 
  ncdata         = '/home/ccsm-data/inputdata/atm/cam/inic/homme/cami_mam3_Linoz_ne16np4_L72_c160614.nc'
 
@@ -1181,8 +1211,8 @@ clubb_use_sgv = .true.
  micro_mg_version = 2
  micro_mg_sub_version = 0
  micro_mg_num_steps = 1
- micro_mg_dcs = 195e-6
- micro_mg_berg_eff_factor =0.7D0
+ micro_mg_dcs = 400e-6 !
+ micro_mg_berg_eff_factor =2.0D0
  cldfrc2m_rhmini = 0.8
  cldfrc2m_rhmaxi = 1.05
 
@@ -1206,9 +1236,14 @@ clubb_use_sgv = .true.
   mam_amicphys_optaa             = 1
   micro_mg_accre_enhan_fac               = 1.75D0
   n_so4_monolayers_pcage         = 8.0D0 
-  prc_coef1              = 30500.0D0
-  prc_exp                = 3.19D0
-  prc_exp1               = -1.40D0
+!  prc_coef1 = 1350.0D0
+!  prc_exp = 2.45 !2.47D0
+!  prc_exp1 = -1.4!-1.79D0
+prc_coef1 = 30500.0D0
+prc_exp =  3!.19D0
+prc_exp1 = -1.2D0
+
+
   radiation_scheme               = 'rrtmg'                                                              
   regen_fix              = .true.
   resus_fix              = .true.
@@ -1224,12 +1259,13 @@ clubb_use_sgv = .true.
   so4_sz_thresh_icenuc           = 0.080e-6
   use_preexisting_ice            = .false.
   taubgnd                = 2.5D-3
-  ice_sed_ai= 2000.0
+  ice_sed_ai= 1200.0
+
   effgw_beres            =         0.4
   effgw_oro              =           0.25
   dust_emis_fact         =      2.8D0
   clubb_use_sgv          = .true. 
-  micro_mg_dcs_tdep              = .true.
+  micro_mg_dcs_tdep              = .false.
   mam_mom_mixing_state           = 3
   se_ftype               = 2
   use_rad_dt_cosz                = .true.

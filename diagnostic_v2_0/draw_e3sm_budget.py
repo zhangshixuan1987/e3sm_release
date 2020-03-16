@@ -58,7 +58,7 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
 
          wks= Ngl.open_wks(ptype,plotname)
 
-         Ngl.define_colormap(wks,"radar_1")
+         Ngl.define_colormap(wks,"radar")
          plot = []
          res     = Ngl.Resources()  
          res.nglDraw              = False
@@ -77,11 +77,11 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
          res.tmXBLabelFontThicknessF = 1.0
          res.xyMarkLineMode      = "MarkLines"
          res.xyLineThicknesses = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0,2.,2.,2.,2.,2,2,2,2,2,2,2]
-         res.xyLineColors      = np.arange(2,25,2)
+         res.xyLineColors      = np.arange(2,16,2)
          res.xyDashPatterns    = np.arange(0,24,1)
          res.xyMarkers         = np.arange(16,40,1)
          res.xyMarkerSizeF       = 0.005
-         res.xyMarkerColors      = np.arange(2,25,2)
+         res.xyMarkerColors      = np.arange(2,16,2)
          res.pmLegendDisplayMode    = "ALWAYS"
          res.pmLegendSide           = "top"                 # Change location of
          res.pmLegendParallelPosF   = 0.6                  # move units right

@@ -775,6 +775,11 @@ subroutine micro_mg_tend ( &
   real(r8) :: fnr(nlev)
   real(r8) :: fs(nlev)
   real(r8) :: fns(nlev)
+  real(r8) :: frmax
+  real(r8) :: fnrmax
+  real(r8) :: fsmax
+  real(r8) :: fnsmax
+
 
   real(r8) :: faloutc(nlev)
   real(r8) :: faloutnc(nlev)
@@ -1421,6 +1426,9 @@ subroutine micro_mg_tend ( &
         unr(:,k) = 0._r8
      end where
 
+!        umr(:,k) = umr(:,k) *5
+!        unr(:,k) = unr(:,k) *0.2
+
      !......................................................................
      ! snow
 
@@ -1438,6 +1446,9 @@ subroutine micro_mg_tend ( &
         ums(:,k) = 0._r8
         uns(:,k) = 0._r8
      end where
+!        ums(:,k) = ums(:,k) *5.
+!        uns(:,k) = uns(:,k) *0.2
+
 
      if (do_cldice) then
         if (.not. use_hetfrz_classnuc) then
@@ -2156,8 +2167,15 @@ subroutine micro_mg_tend ( &
            unr(i,k) = min(arn(i,k)*gamma_br_plus1/lamr(i,k)**br,9.1_r8*rhof(i,k))
            umr(i,k) = min(arn(i,k)*gamma_br_plus4/(6._r8*lamr(i,k)**br),9.1_r8*rhof(i,k))
 
+!           umr(i,k) = umr(i,k)*0.5 
+!           unr(i,k) = unr(i,k)*0.5
+
            fr(k) = g*rho(i,k)*umr(i,k)
            fnr(k) = g*rho(i,k)*unr(i,k)
+
+            ! write(iulog,*) "lamr>qsmall"
+            ! write(iulog,*) "fr(pver)", fr(nlev),"umr",umr(i,nlev)
+            ! write(iulog,*) "fr(1)", fr(1),"umr",umr(i,1)
 
         else
            fr(k)=0._r8
@@ -2174,6 +2192,9 @@ subroutine micro_mg_tend ( &
            ! 'final' values of number and mass weighted mean fallspeed for snow (m/s)
            ums(i,k) = min(asn(i,k)*gamma_bs_plus4/(6._r8*lams(i,k)**bs),1.2_r8*rhof(i,k))
            uns(i,k) = min(asn(i,k)*gamma_bs_plus1/lams(i,k)**bs,1.2_r8*rhof(i,k))
+
+!           ums(i,k) = ums(i,k)*0.5
+!           uns(i,k) = uns(i,k)*0.5
 
            fs(k) = g*rho(i,k)*ums(i,k)
            fns(k) = g*rho(i,k)*uns(i,k)
@@ -2365,6 +2386,9 @@ subroutine micro_mg_tend ( &
           maxval(fnr/pdel(i,:))) &
           * deltat)
 
+     frmax = maxval( fr)
+     fnrmax= maxval( fnr) 
+
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
      do n = 1,nstep
@@ -2402,6 +2426,27 @@ subroutine micro_mg_tend ( &
            dumr(i,k) = dumr(i,k)-faltndr*deltat/real(nstep)
            dumnr(i,k) = dumnr(i,k)-faltndnr*deltat/real(nstep)
 
+! Zhun copys down  
+        call size_dist_param_basic(mg_rain_props, dumr(i,k), dumnr(i,k), &
+             lamr(i,k))
+
+        if (lamr(i,k).ge.qsmall) then
+
+          ! 'final' values of number and mass weighted mean fallspeed for rain
+          ! (m/s)
+
+           unr(i,k) = min(arn(i,k)*gamma_br_plus1/lamr(i,k)**br,9.1_r8*rhof(i,k))
+           umr(i,k) = min(arn(i,k)*gamma_br_plus4/(6._r8*lamr(i,k)**br),9.1_r8*rhof(i,k))
+
+           fr(k) = g*rho(i,k)*umr(i,k)
+           fnr(k) = g*rho(i,k)*unr(i,k)
+        else
+           fr(k)=0._r8
+           fnr(k)=0._r8
+        end if
+        fr(k) = min(fr(k),frmax)
+        fnr(k) = min(fnr(k),fnrmax)
+
         end do
 
         ! Rain Flux
@@ -2420,6 +2465,9 @@ subroutine micro_mg_tend ( &
           maxval( fs/pdel(i,:)), &
           maxval(fns/pdel(i,:))) &
           * deltat)
+
+     fsmax = maxval( fs)
+     fnsmax= maxval( fns)
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
@@ -2457,6 +2505,28 @@ subroutine micro_mg_tend ( &
 
            dums(i,k) = dums(i,k)-faltnds*deltat/real(nstep)
            dumns(i,k) = dumns(i,k)-faltndns*deltat/real(nstep)
+!
+! Zhun copied down
+           call size_dist_param_basic(mg_snow_props, dums(i,k), dumns(i,k), &
+                lams(i,k))
+
+           if (lams(i,k).ge.qsmall) then
+
+              ! 'final' values of number and mass weighted mean fallspeed for snow
+              ! (m/s)
+              ums(i,k) = min(asn(i,k)*gamma_bs_plus4/(6._r8*lams(i,k)**bs),1.2_r8*rhof(i,k))
+              uns(i,k) = min(asn(i,k)*gamma_bs_plus1/lams(i,k)**bs,1.2_r8*rhof(i,k))
+
+              fs(k) = g*rho(i,k)*ums(i,k)
+              fns(k) = g*rho(i,k)*uns(i,k)
+
+           else
+              fs(k)=0._r8
+              fns(k)=0._r8
+           end if
+
+           fs(k) = min(fs(k),fsmax)
+           fns(k) = min(fns(k),fnsmax)
 
         end do   !! k loop
 

@@ -2484,6 +2484,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    CC_qlst(:ncol,top_lev:pver) = qcten(:ncol,top_lev:pver)/max(0.01_r8,alst_mic(:ncol,top_lev:pver))
 
    ! Net micro_mg_cam condensation rate
+   qme = 0.0_r8 ! Initialize qme to avoid problem when FP trapping is turned on.
    qme(:ncol,top_lev:pver) = cmeliq(:ncol,top_lev:pver) + cmeiout(:ncol,top_lev:pver)
 
    ! For precip, accumulate only total precip in prec_pcw and snow_pcw variables.

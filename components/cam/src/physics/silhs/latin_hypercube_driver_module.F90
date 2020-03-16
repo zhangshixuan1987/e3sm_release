@@ -422,6 +422,19 @@ module latin_hypercube_driver_module
     !$acc end data
     !$acc end data
 
+    ! This code lets precip fall through the cloud not clear sky.
+!    do k=1, nz
+!      if ( pdf_params%ice_supersat_frac_1(k) >= 0.01_core_rknd .or.  &
+!           pdf_params%ice_supersat_frac_2(k) >= 0.01_core_rknd .or.  &
+!           pdf_params%cloud_frac_1(k) >= 0.01_core_rknd .or.   &
+!           pdf_params%cloud_frac_2(k) >= 0.01_core_rknd ) then
+!        do sample=1, num_samples
+!          X_nl_all_levs(k,sample,iiPDF_chi) &
+!                = max( X_nl_all_levs(k,sample,iiPDF_chi), 0.0_core_rknd)
+!        end do
+!      end if
+!    end do
+
     ! Stop the run if an error occurred
     if ( l_error ) then
       stop "Fatal error in generate_silhs_sample"

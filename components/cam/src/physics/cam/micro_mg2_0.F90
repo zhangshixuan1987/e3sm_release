@@ -415,7 +415,14 @@ subroutine micro_mg_tend ( &
      errstring, & ! Below arguments are "optional" (pass null pointers to omit).
      tnd_qsnow,          tnd_nsnow,          re_ice,             &
      prer_evap,                                                      &
-     frzimm,             frzcnt,             frzdep)
+     frzimm,             frzcnt,             frzdep,             & 
+! GZ 2020-03-28
+     nnuccctot,          nnuccttot,          npsacwstot,         &
+     nsubctot,           npratot,            nprc1tot,           &
+     nnuccdtot,          tmpfrztot,          nnudeptot,          &
+     nsacwitot,          nsubitot,           nprcitot,           &
+     npraitot,           nnuccritot)
+! GZ for budget of nitend and nctend
 
   ! Constituent properties.
   use micro_mg_utils, only: &
@@ -589,6 +596,22 @@ subroutine micro_mg_tend ( &
   real(r8), intent(out) :: qcrat(:,:)        ! limiter for qc process rates (1=no limit --> 0. no qc)
 
   real(r8), intent(out) :: prer_evap(:,:)
+! GZ
+  real(r8), intent(out) :: nnuccctot(:,:) 
+  real(r8), intent(out) :: nnuccttot(:,:)
+  real(r8), intent(out) :: npsacwstot(:,:)
+  real(r8), intent(out) :: nsubctot(:,:)  
+  real(r8), intent(out) :: npratot(:,:) 
+  real(r8), intent(out) :: nprc1tot(:,:)
+  real(r8), intent(out) :: nnuccdtot(:,:) 
+  real(r8), intent(out) :: tmpfrztot(:,:) 
+  real(r8), intent(out) :: nnudeptot(:,:) 
+  real(r8), intent(out) :: nsacwitot(:,:) 
+  real(r8), intent(out) :: nsubitot(:,:) 
+  real(r8), intent(out) :: nprcitot(:,:)
+  real(r8), intent(out) :: npraitot(:,:)
+  real(r8), intent(out) :: nnuccritot(:,:)
+! GZ
 
   character(128),   intent(out) :: errstring  ! output status (non-blank for error return)
 
@@ -1993,6 +2016,8 @@ subroutine micro_mg_tend ( &
            nitend(i,k) = nitend(i,k)+ nnuccd(i,k)+ &
                 (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k))*lcldm(i,k)+(nsubi(i,k)-nprci(i,k)- &
                 nprai(i,k))*icldm(i,k)+nnuccri(i,k)*precip_frac(i,k)
+           tmpfrztot(i,k) = tmpfrz*lcldm(i,k)
+
         end if
 
         nstend(i,k) = nstend(i,k)+(nsubs(i,k)+ &
@@ -2011,6 +2036,25 @@ subroutine micro_mg_tend ( &
            nitend(i,k)=max(0._r8,(nimax(i,k)-ni(i,k))/deltat)
         end if
 
+! GZ
+!For  nctend
+        nnuccctot(i,k) = nnuccc(i,k)*lcldm(i,k)    ! 
+        nnuccttot(i,k) = nnucct(i,k)*lcldm(i,k)
+        npsacwstot(i,k) = npsacws(i,k)*lcldm(i,k)
+        nsubctot(i,k)  = nsubc(i,k)*lcldm(i,k)
+        npratot(i,k) = npra(i,k)*lcldm(i,k)
+        nprc1tot(i,k) = nprc1(i,k)*lcldm(i,k)
+! For nitend 
+        nnuccdtot(i,k) = nnuccd(i,k)*lcldm(i,k) 
+        nnudeptot(i,k) = nnudep(i,k)*lcldm(i,k)
+        nsacwitot(i,k) = nsacwi(i,k)*lcldm(i,k)
+
+        nsubitot(i,k) = nsubi(i,k)*icldm(i,k)
+        nprcitot(i,k) = nprci(i,k)*icldm(i,k)
+        npraitot(i,k) = nprai(i,k)*icldm(i,k)
+
+        nnuccritot(i,k) = nnuccri(i,k)*precip_frac(i,k)
+! GZ
      end do
 
      ! End of "administration" loop

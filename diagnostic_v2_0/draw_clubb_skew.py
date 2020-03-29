@@ -55,7 +55,7 @@ def clubb_skw_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      plotskw[ire] = 'CLUBB_skewfunc_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
      wks= Ngl.open_wks(ptype,plotname)
 
-     Ngl.define_colormap(wks,"default")
+     Ngl.define_colormap(wks,"GMT_paired")
      plot = []
      res     = Ngl.Resources()
      res.nglDraw              = False
@@ -72,7 +72,7 @@ def clubb_skw_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      res.tmXBLabelFontThicknessF = 1.0
 #     res.tmXBLabelAngleF = 45
      res.xyMarkLineMode      = "Lines"
-     res.xyLineThicknesses = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0,2.,2.,2.,2.,2,2,2,2,2,2,2]
+     res.xyLineThicknesses = [3.0, 3.0, 3.0, 3.0, 3.0, 3.0,3.,3.,3.,3.,3,3,3,3,3,3,3]
 
      res.xyDashPatterns    = np.arange(0,24,1)
 #     res.xyMarkers         = np.arange(16,40,1)
@@ -160,7 +160,7 @@ def clubb_skw_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
 #         res.trXMinF = min(np.min(A_field[0, :]))
 #         res.trXMaxF = max(np.max(A_field[0, :]))
          res.trYReverse        = True
-         res.xyLineColors      = np.arange(2,20,1)
+         res.xyLineColors      = np.arange(3,20,2)
          res.xyMarkerColors    = np.arange(2,20,2)
          p = Ngl.xy(wks,A_field,lev,res)
          
@@ -177,7 +177,7 @@ def clubb_skw_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
      txres.txFontHeightF = 0.020
      txres.txFont        = _Font
      Ngl.text_ndc(wks,"Skewness Functions at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.92+ncases*0.01,txres)
-     Common_functions.create_legend(wks,casenames,np.arange(2,20,1),0.1,0.89+ncases*0.01)
+     Common_functions.create_legend(wks,casenames,np.arange(3,20,2),0.1,0.89+ncases*0.01)
 
 
      Ngl.panel(wks,plot[:],[nvaris/3,3],pres)

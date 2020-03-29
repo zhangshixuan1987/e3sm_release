@@ -429,8 +429,12 @@ module latin_hypercube_driver_module
 !           pdf_params%cloud_frac_1(k) >= 0.01_core_rknd .or.   &
 !           pdf_params%cloud_frac_2(k) >= 0.01_core_rknd ) then
 !        do sample=1, num_samples
-!          X_nl_all_levs(k,sample,iiPDF_chi) &
-!                = max( X_nl_all_levs(k,sample,iiPDF_chi), 0.0_core_rknd)
+!           if ( X_nl_all_levs(k,sample,iiPDF_chi) .lt. 0.0_core_rknd ) then 
+!                X_nl_all_levs(k,sample,iiPDF_chi) = &
+!                X_nl_all_levs(k,sample,iiPDF_chi) * 0.3_core_rknd 
+!           end if
+!!           X_nl_all_levs(k,sample,iiPDF_chi) &
+!!                = max( X_nl_all_levs(k,sample,iiPDF_chi), 0.0_core_rknd)
 !        end do
 !      end if
 !    end do

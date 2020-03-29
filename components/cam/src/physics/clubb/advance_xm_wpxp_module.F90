@@ -3844,8 +3844,8 @@ module advance_xm_wpxp_module
       if ( clubb_at_least_debug_level( 1 ) ) then
         do k = 1, gr%nz
           if ( xm(k) < zero ) then
-            write(fstderr,*) solve_type_str//" < ", xm_threshold, &
-              " in advance_xm_wpxp_module at k= ", k
+!            write(fstderr,*) solve_type_str//" < ", xm_threshold, &
+!              " in advance_xm_wpxp_module at k= ", k
           end if
         end do
       end if

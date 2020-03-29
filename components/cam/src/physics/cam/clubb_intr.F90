@@ -794,7 +794,7 @@ end subroutine clubb_init_cnst
     ! Set the debug level.  Level 2 has additional computational expense since
     ! it checks the array variables in CLUBB for invalid values.
     ! ----------------------------------------------------------------- !
-    call set_clubb_debug_level_api( 0 )
+    call set_clubb_debug_level_api( 2 )
 
     ! ----------------------------------------------------------------- !
     ! use pbuf_get_fld_idx to get existing physics buffer fields from other
@@ -2707,7 +2707,7 @@ end subroutine clubb_init_cnst
           enddo
 
       enddo 
-     
+
       !  Fill up arrays needed for McICA.  Note we do not want the ghost point,
       !   thus why the second loop is needed.
      
@@ -3028,7 +3028,6 @@ end subroutine clubb_init_cnst
               cloud_frac(:ncol,:pver)*qclvar(:ncol,:pver)-  &
               (1._r8-cloud_frac(:ncol,:pver))*rcm(:ncol,:pver)**2)))
       else
-         
          where (rcm(:ncol,:pver) /= 0 .and. qclvar(:ncol,:pver) /= 0) &
               relvar(:ncol,:pver) = min(relvarmax,max(0.001_r8,rcm(:ncol,:pver)**2/qclvar(:ncol,:pver)))
       endif
@@ -3084,8 +3083,8 @@ end subroutine clubb_init_cnst
    !  FIRST PART COMPUTES THE STRATIFORM CLOUD FRACTION FROM CLUBB CLOUD FRACTION      !
    ! --------------------------------------------------------------------------------- ! 
 
-  ! HW: set alst to alst_o before getting updated
-  if(liqcf_fix) then
+   ! HW: set alst to alst_o before getting updated
+   if(liqcf_fix) then
       if(.not.is_first_step()) alst_o(:ncol,:pver) = alst(:ncol,:pver)
    endif
 

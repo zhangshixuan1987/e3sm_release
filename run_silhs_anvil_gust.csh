@@ -9,7 +9,7 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = LBAbest_level0_run2 
+set job_name       = LBAbest_c11p5
 set compset        = FC5CLBMG2BCL72 
 #set compset        = FAMIPC5 
 set resolution     = ne16_ne16
@@ -907,6 +907,8 @@ endif
 
 $xmlchange_exe --id CAM_CONFIG_OPTS --append --val="-nadv 40  -clubb_sgs -rad rrtmg -chem linoz_mam4_resus_mom_soag -rain_evap_to_coarse_aero -microphys mg$MGVER  -psubcols $NUMSC -cppdefs '-DUWM_MISC -DSILHS'"
 
+#$xmlchange_exe --id CAM_CONFIG_OPTS --append --val="-nadv 40  -clubb_sgs -rad rrtmg -chem linoz_mam4_resus_mom_soag -rain_evap_to_coarse_aero -microphys mg$MGVER  -cppdefs '-DUWM_MISC'"  
+
 #===========================
 # SET THE PARTITION OF NODES
 #===========================
@@ -1052,6 +1054,7 @@ cat <<EOF >> user_nl_cam
 
 state_debug_checks=.true.
 ice_supersat = .true.
+clubb_do_icesuper= .false.
 
 ! clubb_beta             = 2     ! 1.1160
 ! clubb_c1               = 2     ! 4.58330
@@ -1113,23 +1116,23 @@ ice_supersat = .true.
 ! clubb_c_k2             = 0.1
 
  clubb_beta             = 2.
- clubb_c1               = 2.
+ clubb_c1               = 1.5 
  clubb_c11              = .5
  clubb_c11b             = .5
  clubb_c11c             = 0.85
- clubb_c14              = 2.
+ clubb_c14              = 1.5 
  clubb_c15              = 0
- clubb_c1b              = 2.
+ clubb_c1b              = 1.5 
  clubb_c1c              = 0.75
  clubb_c2rt             = 1.5
  clubb_c2rtthl          = 1.5
  clubb_c2thl            = 1.5
  clubb_c4               = 2
  clubb_c5               = 0
- clubb_c6rt             = 2
- clubb_c6rtb            = 2
+ clubb_c6rt             = 2.
+ clubb_c6rtb            = 2.
  clubb_c6rtc            = 0.50
- clubb_c6thlb           = 2
+ clubb_c6thlb           = 2.
  clubb_c6thlc           = 0.50
  clubb_c7               = 0.7
  clubb_c7b              = 0.7
@@ -1189,7 +1192,23 @@ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
 'SILHS_CLUBB_ICE_SS_FRAC', 'T_ADJ_CLUBB','VMAGGUST','VMAGDP','VMAGCL',
 'QCSEVAP', 'QISEVAP', 'QVRES', 'CMEIOUT', 'VTRMC', 'VTRMI', 'QCSEDTEN','QISEDTEN',
 'PRAO',  'PRCO',  'MNUCCCO', 'MNUCCTO', 'MNUCCDO', 'MNUCCDOhet','MSACWIO', 'PSACWSO',
-'BERGSO','BERGO', 'MELTO','HOMOO','QCRESO','PRCIO', 'PRAIO', 'QIRESO','MNUCCRO','PRACSO','MELTSDT','FRZRDT' 
+'BERGSO','BERGO', 'MELTO','HOMOO','QCRESO','PRCIO', 'PRAIO', 'QIRESO','MNUCCRO','PRACSO','MELTSDT','FRZRDT',
+'RELVAR',
+'nnuccco', 
+'nnuccto', 
+'npsacwso',
+'nsubco',
+'nprao', 
+'nprc1o',
+'nnuccdo', 
+'tmpfrzo', 
+'nnudepo', 
+'nsacwio', 
+'nsubio',
+'nprcio',
+'npraio',
+'nnuccrio'
+ 
 
 macrop_scheme = 'CLUBB_SGS'
 eddy_scheme = 'CLUBB_SGS'
@@ -1212,7 +1231,7 @@ clubb_use_sgv = .false.
  micro_mg_sub_version = 0
  micro_mg_num_steps = 1
  micro_mg_dcs = 400e-6 !
- micro_mg_berg_eff_factor =2.0D0
+ micro_mg_berg_eff_factor =1.0D0
  cldfrc2m_rhmini = 0.8
  cldfrc2m_rhmaxi = 1.05
 
@@ -1286,10 +1305,10 @@ prc_exp1 = -1.2D0
   macrop_scheme = 'CLUBB_SGS'
   eddy_scheme = 'CLUBB_SGS'
   shallow_scheme = 'CLUBB_SGS'
-  deep_scheme = 'off'
-  subcol_scheme = 'SILHS'
-  use_subcol_microp = .true.
-  microp_uniform = .true.
+  deep_scheme = 'off'           ! off
+  subcol_scheme = 'SILHS'        ! SILHS
+  use_subcol_microp = .true.  ! true
+  microp_uniform = .true.     ! true
   clubb_do_adv = .false.
   clubb_expldiff = .false.
   clubb_rainevap_turb = .false.

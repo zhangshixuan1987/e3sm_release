@@ -38,13 +38,9 @@ def draw_e3sm_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
  nregions = nsite
 
  varis = [ "DCQ","DCCLDLIQ","DCCLDICE","PTEQ","PTTEND","DTCOND"]
- varisobs = [ "CLOUD", "OMEGA","SHUM","CLWC_ISBL", "THATA","RELHUM"]
  nvaris = len(varis)
- cunits = ["%", "mba/day","g/kg","g/kg","K", "%", "mba/day", "K", "g/kg", "m/s", "m/s","K","m"]
- cscale = [1E8, 1E8, 1E8, 1E8, 1E4, 1E4, 1,1,1E3,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
- chscale = ['1E-8', '1E-8', '1E-8', '1E-8', '1E-4', '1E-4', 1,1,1E3,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
- cscaleobs = [100., 100/86400., 1., 1000, 1., 1., 1, 1,1,1]
- obsdataset =["CCCM", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
+ cscale = [1E8, 1E8, 1E8, 1E8, 1E4, 1E4]
+ chscale = ['1E-8', '1E-8', '1E-8', '1E-8', '1E-4', '1E-4']
 
  plote3smbgt=["" for x in range(nsite*ncases)] 
 

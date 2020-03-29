@@ -932,7 +932,6 @@ elemental subroutine snow_self_aggregation(t, rho, asn, rhosn, qsic, nsic, nsagg
   else
      nsagg=0._r8
   end if
-
 end subroutine snow_self_aggregation
 
 ! accretion of cloud droplets onto snow/graupel
@@ -990,6 +989,7 @@ elemental subroutine accrete_cloud_water_snow(t, rho, asn, uns, mu, qcic, ncic, 
      dum = dc0*dc0*uns*rhow*lams/(9._r8*mu)
      eci = dum*dum/((dum+0.4_r8)*(dum+0.4_r8))
 
+!     eci = 1._r8
      eci = max(eci,0._r8)
      eci = min(eci,1._r8)
 
@@ -1156,7 +1156,7 @@ elemental subroutine accrete_cloud_water_rain(microp_uniform, qric, qcic, &
   if (.not. microp_uniform) then
      pra_coef = accre_enhan * var_coef(relvar, 1.15_r8)
   else
-     pra_coef = 4._r8
+     pra_coef = 2._r8
   end if
 
   if (qric >= qsmall .and. qcic >= qsmall) then

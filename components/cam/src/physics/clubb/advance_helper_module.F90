@@ -576,6 +576,12 @@ module advance_helper_module
 
     ! On some compilers, roundoff error can result in Cx_fnc_Richardson being
     ! slightly outside the range [0,1]. Thus, it is clipped here.
+
+!         Cx_fnc_Richardson = Cx_max + &
+!          ( Cx_fnc_Richardson - Cx_max ) & 
+!          * ( one - 0.5_core_rknd &
+!          * exp( - 0.005_core_rknd * ( gr%zm - 10_core_rknd ) ) )
+
     Cx_fnc_Richardson = max( 0.0_core_rknd, min( 1.0_core_rknd, Cx_fnc_Richardson ) )
 
     ! Stats sampling

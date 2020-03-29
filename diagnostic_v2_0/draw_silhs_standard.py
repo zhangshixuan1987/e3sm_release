@@ -50,7 +50,7 @@ def silhs_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filep
      plotsilhs[ire] = 'CLUBB_standard_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
      wks= Ngl.open_wks(ptype,plotname)
 
-     Ngl.define_colormap(wks,"default")
+     Ngl.define_colormap(wks,"GMT_paired")
      plot = []
      res     = Ngl.Resources()
      res.nglDraw              = False

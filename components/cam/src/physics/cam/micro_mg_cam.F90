@@ -829,6 +829,24 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld ('PRACSO', (/ 'lev' /), 'A', 'kg/kg/s', 'Accretion of rain by snow'                               )
    call addfld ('MELTSDT', (/ 'lev' /), 'A', 'W/kg', 'Latent heating rate due to melting of snow'              )
    call addfld ('FRZRDT', (/ 'lev' /), 'A', 'W/kg', 'Latent heating rate due to homogeneous freezing of rain' )
+! GZ
+   call addfld('nnuccco', (/ 'lev' /), 'A', '1/(kg*s)', 'nnuccc(i,k)*lcldm(i,k)'     )
+   call addfld('nnuccto', (/ 'lev' /), 'A', '1/(kg*s)', 'nnucct(i,k)*lcldm(i,k)'     ) 
+   call addfld('npsacwso',(/ 'lev' /), 'A', '1/(kg*s)', 'npsacws(i,k)*lcldm(i,k)'     )
+   call addfld('nsubco', (/ 'lev' /), 'A',  '1/(kg*s)', 'nsubc(i,k)*lcldm(i,k)'     )
+   call addfld('nprao', (/ 'lev' /), 'A',   '1/(kg*s)', 'npra(i,k)*lcldm(i,k)'     )
+   call addfld('nprc1o', (/ 'lev' /), 'A', '1/(kg*s)', 'nprc1(i,k)*lcldm(i,k)'     )
+   call addfld('nnuccdo',(/ 'lev' /), 'A', '1/(kg*s)', 'nnuccd(i,k)*lcldm(i,k)'     )
+   call addfld('tmpfrzo',(/ 'lev' /), 'A', '1/(kg*s)', 'tmpfrz(i,k)*lcldm(i,k)'     )
+   call addfld('nnudepo',(/ 'lev' /), 'A', '1/(kg*s)', 'nnudep(i,k)*lcldm(i,k)'     )
+   call addfld('nsacwio',(/ 'lev' /), 'A', '1/(kg*s)', 'nsacwi(i,k)*lcldm(i,k)'     )
+   call addfld('nsubio',(/ 'lev' /), 'A', '1/(kg*s)', 'nsubi(i,k)*lcldm(i,k)'     )
+   call addfld('nprcio',(/ 'lev' /), 'A', '1/(kg*s)', 'nprci(i,k)*icldm(i,k)'     )
+   call addfld('npraio',(/ 'lev' /), 'A', '1/(kg*s)', 'nprai(i,k)*icldm(i,k)'     )
+   call addfld('nnuccrio',(/ 'lev' /), 'A', '1/(kg*s)', 'nnuccri(i,k)*precip_frac(i,k)'     )
+! GZ
+
+
    if (micro_mg_version > 1) then
       call addfld ('QRSEDTEN', (/ 'lev' /), 'A', 'kg/kg/s', 'Rain mixing ratio tendency from sedimentation'           )
       call addfld ('QSSEDTEN', (/ 'lev' /), 'A', 'kg/kg/s', 'Snow mixing ratio tendency from sedimentation'           )
@@ -1282,6 +1300,24 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    real(r8), target :: nfice(state%psetcols,pver)
    real(r8), target :: qcrat(state%psetcols,pver)   ! qc limiter ratio (1=no limit)
 
+! GZ
+   real(r8),  target :: nnuccctoto(state%psetcols,pver)
+   real(r8),  target :: nnuccttoto(state%psetcols,pver)
+   real(r8),  target :: npsacwstoto(state%psetcols,pver)
+   real(r8),  target :: nsubctoto(state%psetcols,pver)
+   real(r8),  target :: npratoto(state%psetcols,pver)
+   real(r8),  target :: nprc1toto(state%psetcols,pver)
+   real(r8),  target :: nnuccdtoto(state%psetcols,pver)
+   real(r8),  target :: tmpfrztoto(state%psetcols,pver)
+   real(r8),  target :: nnudeptoto(state%psetcols,pver)
+   real(r8),  target :: nsacwitoto(state%psetcols,pver)
+   real(r8),  target :: nsubitoto(state%psetcols,pver)
+   real(r8),  target :: nprcitoto(state%psetcols,pver)
+   real(r8),  target :: npraitoto(state%psetcols,pver)
+   real(r8),  target :: nnuccritoto(state%psetcols,pver)
+! GZ
+
+
    ! Object that packs columns with clouds/precip.
    type(MGPacker) :: packer
 
@@ -1416,6 +1452,23 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    real(r8), allocatable, target :: packed_mu(:,:)
    real(r8), allocatable, target :: packed_des(:,:)
    real(r8), allocatable, target :: packed_dei(:,:)
+
+! GZ
+   real(r8), allocatable, target :: packed_nnuccctot(:,:)
+   real(r8), allocatable, target :: packed_nnuccttot(:,:)
+   real(r8), allocatable, target :: packed_npsacwstot(:,:)
+   real(r8), allocatable, target :: packed_nsubctot(:,:)
+   real(r8), allocatable, target :: packed_npratot(:,:)
+   real(r8), allocatable, target :: packed_nprc1tot(:,:)
+   real(r8), allocatable, target :: packed_nnuccdtot(:,:)
+   real(r8), allocatable, target :: packed_tmpfrztot(:,:)
+   real(r8), allocatable, target :: packed_nnudeptot(:,:)
+   real(r8), allocatable, target :: packed_nsacwitot(:,:)
+   real(r8), allocatable, target :: packed_nsubitot(:,:)
+   real(r8), allocatable, target :: packed_nprcitot(:,:)
+   real(r8), allocatable, target :: packed_npraitot(:,:)
+   real(r8), allocatable, target :: packed_nnuccritot(:,:)
+! GZ
 
    ! Dummy arrays for cases where we throw away the MG version and
    ! recalculate sizes on the CAM grid to avoid time/subcolumn averaging
@@ -2051,6 +2104,38 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    allocate(packed_nsout(mgncol,nlev))
    call post_proc%add_field(p(nsout), p(packed_nsout))
 
+! GZ
+   allocate(packed_nnuccctot(mgncol,nlev))
+   call post_proc%add_field(p(nnuccctoto), p(packed_nnuccctot))
+   allocate(packed_nnuccttot(mgncol,nlev))
+   call post_proc%add_field(p(nnuccttoto), p(packed_nnuccttot))
+   allocate(packed_npsacwstot(mgncol,nlev))
+   call post_proc%add_field(p(npsacwstoto), p(packed_npsacwstot))
+   allocate(packed_nsubctot(mgncol,nlev))
+   call post_proc%add_field(p(nsubctoto), p(packed_nsubctot))
+   allocate(packed_npratot(mgncol,nlev))
+   call post_proc%add_field(p(npratoto), p(packed_npratot))
+   allocate(packed_nprc1tot(mgncol,nlev))
+   call post_proc%add_field(p(nprc1toto), p(packed_nprc1tot))
+   allocate(packed_nnuccdtot(mgncol,nlev))
+   call post_proc%add_field(p(nnuccdtoto), p(packed_nnuccdtot))
+   allocate(packed_tmpfrztot(mgncol,nlev))
+   call post_proc%add_field(p(tmpfrztoto), p(packed_tmpfrztot))
+   allocate(packed_nnudeptot(mgncol,nlev))
+   call post_proc%add_field(p(nnudeptoto), p(packed_nnudeptot))
+   allocate(packed_nsacwitot(mgncol,nlev))
+   call post_proc%add_field(p(nsacwitoto), p(packed_nsacwitot))
+   allocate(packed_nsubitot(mgncol,nlev))
+   call post_proc%add_field(p(nsubitoto), p(packed_nsubitot))
+   allocate(packed_nprcitot(mgncol,nlev))
+   call post_proc%add_field(p(nprcitoto), p(packed_nprcitot))
+   allocate(packed_npraitot(mgncol,nlev))
+   call post_proc%add_field(p(npraitoto), p(packed_npraitot))
+   allocate(packed_nnuccritot(mgncol,nlev))
+   call post_proc%add_field(p(nnuccritoto), p(packed_nnuccritot))
+! GZ
+
+
    allocate(packed_refl(mgncol,nlev))
    call post_proc%add_field(p(refl), p(packed_refl), fillvalue=-9999._r8)
    allocate(packed_arefl(mgncol,nlev))
@@ -2335,7 +2420,14 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
                  errstring, &
                  packed_tnd_qsnow,packed_tnd_nsnow,packed_re_ice,&
 		 packed_prer_evap,                                     &
-                 packed_frzimm,  packed_frzcnt,  packed_frzdep   )
+                 packed_frzimm,  packed_frzcnt,  packed_frzdep,  &
+! GZ 2020-03-28
+                 packed_nnuccctot,     packed_nnuccttot,   packed_npsacwstot,         &
+                 packed_nsubctot,      packed_npratot,     packed_nprc1tot,           &
+                 packed_nnuccdtot,     packed_tmpfrztot,   packed_nnudeptot,          &
+                 packed_nsacwitot,     packed_nsubitot,    packed_nprcitot,           &
+                 packed_npraitot,      packed_nnuccritot)
+! GZ for budget of nitend and nctend
             call t_stopf('micro_mg_tend2')
          end select
       end select
@@ -3208,6 +3300,22 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    call outfld('MELTSDT',     meltsdt,     psetcols, lchnk, avg_subcol_field=use_subcol_microp)
    call outfld('FRZRDT',      frzrdt ,     psetcols, lchnk, avg_subcol_field=use_subcol_microp)
    call outfld('FICE',        nfice,       psetcols, lchnk, avg_subcol_field=use_subcol_microp)
+! GZ
+   call outfld('nnuccco', nnuccctoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('nnuccto', nnuccttoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('npsacwso', npsacwstoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('nsubco', nsubctoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('nprao', npratoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('nprc1o', nprc1toto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('nnuccdo', nnuccdtoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('tmpfrzo', tmpfrztoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('nnudepo', nnudeptoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('nsacwio', nsacwitoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('nsubio', nsubitoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('nprcio', nprcitoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('npraio', npraitoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
+   call outfld('nnuccrio', nnuccritoto,  psetcols, lchnk, avg_subcol_field=use_subcol_microp)
+! GZ
 
    if (micro_mg_version > 1) then
       call outfld('UMR',      umr,         psetcols, lchnk, avg_subcol_field=use_subcol_microp)

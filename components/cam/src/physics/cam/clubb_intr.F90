@@ -1002,6 +1002,7 @@ end subroutine clubb_init_cnst
 
     call addfld ('ZMDLFI',           (/ 'lev' /),  'A', 'kg/kg/s',  'Detrained ice water from ZM convection')
     call addfld ('DETNLIQTND',       (/ 'lev' /),  'A', '1/kg/s',   'CLDNUM tendency in detrained water')
+    call addfld ('DETNICETND',       (/ 'lev' /),  'A', '1/kg/s',   'CLDNUM tendency in detrained ice')
     call addfld ('RELVARC', (/ 'lev' /),  'A',        '-', 'Relative cloud water variance', flag_xyfill=.true.,fill_value=fillvalue)
     call addfld ('CONCLD', (/ 'lev' /),  'A',        'fraction', 'Convective cloud cover')
     call addfld ('CMELIQ', (/ 'lev' /),  'A',        'kg/kg/s', 'Rate of cond-evap of liq within the cloud')
@@ -1332,6 +1333,7 @@ end subroutine clubb_init_cnst
    real(r8) :: cloud_frac_inout(pverp)          ! CLUBB output of cloud fraction                [fraction]
    real(r8) :: rcm_in_layer_out(pverp)          ! CLUBB output of in-cloud liq. wat. mix. ratio [kg/kg]
    real(r8) :: cloud_cover_out(pverp)           ! CLUBB output of in-cloud cloud fraction       [fraction]
+   real(r8) :: invrs_tau_zm_out(pverp)          ! invrs_tau_zm
    real(r8) :: thlprcp_out(pverp)
    real(r8) :: rho_ds_zm(pverp)                 ! Dry, static density on momentum levels        [kg/m^3]
    real(r8) :: rho_ds_zt(pverp)                 ! Dry, static density on thermodynamic levels   [kg/m^3]
@@ -1434,6 +1436,7 @@ end subroutine clubb_init_cnst
    real(r8) :: edsclr_out(pverp,edsclr_dim)     ! Scalars to be diffused through CLUBB          [units vary]
    real(r8) :: rcm_in_layer(pcols,pverp)        ! CLUBB in-cloud liquid water mixing ratio      [kg/kg]
    real(r8) :: cloud_cover(pcols,pverp)         ! CLUBB in-cloud cloud fraction                 [fraction]
+   real(r8) :: invrs_tau_zm(pcols,pverp)       
    real(r8) :: wprcp(pcols,pverp)               ! CLUBB liquid water flux                       [m/s kg/kg]
    real(r8) :: wpthvp_diag(pcols,pverp)         ! CLUBB buoyancy flux                           [W/m^2]
    real(r8) :: rvm(pcols,pverp)
@@ -1457,6 +1460,7 @@ end subroutine clubb_init_cnst
    real(r8) :: mean_rt
 
    real(r8) :: dlf2(pcols,pver)                 ! Detraining cld H20 from shallow convection    [kg/kg/day]
+   real(r8) :: dlf_tmp(pcols,pver)                 ! Detraining cld H20 fromshallow convection    [kg/kg/day]
    real(r8) :: eps                              ! Rv/Rd                                         [-]
    real(r8) :: dum1                             ! dummy variable                                [units vary]
    real(r8) :: obklen(pcols)                    ! Obukov length                                 [m]
@@ -2318,7 +2322,8 @@ end subroutine clubb_init_cnst
          thlpthvp_inout(k)   = thlpthvp(i,pverp-k+1)
          rcm_inout(k)        = rcm(i,pverp-k+1)
          cloud_frac_inout(k) = cloud_frac(i,pverp-k+1)
- 
+
+
          if (k .ne. 1) then
             pre_in(k)    = prer_evap(i,pverp-k+1)
          endif
@@ -2327,6 +2332,7 @@ end subroutine clubb_init_cnst
          wprcp_out(k)        = 0._r8
          rcm_in_layer_out(k) = 0._r8
          cloud_cover_out(k)  = 0._r8
+         invrs_tau_zm_out(k) = 0._r8
          edsclr_in(k,:)      = 0._r8
          edsclr_out(k,:)     = 0._r8
          khzm_out(k)         = 0._r8
@@ -2537,7 +2543,7 @@ end subroutine clubb_init_cnst
               pdf_implicit_coefs_terms_chnk(i,lchnk), &                    ! intent(inout)
               khzm_out, khzt_out, qclvar_out, thlprcp_out, &               ! intent(out)
               wprcp_out, ice_supersat_frac_out, &                          ! intent(out)
-              rcm_in_layer_out, cloud_cover_out)                           ! intent(out)
+              rcm_in_layer_out, cloud_cover_out, invrs_tau_zm_out)         ! intent(out)
          call t_stopf('advance_clubb_core')
 
          if ( err_code == clubb_fatal_error ) then
@@ -2667,7 +2673,8 @@ end subroutine clubb_init_cnst
           khzm(i,k)         = khzm_out(pverp-k+1)
           khzt(i,k)         = khzt_out(pverp-k+1)
           qclvar(i,k)       = min(1._r8,qclvar_out(pverp-k+1))
-     
+          invrs_tau_zm(i,k) = invrs_tau_zm_out(pverp-k+1)
+
           wm_zt_out(i,k)    = wm_zt(pverp-k+1)
 
           rtp2_zt_out(i,k)  = rtp2_zt(pverp-k+1)
@@ -2916,6 +2923,24 @@ end subroutine clubb_init_cnst
    ! --------------------------------------------------------------------------------- ! 
 
    !  Initialize the shallow convective detrainment rate, will always be zero
+
+! Zhun, detrainment of CLUBB's deep convection
+   if (deep_scheme .eq. 'off') then
+     
+     do k=1,pver
+        do i=1,ncol
+           dlf_tmp(i,k)=(1.0e-2)*rcm(i,k)*  invrs_tau_zm(i,k)
+        enddo
+     enddo
+   else
+     do k=1,pver
+        do i=1,ncol
+           dlf_tmp(i,k)=dlf(i,k)
+        enddo
+     enddo
+   endif
+! Zhun
+
    dlf2(:,:) = 0.0_r8
    dlf_liq_out(:,:) = 0.0_r8
    dlf_ice_out(:,:) = 0.0_r8
@@ -2941,21 +2966,20 @@ end subroutine clubb_init_cnst
             !(clubb_tk1 - clubb_tk2) is also 30.0 but it introduced a non-bfb change
             dum1 = ( clubb_tk1 - state1%t(i,k) ) /(clubb_tk1 - clubb_tk2)
          endif
-        
-         ptend_loc%q(i,k,ixcldliq) = dlf(i,k) * ( 1._r8 - dum1 )
-         ptend_loc%q(i,k,ixcldice) = dlf(i,k) * dum1
-         ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) &
+         ptend_loc%q(i,k,ixcldliq) = dlf_tmp(i,k) * ( 1._r8 - dum1 )
+         ptend_loc%q(i,k,ixcldice) = dlf_tmp(i,k) * dum1
+         ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf_tmp(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) &
                                      / (4._r8*3.14_r8* clubb_liq_deep**3*997._r8) + & ! Deep    Convection
                                      3._r8 * (                         dlf2(i,k)    * ( 1._r8 - dum1 ) ) &
                                      / (4._r8*3.14_r8*clubb_liq_sh**3*997._r8)     ! Shallow Convection 
-         ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf(i,k) - dlf2(i,k) )) *  dum1 ) &
+         ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf_tmp(i,k) - dlf2(i,k) )) *  dum1 ) &
                                      / (4._r8*3.14_r8*clubb_ice_deep**3*500._r8) + & ! Deep    Convection
                                      3._r8 * (                         dlf2(i,k)    *  dum1 ) &
                                      / (4._r8*3.14_r8*clubb_ice_sh**3*500._r8)     ! Shallow Convection
-         ptend_loc%s(i,k)          = dlf(i,k) * dum1 * latice
+         ptend_loc%s(i,k)          = dlf_tmp(i,k) * dum1 * latice
  
-         dlf_liq_out(i,k) = dlf(i,k) * ( 1._r8 - dum1 )
-         dlf_ice_out(i,k) = dlf(i,k) * dum1
+         dlf_liq_out(i,k) = dlf_tmp(i,k) * ( 1._r8 - dum1 )
+         dlf_ice_out(i,k) = dlf_tmp(i,k) * dum1
  
          ! Only rliq is saved from deep convection, which is the reserved liquid.  We need to keep
          !   track of the integrals of ice and static energy that is effected from conversion to ice
@@ -2973,6 +2997,7 @@ end subroutine clubb_init_cnst
    call outfld( 'DPDLFICE', ptend_loc%q(:,:,ixcldice), pcols, lchnk)
    call outfld( 'DPDLFT',   ptend_loc%s(:,:)/cpair, pcols, lchnk)
    call outfld( 'DETNLIQTND', ptend_loc%q(:,:,ixnumliq),pcols, lchnk )
+   call outfld( 'DETNICETND', ptend_loc%q(:,:,ixnumice),pcols, lchnk )
   
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
    call physics_update(state1,ptend_loc,hdtime)
@@ -3581,6 +3606,137 @@ end subroutine clubb_init_cnst
     return
 
   end function energy_fixer
+
+
+!================================================================================!
+!
+!
+!subroutine clubb_detrainment(,dlf)
+!
+!       du(i,k) = 0._r8
+!       mu(i,k) = 0._r8
+!       eps(i,k) = 0._r8
+!       ! grav_on_thvm(j) * ( thv_par_1(j) - thvm(j) )
+!       lengath = 0
+!
+!       do i=1,ncol
+!          if (wpthvp() > 70) then
+!             lengath = lengath + 1
+!             index(lengath) = i
+!          end if
+!          maxg(i) = 1
+!       end do
+!
+!       if (lengath.eq.0) return
+!       do ii=1,lengath
+!          i=index(ii)
+!          ideep(ii)=i
+!       end do
+!
+!       do i = 1,lengath
+!          maxg(i) = maxi(ideep(i))
+!       end do
+!
+!
+!       do k = pver - 1,msg + 1,-1
+!          do i = 1,il2g
+!             if (k < jb(i) .and. k >= jt(i)) then
+!                k1(i,k) = k1(i,k+1) + (hmn(i,mx(i))-hmn(i,k))*dz(i,k)
+!                ihat(i,k) = 0.5_r8* (k1(i,k+1)+k1(i,k))
+!                i2(i,k) = i2(i,k+1) + ihat(i,k)*dz(i,k)
+!                idag(i,k) = 0.5_r8* (i2(i,k+1)+i2(i,k))
+!                i3(i,k) = i3(i,k+1) + idag(i,k)*dz(i,k)
+!                iprm(i,k) = 0.5_r8* (i3(i,k+1)+i3(i,k))
+!                i4(i,k) = i4(i,k+1) + iprm(i,k)*dz(i,k)
+!             end if
+!          end do
+!       end do
+!
+!
+!       do k = msg + 2,pver
+!          do i = 1,lengath
+!             expnum(i) = 0._r8
+!             ftemp(i) = 0._r8
+!             if (k < top_lev .or. k >= maxg(i)) then
+!                k1(i,k) = 0._r8
+!                expnum(i) = 0._r8
+!             else
+!                expnum(i) = hmn(i,mx(i)) - (hsat(i,k-1)*(zf(i,k)-z(i,k)) + &
+!                            hsat(i,k)* (z(i,k-1)-zf(i,k)))/(z(i,k-1)-z(i,k))
+!             end if
+!             if ((expdif(i) > 100._r8 .and. expnum(i) > 0._r8) .and. &
+!                 k1(i,k) > expnum(i)*dz(i,k)) then
+!                ftemp(i) = expnum(i)/k1(i,k)
+!                f(i,k) = ftemp(i) + i2(i,k)/k1(i,k)*ftemp(i)**2 + &
+!                         (2._r8*i2(i,k)**2-k1(i,k)*i3(i,k))/k1(i,k)**2* &
+!                         ftemp(i)**3 + (-5._r8*k1(i,k)*i2(i,k)*i3(i,k)+ &
+!                         5._r8*i2(i,k)**3+k1(i,k)**2*i4(i,k))/ &
+!                         k1(i,k)**3*ftemp(i)**4
+!                f(i,k) = max(f(i,k),0._r8)
+!                f(i,k) = min(f(i,k),0.0002_r8)
+!             end if
+!          end do
+!       end do
+!       do i = 1,lengath
+!          if (j0(i) < maxg(i)) then
+!             if (f(i,j0(i)) < 1.E-6_r8 .and. f(i,j0(i)+1) > f(i,j0(i))) j0(i) = j0(i) + 1
+!          end if
+!       end do
+!       do k = msg + 2,pver
+!          do i = 1,lengath
+!             if (k >= top_lev .and. k <= j0(i)) then
+!                f(i,k) = max(f(i,k),f(i,k-1))
+!             end if
+!          end do
+!       end do
+!
+!       do i = 1,lengath
+!          eps0(i) = f(i,j0(i))
+!          eps(i,maxg(i)) = eps0(i)
+!       end do
+!
+!       do k = pver,msg + 1,-1
+!          do i = 1,lengath
+!             if (k >= j0(i) .and. k <= maxg(i)) then
+!                eps(i,k) = f(i,j0(i))     ! what is f
+!             end if
+!          end do
+!       end do
+!
+!       do k = pver,msg + 1,-1
+!          do i = 1,lengath
+!             if (k < j0(i) .and. k >= top_lev ) eps(i,k) = f(i,k)
+!          end do
+!       end do
+!
+!       do i = 1,lengath
+!          if (eps0(i) > 0._r8) then
+!             mu(i,maxg(i)) = 1._r8
+!          end if
+!       end do
+!
+!       do k = pver,msg + 1,-1
+!          do i = 1,lengath
+!             if (eps0(i) > 0._r8 .and. (k >= top_lev .and. k < maxg(i))) then
+!                zuef(i) =  state1%zi(i,pverp-k+1)-state1%zi(i,maxg(i)) !zf(i,k)
+!- zf(i,maxg(i))
+!                rmue(i) = (1._r8/eps0(i))*
+!(exp(eps(i,k+1)*zuef(i))-1._r8)/zuef(i)
+!                mu(i,k) = (1._r8/eps0(i))* (exp(eps(i,k
+!)*zuef(i))-1._r8)/zuef(i)
+!                du(i,k) = (rmue(i)-mu(i,k))/dz(i,k)
+!             end if
+!          end do
+!       end do
+!
+!       do k = ktm,pver-1
+!          do i = 1,lengath
+!             dlf(i,k) = du(i,k)*rcm(i,k+1)   ! 
+!          end do
+!       end do
+!
+!   endif
+! ============================================================================!
 
   ! =============================================================================== !
   !                                                                                 !

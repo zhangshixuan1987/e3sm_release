@@ -805,7 +805,7 @@ elemental subroutine immersion_freezing(microp_uniform, t, pgam, lamc, &
      dum = 1._r8
   end if
 
-  if (qcic >= qsmall .and. t < 269.15_r8) then
+  if (qcic >= qsmall .and. t < 269.15_r8) then  
 
      nnuccc = &
           pi/6._r8*ncic*rising_factorial(pgam+1._r8, 3)* &

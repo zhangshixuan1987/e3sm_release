@@ -38,8 +38,8 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
  mkres.gsMarkerSizeF = 15.   
  infiles  = ["" for x in range(ncases)] 
  ncdfs    = ["" for x in range(ncases)] 
- varis    = ["CLDTOT",     "SWCF","LWCF","PRECT","LHFLX","SHFLX","U10", "CLDLOW"    ,"CLDHGH"    ,"TMQ"   ,"TS","TGCLDLWP"]
- varisobs = ["CLDTOT_CAL", "SWCF","LWCF","PRECT","LHFLX","SHFLX","U10", "CLDTOT_CAL","CLDTOT_CAL","PREH2O","TS","TGCLDLWP_OCEAN"]
+ varis    = ["CLDTOT",     "SWCF","LWCF","PRECT","LHFLX","SHFLX","U10", "CLDLOW"    ,"CLDHGH"    ,"TMQ"   ,"TS"]
+ varisobs = ["CLDTOT_CAL", "SWCF","LWCF","PRECT","LHFLX","SHFLX","U10", "CLDTOT_CAL","CLDTOT_CAL","PREH2O","TS"]
  alpha    = ["A","B","C","D","E","F"]
  nvaris = len(varis)
  cunits = [""]

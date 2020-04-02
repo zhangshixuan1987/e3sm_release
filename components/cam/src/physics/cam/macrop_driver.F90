@@ -891,6 +891,8 @@ end subroutine macrop_driver_readnl
 
    if (micro_do_icesupersat) then 
 
+
+   write(*,*) "IAM HERE micro_do_icesupersat=TRUE"
       ! -------------------------------------- !
       ! Ice Saturation Adjustment Computation  !
       ! -------------------------------------- !

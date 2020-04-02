@@ -523,7 +523,7 @@ contains
     qclvar, thlprcp_out, &                                  ! intent(out)
 #endif
     wprcp, ice_supersat_frac, &                             ! intent(out)
-    rcm_in_layer, cloud_cover )                             ! intent(out)
+    rcm_in_layer, cloud_cover,invrs_tau_zm )                             ! intent(out)
 
     use advance_clubb_core_module, only : advance_clubb_core
 
@@ -685,7 +685,8 @@ contains
 
     real( kind = core_rknd ), intent(out), dimension(gr%nz) ::  &
       rcm_in_layer, & ! rcm in cloud layer                              [kg/kg]
-      cloud_cover     ! cloud cover                                     [-]
+      cloud_cover,&     ! cloud cover                                     [-]
+      invrs_tau_zm
 
     ! Variables that need to be output for use in host models
     real( kind = core_rknd ), intent(out), dimension(gr%nz) ::  &
@@ -756,7 +757,7 @@ contains
                qclvar, thlprcp_out, &                         ! intent(out)
 #endif
       wprcp, ice_supersat_frac, &                             ! intent(out)
-      rcm_in_layer, cloud_cover, &                            ! intent(out)
+      rcm_in_layer, cloud_cover, invrs_tau_zm,&                            ! intent(out)
       err_code_api )                                          ! intent(out)
 
   end subroutine advance_clubb_core_api

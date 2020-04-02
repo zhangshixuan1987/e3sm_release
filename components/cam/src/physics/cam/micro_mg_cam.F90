@@ -844,6 +844,8 @@ subroutine micro_mg_cam_init(pbuf2d)
    call addfld('nprcio',(/ 'lev' /), 'A', '1/(kg*s)', 'nprci(i,k)*icldm(i,k)'     )
    call addfld('npraio',(/ 'lev' /), 'A', '1/(kg*s)', 'nprai(i,k)*icldm(i,k)'     )
    call addfld('nnuccrio',(/ 'lev' /), 'A', '1/(kg*s)', 'nnuccri(i,k)*precip_frac(i,k)'     )
+   call addfld('mnuccrio',(/ 'lev' /), 'A', '1/(kg*s)', 'mnuccri(i,k)*precip_frac(i,k)')
+   call addfld('mnudepo',(/ 'lev' /), 'A', '1/(kg*s)', 'mnudep(i,k)*lcldm(i,k)'     )
 ! GZ
 
 
@@ -1315,6 +1317,9 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    real(r8),  target :: nprcitoto(state%psetcols,pver)
    real(r8),  target :: npraitoto(state%psetcols,pver)
    real(r8),  target :: nnuccritoto(state%psetcols,pver)
+   real(r8),  target :: mnuccritoto(state%psetcols,pver)
+   real(r8),  target :: mnudeptoto(state%psetcols,pver)
+
 ! GZ
 
 
@@ -1468,6 +1473,9 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    real(r8), allocatable, target :: packed_nprcitot(:,:)
    real(r8), allocatable, target :: packed_npraitot(:,:)
    real(r8), allocatable, target :: packed_nnuccritot(:,:)
+   real(r8), allocatable, target :: packed_mnuccritot(:,:)
+   real(r8), allocatable, target :: packed_mnudeptot(:,:)
+
 ! GZ
 
    ! Dummy arrays for cases where we throw away the MG version and
@@ -2133,6 +2141,11 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    call post_proc%add_field(p(npraitoto), p(packed_npraitot))
    allocate(packed_nnuccritot(mgncol,nlev))
    call post_proc%add_field(p(nnuccritoto), p(packed_nnuccritot))
+
+   allocate(packed_mnuccritot(mgncol,nlev))
+   call post_proc%add_field(p(mnuccritoto), p(packed_mnuccritot))
+   allocate(packed_mnudeptot(mgncol,nlev))
+   call post_proc%add_field(p(mnudeptoto), p(packed_mnudeptot))
 ! GZ
 
 
@@ -2426,7 +2439,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
                  packed_nsubctot,      packed_npratot,     packed_nprc1tot,           &
                  packed_nnuccdtot,     packed_tmpfrztot,   packed_nnudeptot,          &
                  packed_nsacwitot,     packed_nsubitot,    packed_nprcitot,           &
-                 packed_npraitot,      packed_nnuccritot)
+                 packed_npraitot,      packed_nnuccritot,  packed_mnuccritot,         &
+                 packed_mnudeptot  )
 ! GZ for budget of nitend and nctend
             call t_stopf('micro_mg_tend2')
          end select
@@ -2579,7 +2593,7 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    qme = 0.0_r8 ! Initialize qme to avoid problem when FP trapping is turned on.
    qme(:ncol,top_lev:pver) = cmeliq(:ncol,top_lev:pver) + cmeiout(:ncol,top_lev:pver)
 
-   ! For precip, accumulate only total precip in prec_pcw and snow_pcw variables.
+   ! For precip, accumulate only packed_total precip in prec_pcw and snow_pcw variables.
    ! Other precip output variables are set to 0
    ! Do not subscript by ncol here, because in physpkg we divide the whole
    ! array and need to avoid an FPE due to uninitialized data.
@@ -3315,6 +3329,8 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
    call outfld('nprcio', nprcitoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
    call outfld('npraio', npraitoto,  psetcols, lchnk,avg_subcol_field=use_subcol_microp)
    call outfld('nnuccrio', nnuccritoto,  psetcols, lchnk, avg_subcol_field=use_subcol_microp)
+   call outfld('mnuccrio', mnuccritoto,  psetcols, lchnk, avg_subcol_field=use_subcol_microp)
+   call outfld('mnudepo', mnudeptoto,  psetcols, lchnk, avg_subcol_field=use_subcol_microp)
 ! GZ
 
    if (micro_mg_version > 1) then

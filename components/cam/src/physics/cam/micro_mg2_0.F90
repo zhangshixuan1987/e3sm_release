@@ -421,7 +421,8 @@ subroutine micro_mg_tend ( &
      nsubctot,           npratot,            nprc1tot,           &
      nnuccdtot,          tmpfrztot,          nnudeptot,          &
      nsacwitot,          nsubitot,           nprcitot,           &
-     npraitot,           nnuccritot)
+     npraitot,           nnuccritot,         mnuccritot,         &
+     mnudeptot  )
 ! GZ for budget of nitend and nctend
 
   ! Constituent properties.
@@ -611,6 +612,8 @@ subroutine micro_mg_tend ( &
   real(r8), intent(out) :: nprcitot(:,:)
   real(r8), intent(out) :: npraitot(:,:)
   real(r8), intent(out) :: nnuccritot(:,:)
+  real(r8), intent(out) :: mnuccritot(:,:)
+  real(r8), intent(out) :: mnudeptot(:,:) 
 ! GZ
 
   character(128),   intent(out) :: errstring  ! output status (non-blank for error return)
@@ -2002,7 +2005,10 @@ subroutine micro_mg_tend ( &
         pracstot(i,k) = pracs(i,k)*precip_frac(i,k)
         mnuccrtot(i,k) = mnuccr(i,k)*precip_frac(i,k)
 
-
+! GZ
+        mnuccritot(i,k) = mnuccri(i,k)*precip_frac(i,k)
+        mnudeptot(i,k)  = mnudep(i,k)*lcldm(i,k)
+! GZ
         nctend(i,k) = nctend(i,k)+&
              (-nnuccc(i,k)-nnucct(i,k)-npsacws(i,k)+nsubc(i,k) &
              -npra(i,k)-nprc1(i,k))*lcldm(i,k)
@@ -2016,7 +2022,6 @@ subroutine micro_mg_tend ( &
            nitend(i,k) = nitend(i,k)+ nnuccd(i,k)+ &
                 (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k))*lcldm(i,k)+(nsubi(i,k)-nprci(i,k)- &
                 nprai(i,k))*icldm(i,k)+nnuccri(i,k)*precip_frac(i,k)
-           tmpfrztot(i,k) = tmpfrz*lcldm(i,k)
 
         end if
 
@@ -2037,15 +2042,16 @@ subroutine micro_mg_tend ( &
         end if
 
 ! GZ
-!For  nctend
-        nnuccctot(i,k) = nnuccc(i,k)*lcldm(i,k)    ! 
-        nnuccttot(i,k) = nnucct(i,k)*lcldm(i,k)
+! For nctend
+        nnuccctot(i,k)  = nnuccc(i,k)*lcldm(i,k)    ! 
+        nnuccttot(i,k)  = nnucct(i,k)*lcldm(i,k)
         npsacwstot(i,k) = npsacws(i,k)*lcldm(i,k)
-        nsubctot(i,k)  = nsubc(i,k)*lcldm(i,k)
-        npratot(i,k) = npra(i,k)*lcldm(i,k)
-        nprc1tot(i,k) = nprc1(i,k)*lcldm(i,k)
+        nsubctot(i,k)   = nsubc(i,k)*lcldm(i,k)
+        npratot(i,k)    = npra(i,k)*lcldm(i,k)
+        nprc1tot(i,k)   = nprc1(i,k)*lcldm(i,k)
 ! For nitend 
-        nnuccdtot(i,k) = nnuccd(i,k)*lcldm(i,k) 
+        nnuccdtot(i,k) = nnuccd(i,k) 
+        tmpfrztot(i,k) = tmpfrz*lcldm(i,k)
         nnudeptot(i,k) = nnudep(i,k)*lcldm(i,k)
         nsacwitot(i,k) = nsacwi(i,k)*lcldm(i,k)
 

@@ -9,7 +9,7 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = LBAbest_c11p5
+set job_name       = LBAbest_c11p5_dlf1e-2_rhmini9
 set compset        = FC5CLBMG2BCL72 
 #set compset        = FAMIPC5 
 set resolution     = ne16_ne16
@@ -1053,7 +1053,7 @@ EOF
 cat <<EOF >> user_nl_cam 
 
 state_debug_checks=.true.
-ice_supersat = .true.
+!ice_supersat = .true.
 clubb_do_icesuper= .false.
 
 ! clubb_beta             = 2     ! 1.1160
@@ -1175,40 +1175,32 @@ clubb_do_icesuper= .false.
  avgflag_pertape = 'A','A','I','A','A','A'
 
 fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
-'U:A','PS:A','T:A','V:A','OMEGA:A','Z3:A','PRECT:A',
-'CLDLIQ:A', 'CLDICE:A', 'LWCF:A', 'SWCF:A', 'FLUT:A',
-'TMQ:A', 'PRECC:A', 'PRECL:A', 'CME:A', 'PRODPREC:A',
-'EVAPPREC:A','EVAPSNOW:A','ICWMRST:A','ICIMRST:A','PRAO:A',
-'PRCO:A','QCSEVAP:A','QISEVAP:A','QVRES:A','CMEIOUT:A','VTRMI:A',
-'VTRMC:A','QCSEDTEN:A','QISEDTEN:A','MNUCCCO:A','MNUCCTO:A',
-'MNUCCDO:A','MNUCCDOhet:A','MSACWIO:A','PSACWSO:A','BERGSO:A',
-'BERGO:A','MELTO:A','HOMOO:A','QCRESO:A','PRCIO:A','PRAIO:A',
-'MELTSDT:A','FRZRDT:A','ADRAIN:A','ADSNOW:A','FREQR:A','FREQS:A',
-'PE:A','APRL:A','PEFRAC:A','VPRCO:A','VPRAO:A','RACAU:A',
-'QIRESO:A','QCRESO:A','PRACSO:A','MPDT:A','MPDQ:A','MPDLIQ:A',
-'MPDICE:A','INEGCLPTEND', 'LNEGCLPTEND', 'VNEGCLPTEND',
-'QCRAT:A', 'QVHFTEN', 'QCHFTEN', 'QRHFTEN', 'QIHFTEN', 'QSHFTEN', 'THFTEN',
-'SL', 'Q', 'RHW', 'QRS', 'QRL', 'HR', 'FDL', 'SILHS_CLUBB_PRECIP_FRAC',
-'SILHS_CLUBB_ICE_SS_FRAC', 'T_ADJ_CLUBB','VMAGGUST','VMAGDP','VMAGCL',
+'U','PS','T','V','OMEGA','Z3','PRECT',
+'CLDLIQ', 'CLDICE', 'LWCF', 'SWCF', 'FLUT',
+'TMQ', 'PRECC', 'PRECL', 'CME', 'PRODPREC',
+'EVAPPREC','EVAPSNOW','ICWMRST','ICIMRST','PRAO',
+'PRCO','QCSEVAP','QISEVAP','QVRES','CMEIOUT','VTRMI',
+'VTRMC','QCSEDTEN','QISEDTEN','MNUCCCO','MNUCCTO',
+'MNUCCDO','MNUCCDOhet','MSACWIO','PSACWSO','BERGSO',
+'BERGO','MELTO','HOMOO','QCRESO','PRCIO','PRAIO',
+'MELTSDT','FRZRDT','ADRAIN','ADSNOW','FREQR','FREQS',
+'PE','APRL','PEFRAC','VPRCO','VPRAO','RACAU',
+'QIRESO','QCRESO','PRACSO','MPDT','MPDQ','MPDLIQ',
+'MPDICE','INEGCLPTEND', 'LNEGCLPTEND', 'VNEGCLPTEND','AIST','AST','CLDFSNOW','ICSWP',
+'QCRAT', 'QVHFTEN', 'QCHFTEN', 'QRHFTEN', 'QIHFTEN', 'QSHFTEN', 'THFTEN',
+'SL', 'Q', 'RHW', 'QRS', 'QRL', 'HR', 'FDL', 'SILHS_CLUBB_PRECIP_FRAC', 'SILHS_CLUBB_ICE_SS_FRAC', 
+'T_ADJ_CLUBB','VMAGGUST','VMAGDP','VMAGCL','DETNLIQTND','DETNICETND',
 'QCSEVAP', 'QISEVAP', 'QVRES', 'CMEIOUT', 'VTRMC', 'VTRMI', 'QCSEDTEN','QISEDTEN',
 'PRAO',  'PRCO',  'MNUCCCO', 'MNUCCTO', 'MNUCCDO', 'MNUCCDOhet','MSACWIO', 'PSACWSO',
 'BERGSO','BERGO', 'MELTO','HOMOO','QCRESO','PRCIO', 'PRAIO', 'QIRESO','MNUCCRO','PRACSO','MELTSDT','FRZRDT',
-'RELVAR',
-'nnuccco', 
-'nnuccto', 
-'npsacwso',
-'nsubco',
-'nprao', 
-'nprc1o',
-'nnuccdo', 
-'tmpfrzo', 
-'nnudepo', 
-'nsacwio', 
-'nsubio',
-'nprcio',
-'npraio',
-'nnuccrio'
- 
+'RELVAR','nnuccco', 'nnuccto', 'npsacwso','nsubco','nprao','mnuccrio','mnudepo',
+'nprc1o','nnuccdo', 'tmpfrzo', 'nnudepo', 'nsacwio', 'nsubio','nprcio','npraio','nnuccrio', 
+'bc_num', 'dst1_num', 'dst3_num', 'bcc_num', 'dst1c_num','dst3c_num', 'bcuc_num', 'dst1uc_num','dst3uc_num',
+'bc_a1_num','dst_a1_num','dst_a3_num','bc_c1_num','dst_c1_num','dst_c3_num','fn_bc_c1_num','fn_dst_c1_num',
+'fn_dst_c3_num', 'na500','totna500','FREQIMM','FREQCNT','FREQDEP','FREQMIX',
+'DSTFREZIMM','DSTFREZCNT','DSTFREZDEP','BCFREZIMM', 'BCFREZCNT', 'BCFREZDEP', 'NIMIX_IMM', 'NIMIX_CNT', 'NIMIX_DEP'
+'DSTNIDEP','DSTNICNT','DSTNIIMM','BCNIDEP', 'BCNICNT', 'BCNIIMM', 'NUMICE10s','NUMIMM10sDST', 'NUMIMM10sBC' 
+
 
 macrop_scheme = 'CLUBB_SGS'
 eddy_scheme = 'CLUBB_SGS'
@@ -1232,7 +1224,7 @@ clubb_use_sgv = .false.
  micro_mg_num_steps = 1
  micro_mg_dcs = 400e-6 !
  micro_mg_berg_eff_factor =1.0D0
- cldfrc2m_rhmini = 0.8
+ cldfrc2m_rhmini = 0.9
  cldfrc2m_rhmaxi = 1.05
 
   cld_macmic_num_steps           =  6 

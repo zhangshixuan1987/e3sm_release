@@ -30,30 +30,30 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
  extrap = False
  mkres = Ngl.Resources()
  mkres.gsMarkerIndex = 2
- mkres.gsMarkerColor = "Red"
+ mkres.gsMarkerColor = 'Red'
  mkres.gsMarkerSizeF = 15.
- infiles  = ["" for x in range(ncases)]
- ncdfs    = ["" for x in range(ncases)]
+ infiles  = ['' for x in range(ncases)]
+ ncdfs    = ['' for x in range(ncases)]
  nregions = nsite
 
- varisobs = ["CC_ISBL", "OMEGA","SHUM","CLWC_ISBL", "THETA","RELHUM","U","CIWC_ISBL","T" ]
+ varisobs = ['CC_ISBL', 'OMEGA','SHUM','CLWC_ISBL', 'THETA','RELHUM','U','CIWC_ISBL','T' ]
  nvaris = len(varis)
- cunits = ["%","mba/day","g/kg","g/kg","K", "%", "m/s", "g/kg", "m/s", "m/s","K","m" ]
- cscale = [1E3, 1, 1, 1, 1., 1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+ cunits = ['%','mba/day','g/kg','g/kg','K', '%', 'm/s', 'g/kg', 'm/s', 'm/s','K','m' ]
+ cscale = [1, 1, 1, 1, 1., 1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
  cscaleobs = [100,        1,     1, 1000 , 1.,   1,     1,   1000,     1,1,1,1,1,1,1]
- obsdataset =["ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
- plotrain=["" for x in range(nsite)]
+ obsdataset =['ERAI', 'ERAI', 'ERAI', 'ERAI', 'ERAI', 'ERAI', 'ERAI', 'ERAI','ERAI','ERAI']
+ plotrain=['' for x in range(nsite)]
 
 
  for ire in range (0, nsite):
      if not os.path.exists(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N'):
          os.mkdir(casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N')
 
-     plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/'+pname+'_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
-     plotrain[ire] = pname+'_'+str(lons[ire])+"E_"+str(lats[ire])+"N_"+cseason
+     plotname = casedir+'/'+str(lons[ire])+'E_'+str(lats[ire])+'N/'+pname+'_'+str(lons[ire])+'E_'+str(lats[ire])+'N_'+cseason
+     plotrain[ire] = pname+'_'+str(lons[ire])+'E_'+str(lats[ire])+'N_'+cseason
      wks= Ngl.open_wks(ptype,plotname)
 
-     Ngl.define_colormap(wks,"GMT_paired")
+     Ngl.define_colormap(wks,'GMT_paired')
      plot = []
      res     = Ngl.Resources()
      res.nglDraw              = False
@@ -70,7 +70,7 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
      res.tmXBLabelFontHeightF = 0.015
      res.tmXBLabelFontThicknessF = 1.0
 #     res.tmXBLabelAngleF = 45
-     res.xyMarkLineMode      = "Lines"
+     res.xyMarkLineMode      = 'Lines'
      res.xyLineThicknesses = [3.0, 3.0, 3.0, 3.0, 3.0, 3.0,3.,3.,3.,3.,3,3,3,3,3,3,3]
 
      res.xyDashPatterns    = np.arange(0,24,1)
@@ -91,9 +91,9 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
 
      for iv in range (0, nvaris):   
          if(iv == nvaris-1):
-             res.pmLegendDisplayMode    = "Never"
+             res.pmLegendDisplayMode    = 'Never'
              res.xyExplicitLegendLabels = casenames[:]
-             res.pmLegendSide           = "top"             
+             res.pmLegendSide           = 'top'             
              res.pmLegendParallelPosF   = 0.6               
              res.pmLegendOrthogonalPosF = -0.5                  
              res.pmLegendWidthF         = 0.10              
@@ -102,7 +102,7 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
              res.lgLabelFontThicknessF  = 1.5
              res.lgPerimOn              = False
          else:
-             res.pmLegendDisplayMode    = "NEVER"
+             res.pmLegendDisplayMode    = 'NEVER'
 
 
          for im in range (0,ncases):
@@ -130,7 +130,7 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
              A_field[im,:] = A_field[im,:] *cscale[iv]
 
              inptrs.close()
-         res.tiMainString    =  varis[iv]+"  "+theunits
+         res.tiMainString    =  varis[iv]+'  '+theunits
 #         res.trXMinF = min(np.min(A_field[0, :]))
 #         res.trXMaxF = max(np.max(A_field[0, :]))
          res.trYReverse        = True
@@ -139,18 +139,18 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
          p = Ngl.xy(wks,A_field,lev,res)
          
 #         res.trYReverse        = False
-#         res.xyLineColors      = ["black"]
+#         res.xyLineColors      = ['black']
 #         pt = Ngl.xy(wks,B,pre1,res)
 #         Ngl.overlay(p,pt)
 
          plot.append(p)
 
 
-     pres.txString   = "Rain at"+ str(lons[ire])+"E,"+str(lats[ire])+"N"
+     pres.txString   = pname+' at'+ str(lons[ire])+'E,'+str(lats[ire])+'N'
      txres = Ngl.Resources()
      txres.txFontHeightF = 0.020
      txres.txFont = _Font
-     Ngl.text_ndc(wks,"Rain at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.92+ncases*0.01,txres)
+     Ngl.text_ndc(wks,'Rain at'+ str(lons[ire])+'E,'+str(lats[ire])+'N',0.5,0.92+ncases*0.01,txres)
      Common_functions.create_legend(wks,casenames,np.arange(3,20,2),0.1,0.89+ncases*0.01)
 
      Ngl.panel(wks,plot[:],[nvaris/2,2],pres)

@@ -1,5 +1,5 @@
 '''
-    RAIN parameters 
+    RAIN,SNOW,AERO parameters 
     zhunguo : guozhun@lasg.iap.ac.cn ; guozhun@uwm.edu
 '''
 
@@ -14,7 +14,7 @@ import Common_functions
 from subprocess import call
 
 
-def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname):
+def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname):
 
 # ncases, the number of models
 # cases, the name of models
@@ -39,7 +39,6 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
  varisobs = ['CC_ISBL', 'OMEGA','SHUM','CLWC_ISBL', 'THETA','RELHUM','U','CIWC_ISBL','T' ]
  nvaris = len(varis)
  cunits = ['%','mba/day','g/kg','g/kg','K', '%', 'm/s', 'g/kg', 'm/s', 'm/s','K','m' ]
- cscale = [1, 1, 1, 1, 1., 1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
  cscaleobs = [100,        1,     1, 1000 , 1.,   1,     1,   1000,     1,1,1,1,1,1,1]
  obsdataset =['ERAI', 'ERAI', 'ERAI', 'ERAI', 'ERAI', 'ERAI', 'ERAI', 'ERAI','ERAI','ERAI']
  plotrain=['' for x in range(nsite)]
@@ -125,7 +124,7 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
              for subc in range( 0, n[ire]):
                  npoint=idx_cols[ire,n[subc]-1]-1
                  tmp=inptrs.variables[varis[iv]][0,:,npoint] 
-                 theunits=str(cscale[iv])+inptrs.variables[varis[iv]].units
+                 theunits=str(chscale[iv])+'x'+inptrs.variables[varis[iv]].units
                  A_field[im,:] = (A_field[im,:]+tmp[:]/n[ire]).astype(np.float32 )
              A_field[im,:] = A_field[im,:] *cscale[iv]
 
@@ -150,7 +149,7 @@ def rain_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepa
      txres = Ngl.Resources()
      txres.txFontHeightF = 0.020
      txres.txFont = _Font
-     Ngl.text_ndc(wks,'Rain at'+ str(lons[ire])+'E,'+str(lats[ire])+'N',0.5,0.92+ncases*0.01,txres)
+     Ngl.text_ndc(wks,pname+' at'+ str(lons[ire])+'E,'+str(lats[ire])+'N',0.5,0.92+ncases*0.01,txres)
      Common_functions.create_legend(wks,casenames,np.arange(3,20,2),0.1,0.89+ncases*0.01)
 
      Ngl.panel(wks,plot[:],[nvaris/2,2],pres)

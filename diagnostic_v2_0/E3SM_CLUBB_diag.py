@@ -11,7 +11,7 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-case='budget_dlf' # A general case name
+case='budget_dlf3' # A general case name
 outdir='/lcrc/group/acme/zhun/plots/' # Location of plots
 
 filepath=['/lcrc/group/acme/zhun/E3SM_simulations/',\
@@ -35,8 +35,8 @@ filepath=['/lcrc/group/acme/zhun/E3SM_simulations/',\
 
 cases=[ \
        'anvil-centos7.new_zhun.LBAbest_c11p5.ne16_ne16',\
-       'anvil-centos7.new_zhun.LBAbest_c11p5_dlf.ne16_ne16',\
        'anvil-centos7.new_zhun.LBAbest_c11p5_dlf1e-3.ne16_ne16',\
+       'anvil-centos7.new_zhun.LBAbest_c11p5_dlf1e-3_cldfsnowp1.ne16_ne16',\
 #      'anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_acc_try12.ne16_ne16',\
       'anvil-centos7.new_zhun.ZM_LBAbest_c11p5.ne16_ne16',\
 #      'anvil-centos7.new_zhun.ZM_LBAbest_c11p5_nodcixnumice.ne16_ne16',\
@@ -46,11 +46,11 @@ cases=[ \
 # Give a short name for your experiment which will appears on plots
 
 #casenames=['arc4_prc3_1p2_wp3_wpxp1_n2p5','arc4_prc3_1p2_wp3_wpxp1_n2p45_c61p5','arc4_prc3_1p2_wp3_wpxp1_n2p5_c1c61p5','arc4_prc3','ZM']
-casenames=['acc=2_berg=1_c1=1p5','acc=2_berg=1_c1=1p5_dlf','acc=2_berg=1_c1=1p5_dlf1e-3','ZM_acc=2_berg=1_c1=1p5']
+casenames=['acc=2_berg=1_c1=1p5','acc=2_berg=1_c1=1p5_dlf-2','acc=2_berg=1_c1=1p5_dlf1e-2_cldfsnow=p1','ZM_acc=2_berg=1_c1=1p5']
 years=[\
         '0001', '0001','0001', '0001','0001','0001']
 dpsc=[\
-      'none','none','none','zm']
+      'none','none','none','none','zm']
 # NOTE, dpsc,deep scheme, has to be 'none', if silhs is turned on. 
 
 # Observation Data
@@ -58,12 +58,12 @@ dpsc=[\
 filepathobs='/blues/gpfs/home/zhun/amwg_diag_20140804/obs_data_20140804/'
 #------------------------------------------------------------------------
 # Setting of plots.
-ptype='png'   # eps, pdf, ps, png, x11, ... are supported by this package
-cseason='ANN' # Seasons, or others
-casename=case+'_'+cseason
+ptype         ='png'   # eps, pdf, ps, png, x11, ... are supported by this package
+cseason       ='ANN' # Seasons, or others
+casename      =case+'_'+cseason
 
 #------------------------------------------------------------------------
-calmean          = True       # make mean states
+calmean          = False       # make mean states
 findout          = True       # pick out the locations of your sites
 draw2d           = True       # 2D plots, SWCF etc.
 drawclm          = False      # Plots of global land surface?
@@ -91,6 +91,9 @@ area  = 1.
 # sites    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16   17   18   19   20
 lats = [  20,  27, -20, -20,  -5,  -1,  60,   2,   9,   56,  45,   0,  10,  20,   0,   5,   9, -60,   0,   0 ]
 lons = [ 190, 240, 275, 285, 355, 259,  180, 140, 229, 311, 180, 295,  90, 205, 325, 280, 170, 340, 305,  25 ]
+
+
+
 
 #========================================================================
 
@@ -187,26 +190,46 @@ if drawhf:
     plothf=draw_hollfiller.hollfiller_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 if drawrain:
+    print('Rain and Snow')
+
     pname = 'Rain'
-    varis=[ 'AQRAIN','ANRAIN','ADRAIN','FREQR']
-    plotrain=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname)
+    varis   = [ 'AQRAIN','ANRAIN','ADRAIN','FREQR']
+    cscale  = [      1E6,     1,       1E4,      1]
+    chscale = [   '1E-6',  '1',    '1E-4',     '1']
+    plotrain=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
+
     pname = 'Snow'
-    varis=[ 'AQSNOW','ANSNOW','ADSNOW','FREQS']
-    plotsnow=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname)
+    varis   = [ 'AQSNOW','ANSNOW','ADSNOW','FREQS']
+    cscale  = [      1E6,     1,       1E4,      1]
+    chscale = [   '1E-6',  '1',    '1E-4',     '1']
+    plotsnow=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
+
     pname = 'NUM'
-    varis=[ 'AWNC','AWNI','AREL','AREI']
-    plotsnum=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname)
+    varis   = [ 'AWNC','AWNI','AREL','AREI']
+    cscale  = [     1E-7,    1E-3,        1,         1]
+    chscale = [    '1E7',   '1E3',      '1',       '1']
+    plotsnum=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
 
 if drawaero:
+    print('draw aerosol related vars')
+
     pname = 'FREZ'
-    varis=[ 'DSTFREZIMM','BCFREZIMM','DSTFREZCNT','BCFREZCNT','DSTFREZDEP','BCFREZDEP']
-    plotsaero1=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname)
+    varis   = [ 'DSTFREZIMM','BCFREZIMM','DSTFREZCNT','BCFREZCNT','DSTFREZDEP','BCFREZDEP']
+    cscale  = [            1,          1,        1E12,       1E3 ,         1E8,        1E3]
+    chscale = [          '1',        '1',     '1E-12',     '1E-3',      '1E-8',     '1E-3']
+    plotsaero1=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
+
     pname = 'FREQAERO'
-    varis=[ 'FREQIMM','FREQCNT','FREQDEP','FREQMIX']
-    plotsaero2=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname)
-    pname = 'CCN'
-    varis=[ 'bc_a1_num','bc_c1_num','dst_a1_num','dst_a3_num','dst_c1_num','dst_c3_num']
-    plotsaero3=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,pname)
+    varis   =[ 'FREQIMM','FREQCNT','FREQDEP','FREQMIX']
+    cscale  = [      1,     1,       1E3,      1]
+    chscale = [    '1',   '1',    '1E-3',     '1']
+    plotsaero2=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
+
+    pname = 'ACN'
+    varis   = [ 'bc_a1_num','bc_c1_num','dst_a1_num','dst_a3_num','dst_c1_num','dst_c3_num']
+    cscale  = [            1,         1,           1,         1E3,          1,        1E3]
+    chscale = [          '1',       '1',         '1',      '1E-3',         '1',     '1E-3']
+    plotsaero3=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
 
 
 if drawe3smbgt:

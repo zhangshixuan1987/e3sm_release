@@ -9,7 +9,7 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = LBAbest_c11p5_dlf1e-2_rhmini9
+set job_name       = LBAbest_c11p5_dlf1e-3_cldfsnowp1
 set compset        = FC5CLBMG2BCL72 
 #set compset        = FAMIPC5 
 set resolution     = ne16_ne16
@@ -1186,7 +1186,7 @@ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
 'MELTSDT','FRZRDT','ADRAIN','ADSNOW','FREQR','FREQS',
 'PE','APRL','PEFRAC','VPRCO','VPRAO','RACAU',
 'QIRESO','QCRESO','PRACSO','MPDT','MPDQ','MPDLIQ',
-'MPDICE','INEGCLPTEND', 'LNEGCLPTEND', 'VNEGCLPTEND','AIST','AST','CLDFSNOW','ICSWP',
+'MPDICE','INEGCLPTEND', 'LNEGCLPTEND', 'VNEGCLPTEND','AIST','AST','CLDFSNOW',
 'QCRAT', 'QVHFTEN', 'QCHFTEN', 'QRHFTEN', 'QIHFTEN', 'QSHFTEN', 'THFTEN',
 'SL', 'Q', 'RHW', 'QRS', 'QRL', 'HR', 'FDL', 'SILHS_CLUBB_PRECIP_FRAC', 'SILHS_CLUBB_ICE_SS_FRAC', 
 'T_ADJ_CLUBB','VMAGGUST','VMAGDP','VMAGCL','DETNLIQTND','DETNICETND',
@@ -1224,7 +1224,7 @@ clubb_use_sgv = .false.
  micro_mg_num_steps = 1
  micro_mg_dcs = 400e-6 !
  micro_mg_berg_eff_factor =1.0D0
- cldfrc2m_rhmini = 0.9
+ cldfrc2m_rhmini = 0.8
  cldfrc2m_rhmaxi = 1.05
 
   cld_macmic_num_steps           =  6 

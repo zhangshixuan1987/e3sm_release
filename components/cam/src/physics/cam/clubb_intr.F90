@@ -970,6 +970,8 @@ end subroutine clubb_init_cnst
     call addfld ('RCM_CLUBB',     (/ 'ilev' /), 'A',        'g/kg', 'Cloud Water Mixing Ratio')
     call addfld ('WPRCP_CLUBB',     (/ 'ilev' /), 'A',      'W/m2', 'Liquid Water Flux')
     call addfld ('CLOUDFRAC_CLUBB', (/ 'lev' /),  'A',  'fraction', 'Cloud Fraction')
+    call addfld ('AST', (/ 'lev' /),  'A',  'fraction', 'stratiform cloud')
+    call addfld ('AIST', (/ 'lev' /),  'A',  'fraction', 'ice stratiform cloud')
     call addfld ('RCMINLAYER_CLUBB',     (/ 'ilev' /), 'A', 'g/kg', 'Cloud Water in Layer')
     call addfld ('CLOUDCOVER_CLUBB', (/ 'ilev' /), 'A', 'fraction', 'Cloud Cover') 
     call addfld ('WPTHVP_CLUBB',     (/ 'lev' /),  'A',     'W/m2', 'Buoyancy Flux')
@@ -2926,18 +2928,14 @@ end subroutine clubb_init_cnst
 
 ! Zhun, detrainment of CLUBB's deep convection
    if (deep_scheme .eq. 'off') then
-     
+    dlf_tmp(:,:)=0.0 
      do k=1,pver
         do i=1,ncol
-           dlf_tmp(i,k)=(1.0e-2)*rcm(i,k)*  invrs_tau_zm(i,k)
+           dlf_tmp(i,k)=(1.0e-3)*rcm(i,k)*  invrs_tau_zm(i,k)
         enddo
      enddo
    else
-     do k=1,pver
-        do i=1,ncol
-           dlf_tmp(i,k)=dlf(i,k)
-        enddo
-     enddo
+           dlf_tmp(:,:)=dlf(:,:)
    endif
 ! Zhun
 
@@ -3331,6 +3329,9 @@ end subroutine clubb_init_cnst
    tmp_array = wprcp(:ncol,:)*latvap
    call outfld( 'WPRCP_CLUBB',      tmp_array,               ncol,  lchnk )
    call outfld( 'CLOUDFRAC_CLUBB',  alst,                    pcols, lchnk )
+   call outfld( 'AIST', aist ,pcols, lchnk )
+   call outfld( 'AST', ast ,pcols, lchnk )
+
    tmp_array = rcm_in_layer(:ncol,:)*1000._r8
    call outfld( 'RCMINLAYER_CLUBB', tmp_array,               ncol,  lchnk )
    call outfld( 'CLOUDCOVER_CLUBB', cloud_frac,              pcols, lchnk )

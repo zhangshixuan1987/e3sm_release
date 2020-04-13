@@ -41,27 +41,27 @@ module advance_xp2_xpyp_module
 
   contains
 
-  !=============================================================================
-  subroutine advance_xp2_xpyp( tau_zm, wm_zm, rtm, wprtp, thlm,        & ! In
-                               wpthlp, wpthvp, um, vm, wp2, wp2_zt,    & ! In
-                               wp3, upwp, vpwp, sigma_sqd_w, Skw_zm,   & ! In
-                               wprtp2, wpthlp2, wprtpthlp,             & ! In
-                               Kh_zt, rtp2_forcing, thlp2_forcing,     & ! In
-                               rtpthlp_forcing, rho_ds_zm, rho_ds_zt,  & ! In
-                               invrs_rho_ds_zm, thv_ds_zm, cloud_frac, & ! In
-                               Lscale, wp3_on_wp2, wp3_on_wp2_zt,      & ! In
-                               pdf_implicit_coefs_terms,               & ! In
-                               l_iter, dt,                             & ! In
-                               sclrm, wpsclrp,                         & ! In
-                               wpsclrp2, wpsclrprtp, wpsclrpthlp,      & ! In
-                               wp2_splat,                              & ! In
-                               l_predict_upwp_vpwp,                    & ! In
-                               l_min_xp2_from_corr_wx,                 & ! In
-                               l_C2_cloud_frac,                        & ! In
-                               l_upwind_xpyp_ta,                       & ! In
-                               l_single_C2_Skw,                        & ! In
-                               rtp2, thlp2, rtpthlp, up2, vp2,         & ! Inout
-                               sclrp2, sclrprtp, sclrpthlp)              ! Inout
+  !===============================================================================
+  subroutine advance_xp2_xpyp( tau_zm, tau_wp2_zm, wm_zm, rtm, wprtp, thlm, & ! In
+                               wpthlp, wpthvp, um, vm, wp2, wp2_zt,         & ! In
+                               wp3, upwp, vpwp, sigma_sqd_w, Skw_zm,        & ! In
+                               wprtp2, wpthlp2, wprtpthlp,                  & ! In
+                               Kh_zt, rtp2_forcing, thlp2_forcing,          & ! In
+                               rtpthlp_forcing, rho_ds_zm, rho_ds_zt,       & ! In
+                               invrs_rho_ds_zm, thv_ds_zm, cloud_frac,      & ! In
+                               Lscale, wp3_on_wp2, wp3_on_wp2_zt,           & ! In
+                               pdf_implicit_coefs_terms,                    & ! In
+                               l_iter, dt,                                  & ! In
+                               sclrm, wpsclrp,                              & ! In
+                               wpsclrp2, wpsclrprtp, wpsclrpthlp,           & ! In
+                               wp2_splat,                                   & ! In
+                               l_predict_upwp_vpwp,                         & ! In
+                               l_min_xp2_from_corr_wx,                      & ! In
+                               l_C2_cloud_frac,                             & ! In
+                               l_upwind_xpyp_ta,                            & ! In
+                               l_single_C2_Skw,                             & ! In
+                               rtp2, thlp2, rtpthlp, up2, vp2,              & ! Inout
+                               sclrp2, sclrprtp, sclrpthlp)                   ! Inout
 
     ! Description:
     ! Prognose scalar variances, scalar covariances, and horizontal turbulence components.
@@ -197,7 +197,8 @@ module advance_xp2_xpyp_module
 
     ! Input variables
     real( kind = core_rknd ), intent(in), dimension(gr%nz) ::  & 
-      tau_zm,          & ! Time-scale tau on momentum levels     [s]
+      tau_zm,          & ! Time-scale tau on momentum levels            [s]
+      tau_wp2_zm,      & ! Time-scale tau on momentum levels            [s]
       wm_zm,           & ! w-wind component on momentum levels   [m/s]
       rtm,             & ! Total water mixing ratio (t-levs)     [kg/kg]
       wprtp,           & ! <w'r_t'> (momentum levels)            [(m/s)(kg/kg)]
@@ -575,14 +576,14 @@ module advance_xp2_xpyp_module
        ! ADG1 allows up2 and vp2 to use the same LHS.
 
        ! Implicit contributions to term up2/vp2
-       call xp2_xpyp_lhs( dt, l_iter, tau_zm, C4_C14_1d, & ! In
+       call xp2_xpyp_lhs( dt, l_iter, tau_wp2_zm, C4_C14_1d, & ! In
                           lhs_ta_wpup2, lhs_ma, lhs_diff_uv, & ! In
                           lhs ) ! Out
 
        ! Explicit contributions to up2
        call xp2_xpyp_uv_rhs( xp2_xpyp_up2, dt, l_iter, & ! In
                              wp2, wp2_zt, wpthvp, & ! In
-                             Lscale, C4_C14_1d, tau_zm,  & ! In
+                             Lscale, C4_C14_1d, tau_wp2_zm,  & ! In
                              um, vm, upwp, vpwp, up2, vp2, & ! In
                              thv_ds_zm, C4, C5, C14, wp2_splat, & ! In
                              lhs_ta_wpup2, rhs_ta_wpup2, & ! In
@@ -591,7 +592,7 @@ module advance_xp2_xpyp_module
        ! Explicit contributions to vp2
        call xp2_xpyp_uv_rhs( xp2_xpyp_vp2, dt, l_iter, & ! In
                              wp2, wp2_zt, wpthvp, & ! In
-                             Lscale, C4_C14_1d, tau_zm,  & ! In
+                             Lscale, C4_C14_1d, tau_wp2_zm,  & ! In
                              vm, um, vpwp, upwp, vp2, up2, & ! In
                              thv_ds_zm, C4, C5, C14, wp2_splat, & ! In
                              lhs_ta_wpup2, rhs_ta_wpvp2, & ! In

@@ -11,7 +11,7 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-case='budget_dlf3' # A general case name
+case='newbase' # A general case name
 outdir='/lcrc/group/acme/zhun/plots/' # Location of plots
 
 filepath=['/lcrc/group/acme/zhun/E3SM_simulations/',\
@@ -34,11 +34,11 @@ filepath=['/lcrc/group/acme/zhun/E3SM_simulations/',\
 #]
 
 cases=[ \
-       'anvil-centos7.new_zhun.LBAbest_c11p5.ne16_ne16',\
-       'anvil-centos7.new_zhun.LBAbest_c11p5_dlf1e-3.ne16_ne16',\
-       'anvil-centos7.new_zhun.LBAbest_c11p5_dlf1e-3_cldfsnowp1.ne16_ne16',\
+      'anvil-centos7.new_zhun.newbase.ne16_ne16',\
+      'anvil-centos7.new_zhun.LBAbest_c11p5_newdlf1e-2_snwfracp1.ne16_ne16',\
+      'anvil-centos7.new_zhun.newbase_dbltau.ne16_ne16',\
+      'anvil-centos7.new_zhun.newbase_1ptau.ne16_ne16',\
 #      'anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_acc_try12.ne16_ne16',\
-      'anvil-centos7.new_zhun.ZM_LBAbest_c11p5.ne16_ne16',\
 #      'anvil-centos7.new_zhun.ZM_LBAbest_c11p5_nodcixnumice.ne16_ne16',\
 ]
 
@@ -46,7 +46,10 @@ cases=[ \
 # Give a short name for your experiment which will appears on plots
 
 #casenames=['arc4_prc3_1p2_wp3_wpxp1_n2p5','arc4_prc3_1p2_wp3_wpxp1_n2p45_c61p5','arc4_prc3_1p2_wp3_wpxp1_n2p5_c1c61p5','arc4_prc3','ZM']
-casenames=['acc=2_berg=1_c1=1p5','acc=2_berg=1_c1=1p5_dlf-2','acc=2_berg=1_c1=1p5_dlf1e-2_cldfsnow=p1','ZM_acc=2_berg=1_c1=1p5']
+casenames=['newbase','newbase_snwfracp01',\
+'newbase_c1=c6=c2=c8=1_tau_dbl',\
+'newbase_c1=c6=c2=c8=1_gnd=1p7_n2=p8']
+
 years=[\
         '0001', '0001','0001', '0001','0001','0001']
 dpsc=[\
@@ -88,9 +91,9 @@ area  = 1.
 # lats - area < lat(ncol) < lons + area .and. lons- area < lon(ncol) < lons + area
 #------------------------------------------------------------------------
 # Please give the lat and lon of sites here.
-# sites    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16   17   18   19   20
-lats = [  20,  27, -20, -20,  -5,  -1,  60,   2,   9,   56,  45,   0,  10,  20,   0,   5,   9, -60,   0,   0 ]
-lons = [ 190, 240, 275, 285, 355, 259,  180, 140, 229, 311, 180, 295,  90, 205, 325, 280, 170, 340, 305,  25 ]
+# sites    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16   17   18   19   20   21
+lats = [  20,  27, -20, -20,  -5,  -1,  60,   2,   9,   56,  45,   0,  10,  20,   0,   5,   9, -60,   0,   0, -45 ]
+lons = [ 190, 240, 275, 285, 355, 259,  180, 140, 229, 311, 180, 295,  90, 205, 325, 280, 170, 340, 305,  25,  90 ]
 
 
 
@@ -150,35 +153,42 @@ if drawclm:
 
 
 if drawlarge:
-    print('Large-scale variables on selected sites')
+    print('Drawing Large-scale variables on selected sites')
     plotlgs=draw_large_scale.large_scale_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 if drawclubb:
-    print('CLUBB standard variables on selected sites')
+    print('Drawing CLUBB standard variables on selected sites')
 
     pname = 'std1'
     varis    = [ 'wp2','up2','vp2','rtp2','thlp2','wp3']
-    cscale   = [     1,    1,    1,   1E6,      1,   1]
-    plotstd1=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
+    cscale   = [     1,    1,    1,   1E6,      1,    1]
+    chscale  = [   '1',  '1',  '1','1E-6',    '1',  '1']
+
+    plotstd1=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
 
     pname = 'std2'
     varis    = [ 'wprtp','wpthlp','wprcp','upwp','vpwp','wpthvp']
-    cscale   = [     1E3,       1,    1E3,     1,     1,     1] 
-    plotstd2=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
+    cscale   = [     1E3,       1,    1E3,     1,     1,       1] 
+    chscale  = [  '1E-3',     '1', '1E-3',   '1',    '1',    '1']
+
+    plotstd2=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
 
     pname = 'std3'
     varis    = [ 'wp2thlp','wp2rtp','wpthlp2','wprtp2','rcp2', 'wp2rcp']
-    cscale   = [         1,        1,        1,     1E6,   1E6,    1E3] 
-    plotstd3=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
+    cscale   = [         1,        1,       1,     1E6,   1E6,      1E3] 
+    chscale  = [       '1',      '1',     '1',  '1E-6','1E-6',   '1E-3']
+
+    plotstd3=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
 
     varis    = [ 'wpthvp','wp2thvp','rtpthvp','thlpthvp','wp4','wprtpthlp']
-    cscale   = [        1,        1,      1E3,         1,    1,       1E3] 
+    cscale   = [        1,        1,      1E3,         1,    1,        1E3] 
+    chscale  = [      '1',      '1',   '1E-3',       '1',  '1',    '1-E-3']
     pname = 'std4'
-    plotstd4=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,pname)
+    plotstd4=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
 
 
 if drawskw:
-    print('CLUBB standard variables on selected sites')
+    print('Drawing CLUBB skewness functions on selected sites')
     plotskw=draw_clubb_skew.clubb_skw_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 if drawsilhs:
@@ -190,7 +200,7 @@ if drawhf:
     plothf=draw_hollfiller.hollfiller_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
 
 if drawrain:
-    print('Rain and Snow')
+    print('Drawing Rain and Snow properties')
 
     pname = 'Rain'
     varis   = [ 'AQRAIN','ANRAIN','ADRAIN','FREQR']
@@ -210,8 +220,14 @@ if drawrain:
     chscale = [    '1E7',   '1E3',      '1',       '1']
     plotsnum=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
 
+    pname = 'Tau'
+    varis   = [ 'tau_zm','tau_no_N2_zm','tau_wp2_zm','tau_wp3_zm','tau_xp2_zm','tau_wpxp_zm','cloud_frac_zm','em','bv_freq_sqd']
+    cscale  = [      1E3,         1E3,         1E3,           1E3,         1E3,          1E3,     1,1, 1,1]
+    chscale = [   '1E-3',      '1E-3',      '1E-3',        '1E-3',      '1E-3',       '1E-3',     '1','1','1']
+    plottau=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
+
 if drawaero:
-    print('draw aerosol related vars')
+    print('Drawing  aerosol related vars')
 
     pname = 'FREZ'
     varis   = [ 'DSTFREZIMM','BCFREZIMM','DSTFREZCNT','BCFREZCNT','DSTFREZDEP','BCFREZDEP']
@@ -220,7 +236,7 @@ if drawaero:
     plotsaero1=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
 
     pname = 'FREQAERO'
-    varis   =[ 'FREQIMM','FREQCNT','FREQDEP','FREQMIX']
+    varis   = ['FREQIMM','FREQCNT','FREQDEP','FREQMIX']
     cscale  = [      1,     1,       1E3,      1]
     chscale = [    '1',   '1',    '1E-3',     '1']
     plotsaero2=draw_rain.rain_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
@@ -233,11 +249,11 @@ if drawaero:
 
 
 if drawe3smbgt:
-    print('e3sm_budget')
+    print('Drawing e3sm standard budgets')
     plote3smbgt=draw_e3sm_budget.draw_e3sm_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,dpsc)
 
 if drawmicrobgt:
-    print('micro_budget')
+    print('Drawing MG budget')
     pname = 'mirco1'
     vname   = [ 'Liquid','Ice','Rain','Snow']
     varis   = [ 'MPDLIQ','MPDICE','QRSEDTEN','QSSEDTEN'] # We just need a unit
@@ -252,7 +268,7 @@ if drawmicrobgt:
     plotmicrobgt2=draw_micro_budget.draw_micro_bgt(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,vname,cscale,chscale,pname)
 
 if drawbgt:
-    print('CLUBB BUDGET on selected sites')
+    print('Drawing CLUBB BUDGET')
     varis   = [ 'wp2','wp3','up2','vp2']
     cscale  = [     1,    1,    1,    1]
     chscale = [   '1',  '1',  '1',  '1']
@@ -305,6 +321,7 @@ if makeweb:
            plotclb.append(plotrain[ire])
            plotclb.append(plotsnow[ire])
            plotclb.append(plotsnum[ire])
+           plotclb.append(plottau[ire])
         if (drawaero):
            plotclb.append(plotsaero1[ire])
            plotclb.append(plotsaero2[ire])

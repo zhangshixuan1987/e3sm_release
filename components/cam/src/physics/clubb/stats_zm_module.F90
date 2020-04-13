@@ -50,6 +50,8 @@ module stats_zm_module
         itau_wp2_zm, &
         itau_wp3_zm, &
         itau_xp2_zm, &
+        itau_wpxp_zm,&
+        ibrunt_vaisala_freq_sqd,& 
         iKh_zm, & 
         iK_hm, & 
         iwprcp, & 
@@ -684,6 +686,14 @@ module stats_zm_module
 
         call stat_assign( var_index=itau_xp2_zm, var_name="tau_xp2_zm", &
              var_description="tau for xp2 on momentum levels [s]", var_units="s",&
+             l_silhs=.false., grid_kind=stats_zm )
+        k = k + 1
+
+      case ('tau_wpxp_zm')
+        itau_wpxp_zm = k
+
+        call stat_assign( var_index=itau_wpxp_zm, var_name="tau_wpxp_zm", &
+             var_description="tau for wpxp on momentum levels [s]", var_units="s",&
              l_silhs=.false., grid_kind=stats_zm )
         k = k + 1
 
@@ -2380,9 +2390,9 @@ module stats_zm_module
                           var_units="-", l_silhs=.false., grid_kind=stats_zm )
         k = k + 1
 
-      case ( 'brunt_vaisala_freq_sqd' )
+      case ( 'bv_freq_sqd' )
         ibrunt_vaisala_freq_sqd = k
-        call stat_assign( var_index=ibrunt_vaisala_freq_sqd, var_name="brunt_vaisala_freq_sqd", &
+        call stat_assign( var_index=ibrunt_vaisala_freq_sqd, var_name="bv_freq_sqd", &
              var_description="Brunt-Vaisala freqency squared, N^2 [1/s^2]", var_units="1/s^2", &
              l_silhs=.false., grid_kind=stats_zm )
         k = k + 1

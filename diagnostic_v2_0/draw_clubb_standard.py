@@ -15,7 +15,7 @@ import Common_functions
 from subprocess import call
 
 
-def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs, casedir,varis,cscale,pname):
+def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs, casedir,varis,cscale,chscale,pname):
 
 # ncases, the number of models
 # cases, the name of models
@@ -37,11 +37,11 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
  ncdfs    = ["" for x in range(ncases)]
  nregions = nsite
 
- varisobs = ["CC_ISBL", "OMEGA","SHUM","CLWC_ISBL", "THETA","RELHUM","U","CIWC_ISBL","T" ]
+# varisobs = ["CC_ISBL", "OMEGA","SHUM","CLWC_ISBL", "THETA","RELHUM","U","CIWC_ISBL","T" ]
  nvaris = len(varis)
- cunits = ["%","mba/day","g/kg","g/kg","K", "%", "m/s", "g/kg", "m/s", "m/s","K","m" ]
- cscaleobs = [100,        1,     1, 1000 , 1.,   1,     1,   1000,     1,1,1,1,1,1,1]
- obsdataset =["ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
+# cunits = ["%","mba/day","g/kg","g/kg","K", "%", "m/s", "g/kg", "m/s", "m/s","K","m" ]
+# cscaleobs = [100,        1,     1, 1000 , 1.,   1,     1,   1000,     1,1,1,1,1,1,1]
+# obsdataset =["ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI", "ERAI", "ERAI", "ERAI", "ERAI", "ERAI","ERAI","ERAI"]
 
  plotstd=["" for x in range(nsite)]
 
@@ -159,16 +159,24 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
                      for il in range (0, nlev):
                          pre[il] = hyam[il]*p0 + hybm[il] * ps
                          tmp[il] = tmp[il] * (100000/pre[il])**0.286
-                     theunits=str(cscale[iv])+"x"+inptrs.variables['T'].units
+                     theunits=str(chscale[iv])+"x"+inptrs.variables['T'].units
 
                  else:
-                     tmp=inptrs.variables[varis[iv]][0,:,npoint] 
-                     theunits=str(cscale[iv])+"x"+inptrs.variables[varis[iv]].units
+                     tmp=inptrs.variables[varis[iv]][0,:,npoint]
+                     if (varis[iv] == 'tau_zm' or varis[iv] == 'tau_wp2_zm' \
+                        or varis[iv] == 'tau_wp3_zm' or varis[iv] == 'tau_xp2_zm' \
+                        or varis[iv] == 'tau_no_N2_zm' or varis[iv] == 'tau_wpxp_zm'):
+                        tmp=1/tmp
+                     theunits=str(chscale[iv])+'x'+inptrs.variables[varis[iv]].units
+
                  A_field[im,:] = (A_field[im,:]+tmp[:]/n[ire]).astype(np.float32 )
              A_field[im,:] = A_field[im,:] *cscale[iv]
 
              inptrs.close()
-         res.tiMainString    =  varis[iv]+"  "+theunits
+         if (varis[iv] == 'tau_zm' or varis[iv] == 'tau_wp2_zm' or varis[iv] == 'tau_wp3_zm' or varis[iv] == 'tau_xp2_zm' or varis[iv] == 'tau_no_N2_zm'):
+             res.tiMainString    =  "invrs_"+varis[iv]+"  "+theunits
+         else:
+             res.tiMainString    =  varis[iv]+"  "+theunits
          res.trYReverse        = True
          res.xyLineColors      = np.arange(3,20,2)
          res.xyMarkerColors    = np.arange(2,20,2)

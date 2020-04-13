@@ -1281,7 +1281,12 @@ subroutine micro_mg_tend ( &
   ! water or ice is present, so precip_frac will be correctly set below
   ! and nothing extra needs to be done here
 
-  precip_frac = cldm
+  if (microp_uniform) then
+      precip_frac = 1.
+  else
+      precip_frac = cldm
+  endif
+
 
   micro_vert_loop: do k=1,nlev
 
@@ -1327,6 +1332,7 @@ subroutine micro_mg_tend ( &
            end where
         endif
      endif
+
 
      do i = 1, mgncol
 

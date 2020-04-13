@@ -2653,11 +2653,11 @@ subroutine micro_mg_cam_tend(state, ptend, dtime, pbuf, chunk_smry)
          !PMA: .lt. is replaced by .le. following part of NCAR RRTMG bug fix         
          if(rrtmg_temp_fix ) then
             if( (cldfsnow(i,k) .le. 1.e-4_r8) .and. (qsout(i,k) .gt. 1.e-6_r8) ) then
-               cldfsnow(i,k) = 0.25_r8
+               cldfsnow(i,k) = 0.1_r8
             endif
          else
             if( (cldfsnow(i,k) .lt. 1.e-4_r8) .and. (qsout(i,k) .gt. 1.e-6_r8) ) then
-               cldfsnow(i,k) = 0.25_r8
+               cldfsnow(i,k) = 0.1_r8
             endif
          endif
 

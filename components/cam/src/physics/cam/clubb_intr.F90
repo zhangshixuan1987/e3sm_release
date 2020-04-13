@@ -2931,7 +2931,7 @@ end subroutine clubb_init_cnst
     dlf_tmp(:,:)=0.0 
      do k=1,pver
         do i=1,ncol
-           dlf_tmp(i,k)=(1.0e-3)*rcm(i,k)*  invrs_tau_zm(i,k)
+           dlf_tmp(i,k)=(1.0e-2)*rcm(i,k)*  invrs_tau_zm(i,k)
         enddo
      enddo
    else
@@ -2964,18 +2964,33 @@ end subroutine clubb_init_cnst
             !(clubb_tk1 - clubb_tk2) is also 30.0 but it introduced a non-bfb change
             dum1 = ( clubb_tk1 - state1%t(i,k) ) /(clubb_tk1 - clubb_tk2)
          endif
-         ptend_loc%q(i,k,ixcldliq) = dlf_tmp(i,k) * ( 1._r8 - dum1 )
-         ptend_loc%q(i,k,ixcldice) = dlf_tmp(i,k) * dum1
-         ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf_tmp(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) &
-                                     / (4._r8*3.14_r8* clubb_liq_deep**3*997._r8) + & ! Deep    Convection
-                                     3._r8 * (                         dlf2(i,k)    * ( 1._r8 - dum1 ) ) &
-                                     / (4._r8*3.14_r8*clubb_liq_sh**3*997._r8)     ! Shallow Convection 
-         ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf_tmp(i,k) - dlf2(i,k) )) *  dum1 ) &
-                                     / (4._r8*3.14_r8*clubb_ice_deep**3*500._r8) + & ! Deep    Convection
-                                     3._r8 * (                         dlf2(i,k)    *  dum1 ) &
-                                     / (4._r8*3.14_r8*clubb_ice_sh**3*500._r8)     ! Shallow Convection
+
+! Zhun             
+         if (deep_scheme .eq. 'off') then 
+            ! let ptend_loc%q(i,k,ixcldliq) = -1 * ptend_loc%q(i,k,ixcldice) 
+            ptend_loc%q(i,k,ixcldice) = dlf_tmp(i,k) * dum1
+            ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf_tmp(i,k) - dlf2(i,k) )) *  dum1 ) &
+                                        / (4._r8*3.14_r8*clubb_ice_deep**3*500._r8) + & ! Deep    Convection
+                                        3._r8 * (                         dlf2(i,k)    *  dum1 ) &
+                                        / (4._r8*3.14_r8*clubb_ice_sh**3*500._r8)     ! Shallow Convection
+            ptend_loc%q(i,k,ixcldliq) = -1 * ptend_loc%q(i,k,ixcldice) 
+            ptend_loc%q(i,k,ixnumliq) = -1 * ptend_loc%q(i,k,ixnumice)
+         else
+            ptend_loc%q(i,k,ixcldliq) = dlf_tmp(i,k) * ( 1._r8 - dum1 )
+            ptend_loc%q(i,k,ixcldice) = dlf_tmp(i,k) * dum1
+            ptend_loc%q(i,k,ixnumliq) = 3._r8 * ( max(0._r8, ( dlf_tmp(i,k) - dlf2(i,k) )) * ( 1._r8 - dum1 ) ) &
+                                        / (4._r8*3.14_r8* clubb_liq_deep**3*997._r8) + & ! Deep    Convection
+                                        3._r8 * (                         dlf2(i,k)* ( 1._r8 - dum1 ) ) &
+                                        / (4._r8*3.14_r8*clubb_liq_sh**3*997._r8) ! Shallow Convection 
+            ptend_loc%q(i,k,ixnumice) = 3._r8 * ( max(0._r8, ( dlf_tmp(i,k) - dlf2(i,k) )) *  dum1 ) &
+                                        / (4._r8*3.14_r8*clubb_ice_deep**3*500._r8) + & ! Deep    Convection
+                                        3._r8 * (                         dlf2(i,k) *  dum1 ) &
+                                        / (4._r8*3.14_r8*clubb_ice_sh**3*500._r8)! Shallow Convection
+         endif
+! Zhun Apr/3 2020
+
          ptend_loc%s(i,k)          = dlf_tmp(i,k) * dum1 * latice
- 
+
          dlf_liq_out(i,k) = dlf_tmp(i,k) * ( 1._r8 - dum1 )
          dlf_ice_out(i,k) = dlf_tmp(i,k) * dum1
  

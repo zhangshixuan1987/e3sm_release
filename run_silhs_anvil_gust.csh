@@ -1147,7 +1147,7 @@ clubb_do_icesuper= .false.
  clubb_c_invrs_tau_sfc          = 0.2
  clubb_c_invrs_tau_shear                = 0.03
 
- clubb_c_k1             = 2
+ clubb_c_k1             = 10
  clubb_c_k10            = 0.3
  clubb_c_k2             = 0.1
  clubb_c_k8             = 10

@@ -167,9 +167,9 @@ if drawclubb:
     plotstd1=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
 
     pname = 'std2'
-    varis    = [ 'wprtp','wpthlp','wprcp','upwp','vpwp','wpthvp']
-    cscale   = [     1E3,       1,    1E3,     1,     1,       1] 
-    chscale  = [  '1E-3',     '1', '1E-3',   '1',    '1',    '1']
+    varis    = [ 'wprtp','wpthlp','wprcp','upwp','vpwp','rtpthlp']
+    cscale   = [     1E3,       1,    1E3,     1,     1,     1E3] 
+    chscale  = [  '1E-3',     '1', '1E-3',   '1',    '1',    '1E-3']
 
     plotstd2=draw_clubb_standard.clubb_std_prf(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir,varis,cscale,chscale,pname)
 

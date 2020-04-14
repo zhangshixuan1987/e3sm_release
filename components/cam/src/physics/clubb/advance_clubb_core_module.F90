@@ -1212,7 +1212,7 @@ module advance_clubb_core_module
         end if
 
         tau_no_N2_zm = one / invrs_tau_no_N2_zm  
-        tau_zm       = one / invrs_tau_zm
+        tau_zm       = one / invrs_tau_zm * 2
         tau_wp2_zm   = one / invrs_tau_wp2_zm
         tau_xp2_zm   = one / invrs_tau_xp2_zm
         tau_wpxp_zm  = one / invrs_tau_wpxp_zm

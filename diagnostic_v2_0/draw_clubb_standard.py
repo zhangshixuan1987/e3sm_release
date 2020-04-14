@@ -173,10 +173,14 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
              A_field[im,:] = A_field[im,:] *cscale[iv]
 
              inptrs.close()
-         if (varis[iv] == 'tau_zm' or varis[iv] == 'tau_wp2_zm' or varis[iv] == 'tau_wp3_zm' or varis[iv] == 'tau_xp2_zm' or varis[iv] == 'tau_no_N2_zm'):
+
+         if (varis[iv] == 'tau_zm' or varis[iv] == 'tau_wp2_zm' \
+            or varis[iv] == 'tau_wp3_zm' or varis[iv] == 'tau_xp2_zm' \
+            or varis[iv] == 'tau_no_N2_zm' or varis[iv] == 'tau_wpxp_zm'):
              res.tiMainString    =  "invrs_"+varis[iv]+"  "+theunits
          else:
              res.tiMainString    =  varis[iv]+"  "+theunits
+
          res.trYReverse        = True
          res.xyLineColors      = np.arange(3,20,2)
          res.xyMarkerColors    = np.arange(2,20,2)

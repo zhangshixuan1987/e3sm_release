@@ -11,7 +11,7 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-case='newbase' # A general case name
+case='newbase_repeat' # A general case name
 outdir='/lcrc/group/acme/zhun/plots/' # Location of plots
 
 filepath=['/lcrc/group/acme/zhun/E3SM_simulations/',\
@@ -35,8 +35,8 @@ filepath=['/lcrc/group/acme/zhun/E3SM_simulations/',\
 
 cases=[ \
       'anvil-centos7.new_zhun.newbase.ne16_ne16',\
-      'anvil-centos7.new_zhun.LBAbest_c11p5_newdlf1e-2_snwfracp1.ne16_ne16',\
-      'anvil-centos7.new_zhun.newbase_dbltau.ne16_ne16',\
+      'anvil-centos7.new_zhun.newbase_repeat2.ne16_ne16',\
+      'anvil-centos7.new_zhun.newbase_repeat.ne16_ne16',\
       'anvil-centos7.new_zhun.newbase_1ptau.ne16_ne16',\
 #      'anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_acc_try12.ne16_ne16',\
 #      'anvil-centos7.new_zhun.ZM_LBAbest_c11p5_nodcixnumice.ne16_ne16',\
@@ -46,8 +46,9 @@ cases=[ \
 # Give a short name for your experiment which will appears on plots
 
 #casenames=['arc4_prc3_1p2_wp3_wpxp1_n2p5','arc4_prc3_1p2_wp3_wpxp1_n2p45_c61p5','arc4_prc3_1p2_wp3_wpxp1_n2p5_c1c61p5','arc4_prc3','ZM']
-casenames=['newbase','newbase_snwfracp01',\
-'newbase_c1=c6=c2=c8=1_tau_dbl',\
+casenames=['newbase',\
+'newbase_c1=c2=p75_c6=1_c8=p5_dbltau_srf',\
+'newbase_c1=c2=p75_c6=1_c8=p5_dbltau',\
 'newbase_c1=c6=c2=c8=1_gnd=1p7_n2=p8']
 
 years=[\
@@ -66,7 +67,7 @@ cseason       ='ANN' # Seasons, or others
 casename      =case+'_'+cseason
 
 #------------------------------------------------------------------------
-calmean          = False       # make mean states
+calmean          = True       # make mean states
 findout          = True       # pick out the locations of your sites
 draw2d           = True       # 2D plots, SWCF etc.
 drawclm          = False      # Plots of global land surface?

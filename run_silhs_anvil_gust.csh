@@ -9,7 +9,7 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = newbase_wpxp2 
+set job_name       = newbase_repeat2_2 
 set compset        = FC5CLBMG2BCL72 
 #set compset        = FAMIPC5 
 set resolution     = ne16_ne16
@@ -1116,38 +1116,38 @@ clubb_do_icesuper= .false.
 ! clubb_c_k2             = 0.1
 
  clubb_beta             = 2.
- clubb_c1               = 1.5 
+ clubb_c1               = 0.75
  clubb_c11              = .5
  clubb_c11b             = .5
  clubb_c11c             = 0.85
- clubb_c14              = 1.5 
+ clubb_c14              = 0.75
  clubb_c15              = 0
- clubb_c1b              = 1.5 
+ clubb_c1b              = 0.75
  clubb_c1c              = 0.75
- clubb_c2rt             = 1.5
- clubb_c2rtthl          = 1.5
- clubb_c2thl            = 1.5
- clubb_c4               = 2
+ clubb_c2rt             = 0.75
+ clubb_c2rtthl          = 0.75
+ clubb_c2thl            = 0.75
+ clubb_c4               = 1
  clubb_c5               = 0
- clubb_c6rt             = 2.
- clubb_c6rtb            = 2.
+ clubb_c6rt             = 1
+ clubb_c6rtb            = 1
  clubb_c6rtc            = 0.50
- clubb_c6thlb           = 2.
+ clubb_c6thlb           = 1
  clubb_c6thlc           = 0.50
  clubb_c7               = 0.7
  clubb_c7b              = 0.7
- clubb_c8               = 1.
+ clubb_c8               = 0.5
 
- clubb_c_invrs_tau_bkgnd                = 1.1
- clubb_c_invrs_tau_n2           = 0.4
- clubb_c_invrs_tau_n2_clear_wp3         = 1
- clubb_c_invrs_tau_n2_wp2               = 0.1
- clubb_c_invrs_tau_n2_wpxp              = 1
- clubb_c_invrs_tau_n2_xp2               = 0.03
- clubb_c_invrs_tau_sfc          = 0.2
- clubb_c_invrs_tau_shear                = 0.03
+ clubb_c_invrs_tau_bkgnd                = 2.2
+ clubb_c_invrs_tau_n2                   = 0.8
+ clubb_c_invrs_tau_n2_clear_wp3         = 2
+ clubb_c_invrs_tau_n2_wp2               = 0.2
+ clubb_c_invrs_tau_n2_wpxp              = 2.
+ clubb_c_invrs_tau_n2_xp2               = 0.06
+ clubb_c_invrs_tau_sfc                  = 0.4
+ clubb_c_invrs_tau_shear                = 0.06
 
- clubb_c_k1             = 10
+ clubb_c_k1             = 2
  clubb_c_k10            = 0.3
  clubb_c_k2             = 0.1
  clubb_c_k8             = 10

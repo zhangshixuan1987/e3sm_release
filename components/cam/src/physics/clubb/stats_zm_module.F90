@@ -315,7 +315,8 @@ module stats_zm_module
         iwphydrometp, &
         irtphmp, &
         ithlphmp, &
-        ihmxphmyp
+        ihmxphmyp, &
+        iC6_term
 
     use stats_variables, only: &
         irtp2_from_chi
@@ -2364,6 +2365,13 @@ module stats_zm_module
         iC6thl_Skw_fnc = k
         call stat_assign( var_index=iC6thl_Skw_fnc, var_name="C6thl_Skw_fnc", &
              var_description="C_6thl parameter with Sk_w applied [-]", var_units="-", &
+             l_silhs=.false., grid_kind=stats_zm )
+        k = k + 1
+
+      case ( 'C6_term' )
+        iC6_term = k
+        call stat_assign( var_index=iC6_term, var_name="C6_term", &
+             var_description="C6 term [-]", var_units="-", &
              l_silhs=.false., grid_kind=stats_zm )
         k = k + 1
 

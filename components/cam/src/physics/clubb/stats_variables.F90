@@ -1062,9 +1062,10 @@ module stats_variables
     iC1_Skw_fnc = 0,     &
     ibrunt_vaisala_freq_sqd = 0, &
     iRichardson_num = 0, &
-    ishear_sqd = 0
+    ishear_sqd = 0,      &
+    iC6_term
 
-!$omp   threadprivate(igamma_Skw_fnc, iC6rt_Skw_fnc, iC6thl_Skw_fnc)
+!$omp   threadprivate(igamma_Skw_fnc, iC6rt_Skw_fnc, iC6thl_Skw_fnc, iC6_term)
 !$omp   threadprivate(iC7_Skw_fnc, iC1_Skw_fnc)
 !$omp   threadprivate(ibrunt_vaisala_freq_sqd, iRichardson_num, ishear_sqd)
 

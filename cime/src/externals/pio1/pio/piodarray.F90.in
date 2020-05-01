@@ -273,6 +273,7 @@ contains
     {VTYPE}, allocatable :: acopy(:)
     integer :: isize
 
+      write (*,*) "var=",varDesc
     isize= size(array)
     allocate(acopy(isize))
     acopy = reshape(array,(/isize/))

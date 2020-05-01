@@ -422,7 +422,7 @@ module model_flags
     ! Begin code
 
     l_use_precip_frac = .true.
-    l_predict_upwp_vpwp = .false.
+    l_predict_upwp_vpwp = .true.
     l_min_wp2_from_corr_wx = .false.
     l_min_xp2_from_corr_wx = .false.
     l_C2_cloud_frac = .false.

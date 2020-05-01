@@ -181,7 +181,8 @@ module advance_xm_wpxp_module
         iC7_Skw_fnc, &
         iC6rt_Skw_fnc, &
         iC6thl_Skw_fnc, &
-        l_stats_samp
+        l_stats_samp, &
+        iC6_term
 
     use sponge_layer_damping, only: &
         rtm_sponge_damp_settings, &
@@ -333,7 +334,7 @@ module advance_xm_wpxp_module
     ! -------------------- Local Variables --------------------
 
     real( kind = core_rknd ), dimension(gr%nz) ::  & 
-      C6rt_Skw_fnc, C6thl_Skw_fnc, C7_Skw_fnc
+      C6rt_Skw_fnc, C6thl_Skw_fnc, C7_Skw_fnc, C6_term
 
     ! Eddy Diffusion for wpthlp and wprtp.
     real( kind = core_rknd ), dimension(gr%nz) :: Kw6  ! wpxp eddy diff. [m^2/s]
@@ -479,14 +480,14 @@ module advance_xm_wpxp_module
     end if ! l_use_C7_Richardson
 
     ! Damp C6 as a function of Lscale in stably stratified regions
-    C6rt_Skw_fnc = damp_coefficient( C6rt, C6rt_Skw_fnc, &
-                                     C6rt_Lscale0, wpxp_L_thresh, Lscale )
+!    C6rt_Skw_fnc = damp_coefficient( C6rt, C6rt_Skw_fnc, &
+!                                     C6rt_Lscale0, wpxp_L_thresh, Lscale )
 
-    C6thl_Skw_fnc = damp_coefficient( C6thl, C6thl_Skw_fnc, &
-                                      C6thl_Lscale0, wpxp_L_thresh, Lscale )
+!    C6thl_Skw_fnc = damp_coefficient( C6thl, C6thl_Skw_fnc, &
+!                                      C6thl_Lscale0, wpxp_L_thresh, Lscale )
 
-    !        C6rt_Skw_fnc = C6rt
-    !        C6thl_Skw_fnc = C6thl
+            C6rt_Skw_fnc = C6rt
+            C6thl_Skw_fnc = C6thl
     !        C7_Skw_fnc = C7
 
     if ( l_stats_samp ) then
@@ -526,6 +527,12 @@ module advance_xm_wpxp_module
                                 tau_C6_zm, l_scalar_calc,                       & ! Intent(in)
                                 lhs_pr1_wprtp, lhs_pr1_wpthlp, lhs_pr1_wpsclrp  ) ! Intent(out)
                                 
+    C6_term = C6rt_Skw_fnc / tau_C6_zm
+
+    if ( l_stats_samp ) then
+      call stat_update_var( iC6_term, C6_term, stats_zm )
+    end if
+
                     
     call  calc_xm_wpxp_ta_terms( wprtp, wp2rtp, wpthlp, wp2thlp, wpsclrp, wp2sclrp, &
                                  rho_ds_zt, invrs_rho_ds_zm, rho_ds_zm, &
@@ -4757,7 +4764,7 @@ module advance_xm_wpxp_module
     ! Local variables
     real( kind = core_rknd ), parameter :: &
       ! Added to prevent large damping at low altitudes where Lscale is small
-      altitude_threshold = 300 !one_hundred  ! Altitude above which damping should occur
+      altitude_threshold = 300  ! Altitude above which damping should occur
 
     ! Return Variable
     real( kind = core_rknd ), dimension(gr%nz) :: damped_value

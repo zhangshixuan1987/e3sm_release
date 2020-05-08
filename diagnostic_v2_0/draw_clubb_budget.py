@@ -120,7 +120,7 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
                  nterms = len (budget_ends)
 
              if (varis[iv] == "wp3") :
-                 budget_ends = ["_bt", "_ma", "_ta", "_tp", "_ac","_bp1","_pr1","_pr2","_dp1", "_cl"]
+                 budget_ends = ["_bt", "_ma", "_ta", "_tp", "_ac","_bp1","_bp2","_pr1","_pr2","_dp1", "_cl"]
                  nterms = len (budget_ends)
 
              if (varis[iv] == "up2" or varis[iv] == "vp2") :

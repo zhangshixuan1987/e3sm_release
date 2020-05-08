@@ -2931,7 +2931,7 @@ end subroutine clubb_init_cnst
     dlf_tmp(:,:)=0.0 
      do k=1,pver
         do i=1,ncol
-           dlf_tmp(i,k)=(1.0e-2)*rcm(i,k)*  invrs_tau_zm(i,k)
+           dlf_tmp(i,k)=(1.e-2)*rcm(i,k)*  invrs_tau_zm(i,k)
         enddo
      enddo
    else

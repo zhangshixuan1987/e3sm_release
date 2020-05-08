@@ -9,7 +9,7 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = newbase_damp5_predictupwp 
+set job_name       = damp5_xp2_upwp 
 set compset        = FC5CLBMG2BCL72 
 #set compset        = FAMIPC5 
 set resolution     = ne16_ne16
@@ -1054,6 +1054,8 @@ state_debug_checks=.true.
 !ice_supersat = .true.
 clubb_do_icesuper= .false.
 
+!microp_aero_wsubmin  = 0.1
+
 ! clubb_beta             = 2     ! 1.1160
 ! clubb_c1               = 2     ! 4.58330
 ! clubb_c11              = .5    ! .50896
@@ -1120,7 +1122,7 @@ clubb_do_icesuper= .false.
  clubb_c11b             = .5
  clubb_c11c             = 0.85
  clubb_c14              = 0.75
- clubb_c15              = 0
+ clubb_c15              = 0.
  clubb_c1b              = 0.75
  clubb_c1c              = 0.75
  clubb_c2rt             = 0.75
@@ -1248,7 +1250,7 @@ clubb_cloudtop_cooling = .false.
 !  prc_exp = 2.45 !2.47D0
 !  prc_exp1 = -1.4!-1.79D0
 prc_coef1 = 30500.0D0
-prc_exp =  3!.19D0
+prc_exp =  3 !3.19D0
 prc_exp1 = -1.2D0
 
 
@@ -1289,7 +1291,6 @@ prc_exp1 = -1.2D0
   zmconv_tiedke_add              = 0.8D0
   zmconv_tp_fac          =       2.0D0
 
-  clubb_C15 = 0
 
   macrop_scheme = 'CLUBB_SGS'
   eddy_scheme = 'CLUBB_SGS'

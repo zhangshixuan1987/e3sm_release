@@ -238,3 +238,4 @@ def draw_micro_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          Ngl.destroy(wks) 
 
  return (plotmicrobgt)
+

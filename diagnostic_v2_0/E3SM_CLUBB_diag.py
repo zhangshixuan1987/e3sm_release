@@ -115,7 +115,7 @@ import draw_micro_budget
 import draw_e3sm_budget
 import Common_functions
 import Diagnostic_webpage
-import draw_plots_hoz_clm
+
 
 casedir=outdir+casename
 

@@ -26,52 +26,46 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
  if not os.path.exists(casedir):
         os.mkdir(casedir)
 
- if not os.path.exists(casedir+"/2D"):
-        os.mkdir(casedir+"/2D") 
+ if not os.path.exists(casedir+'/2D'):
+        os.mkdir(casedir+'/2D') 
 
  _Font   = 25
  interp = 2
  extrap = False
- mkres = Ngl.Resources()
- mkres.gsMarkerIndex = 2
- mkres.gsMarkerColor = "Red"
- mkres.gsMarkerSizeF = 15.   
- infiles  = ["" for x in range(ncases)] 
- ncdfs    = ["" for x in range(ncases)] 
- varis    = ["CLDTOT",     "SWCF","LWCF","PRECT","LHFLX","SHFLX","U10", "CLDLOW"    ,"CLDHGH"    ,"TMQ"   ,"TS"]
- varisobs = ["CLDTOT_CAL", "SWCF","LWCF","PRECT","LHFLX","SHFLX","U10", "CLDTOT_CAL","CLDTOT_CAL","PREH2O","TS"]
- alpha    = ["A","B","C","D","E","F"]
+ infiles  = ['' for x in range(ncases)] 
+ ncdfs    = ['' for x in range(ncases)] 
+ alpha    = ['A','B','C','D','E','F']
+ cunits = ['']
+ varis    = ['SWCF','LWCF', 'PRECT','LHFLX','SHFLX',   'TMQ','PS','TS', 'U10', 'CLDTOT'    , 'CLDLOW'   ,    'CLDHGH', 'TGCLDLWP']
+ varisobs = ['SWCF','LWCF', 'PRECT','LHFLX','SHFLX','PREH2O','PS','TS', 'U10', 'CLDTOT_CAL','CLDTOT_CAL','CLDTOT_CAL', 'TGCLDLWP_OCEAN']
  nvaris = len(varis)
- cunits = [""]
- cscale = [100,1,1,86400000, 1,  1,1,100,100,1,1,1000,1,1,1,1]
+ cscale   = [     1,     1,86400000,      1,      1,    1,    1,   1,     1,          100,         100,         100,       1000,1,1,1]
  cscaleobs =  [1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 # cntrs = [[0 for col in range(11)] for row in range(nvaris)]
  cntrs = np.zeros((nvaris,11),np.float32)
 
- obsdataset=  ["CALIPSOCOSP","CERES-EBAF","CERES-EBAF","GPCP","ERAI", "NCEP", "ERAI", "CALIPSOCOSP","CALIPSOCOSP","NCEP","NCEP","NVAP"]
+ obsdataset=['CERES-EBAF','CERES-EBAF','GPCP','ERAI', 'NCEP', 'ERAI','NCEP', 'ERAI','ERAI','CALIPSOCOSP', 'CALIPSOCOSP','CALIPSOCOSP','NVAP']
  
- plot2d=["" for x in range(nvaris)]
+ plot2d=['' for x in range(nvaris)]
  for iv in range(0, nvaris):
 # make plot for each field 
-   if(varis[iv] == "CLDTOT" or varis[iv] == "CLDLOW" or varis[iv] == "CLDHGH"):
+   if(varis[iv] == 'CLDTOT' or varis[iv] == 'CLDLOW' or varis[iv] == 'CLDHGH'):
        cntrs[iv,:] = [ 2, 5, 10, 20, 30, 40, 50, 60, 70,80, 90]
-   if(varis[iv] == "LWCF"):
-       cntrs[iv,:] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55] 
-   if(varis[iv] =="SWCF" or varis[iv] =="FLUT"):
+   if(varis[iv] == 'LWCF'):
+       cntrs[iv,:] = [1, 2,5, 10, 15, 20, 25, 30, 35, 40, 45] 
+   if(varis[iv] =='SWCF' or varis[iv] =='FLUT'):
        cntrs[iv,:] = [-40, -50, -60, -70, -80, -90, -100, -110, -120, -130,-140]
-   if(varis[iv]=="PRECT" or varis[iv]=="QFLX"):
+   if(varis[iv]=='PRECT' or varis[iv]=='QFLX'):
        cntrs[iv,:] = [0.5, 1, 2, 3, 4, 5, 6, 7, 8,9,10]
-#   if(varis[iv] == "FLUT"):
-#       cntrs[iv,:] = [210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310]
-   if(varis[iv] == "LHFLX"):
+   if(varis[iv] == 'LHFLX'):
        cntrs[iv,:] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
-   if(varis[iv] == "SHFLX"):
+   if(varis[iv] == 'SHFLX'):
        cntrs[iv,:] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
-   if(varis[iv] == "U10"):
+   if(varis[iv] == 'U10'):
        cntrs[iv,:] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-   if(varis[iv] == "TMQ"):
+   if(varis[iv] == 'TMQ'):
        cntrs[iv,:] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
-   if(varis[iv] == "TGCLDLWP"):
+   if(varis[iv] == 'TGCLDLWP'):
        cntrs[iv,:] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
 
 
@@ -80,13 +74,13 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
 
 
 #  Observational data
-   if(obsdataset[iv] =="CCCM"):
-       if(cseason == "ANN"):
-           fileobs = "/Users/guoz/databank/CLD/CCCm/cccm_cloudfraction_2007-"+cseason+".nc"
+   if(obsdataset[iv] =='CCCM'):
+       if(cseason == 'ANN'):
+           fileobs = '/Users/guoz/databank/CLD/CCCm/cccm_cloudfraction_2007-'+cseason+'.nc'
        else:
-           fileobs = "/Users/guoz/databank/CLD/CCCm/cccm_cloudfraction_2007-2010-"+cseason+".nc"
+           fileobs = '/Users/guoz/databank/CLD/CCCm/cccm_cloudfraction_2007-2010-'+cseason+'.nc'
    else:
-       if (varisobs[iv] =="PRECT"):
+       if (varisobs[iv] =='PRECT'):
            fileobs = filepathobs+'/GPCP_'+cseason+'_climo.nc'
        else:
            fileobs = filepathobs + obsdataset[iv]+'_'+cseason+'_climo.nc'
@@ -97,9 +91,9 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    inptrobs = Dataset(fileobs,'r') 
    latobs=inptrobs.variables['lat'][:]
    lonobs=inptrobs.variables['lon'][:]
-   if (varisobs[iv] =="U10"):
+   if (varisobs[iv] =='U10'):
       B0=inptrobs.variables[varisobs[iv]][0,:,:] 
-      B1=inptrobs.variables["V10"][0,:,:]
+      B1=inptrobs.variables['V10'][0,:,:]
       B=(B0*B0+B1*B1)
       B=B * cscaleobs[iv]
       B=np.sqrt(B)
@@ -113,9 +107,10 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    plotname = casedir+'/2D/Horizontal_'+varis[iv]+'_'+cseason
    plot2d[iv] = 'Horizontal_'+varis[iv]+'_'+cseason
    wks= Ngl.open_wks(ptype,plotname)
-   Ngl.define_colormap(wks,"cmocean_thermal")
+   Ngl.define_colormap(wks,'cmocean_thermal')
+#   Ngl.define_colormap(wks,'MPL_coolwarm')
  
-#   ngl_define_colormap(wks,"prcp_1")
+#   ngl_define_colormap(wks,'prcp_1')
    plot = []
 
    textres               = Ngl.Resources()
@@ -135,27 +130,27 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    pres.nglPanelLabelBarLabelFontHeightF = 0.015    # Labelbar font height
    pres.nglPanelLabelBarHeightF          = 0.0750   # Height of labelbar
    pres.nglPanelLabelBarWidthF           = 0.700    # Width of labelbar
-   pres.lbLabelFont                      = "helvetica-bold" # Labelbar font
+   pres.lbLabelFont                      = 'helvetica-bold' # Labelbar font
    pres.nglPanelTop                      = 0.935
    pres.nglPanelFigureStrings            = alpha
-   pres.nglPanelFigureStringsJust        = "BottomRight"
+   pres.nglPanelFigureStringsJust        = 'BottomRight'
 
 
    res = Ngl.Resources()
    res.nglDraw         =  False            #-- don't draw plots
    res.nglFrame        =  False  
    res.cnFillOn     = True
-   res.cnFillMode   = "RasterFill"
+   res.cnFillMode   = 'RasterFill'
    res.cnLinesOn    = False
    res.nglMaximize = True
    res.mpFillOn     = True
    res.mpCenterLonF = 180
    res.tiMainFont                     = _Font
    res.tiMainFontHeightF              = 0.025
-   res.tiXAxisString                  = ""
+   res.tiXAxisString                  = ''
    res.tiXAxisFont                    = _Font
    res.tiXAxisFontHeightF             = 0.025
-   res.tiYAxisString                  = ""
+   res.tiYAxisString                  = ''
    res.tiYAxisFont                    = _Font
    res.tiYAxisOffsetXF                = 0.0
    res.tiYAxisFontHeightF             = 0.025       
@@ -179,9 +174,9 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
 #   res.vcRefAnnoOn     = True#False
 #   res.vcRefAnnoZone   = 3
 #   res.vcRefAnnoFontHeightF = 0.02
-#   res.vcRefAnnoString2 =""
+#   res.vcRefAnnoString2 =''
 #   res.vcRefAnnoOrthogonalPosF   = -1.0   
-#  res.vcRefAnnoArrowLineColor   = "blue"         # change ref vector color
+#  res.vcRefAnnoArrowLineColor   = 'blue'         # change ref vector color
 #  res.vcRefAnnoArrowUseVecColor = False
 #   res.vcMinDistanceF  = .05
 #   res.vcMinFracLengthF         = .
@@ -190,13 +185,13 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
 #   res.vcLineArrowThicknessF    =  3.0
 #   res.vcLineArrowHeadMinSizeF   = 0.01
 #   res.vcLineArrowHeadMaxSizeF   = 0.03
-#   res.vcGlyphStyle              = "CurlyVector"     # turn on curley vectors 
-#  res@vcGlyphStyle              ="Fillarrow"
+#   res.vcGlyphStyle              = 'CurlyVector'     # turn on curley vectors 
+#  res@vcGlyphStyle              ='Fillarrow'
 #   res.vcMonoFillArrowFillColor = True
 #   res.vcMonoLineArrowColor     = True
-#   res.vcLineArrowColor          = "green"           # change vector color
-#   res.vcFillArrowEdgeColor      ="white"
-#   res.vcPositionMode            ="ArrowTail"
+#   res.vcLineArrowColor          = 'green'           # change vector color
+#   res.vcFillArrowEdgeColor      ='white'
+#   res.vcPositionMode            ='ArrowTail'
 #   res.vcFillArrowHeadInteriorXF =0.1
 #   res.vcFillArrowWidthF         =0.05           #default
 #   res.vcFillArrowMinFracWidthF  =.5
@@ -205,7 +200,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
 #   res.vcFillArrowEdgeThicknessF = 2.0
    res.mpFillOn                   = False
    
-   res.cnLevelSelectionMode = "ExplicitLevels"
+   res.cnLevelSelectionMode = 'ExplicitLevels'
 
    res.cnLevels      = cntrs[iv][:]
 
@@ -263,14 +258,14 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
        res.tiXAxisOn  = False 
        res.sfXArray     = lon
        res.sfYArray     = lat
-       res.mpLimitMode  = "LatLon"
+       res.mpLimitMode  = 'LatLon'
        res.mpMaxLonF    = max(lon) 
        res.mpMinLonF    = min(lon) 
        res.mpMinLatF    = min(lat) 
        res.mpMaxLatF    = max(lat) 
-       res.tiMainString    =  "GLB="+str(np.sum(A_xy[:]*area[:]/np.sum(area)))
+       res.tiMainString    =  'GLB='+str(np.sum(A_xy[:]*area[:]/np.sum(area)))
        textres.txFontHeightF = 0.015
-       Ngl.text_ndc(wks,alpha[im]+"  "+ casenames[im],0.3,.135-im*0.03,textres)
+       Ngl.text_ndc(wks,alpha[im]+'  '+ casenames[im],0.3,.135-im*0.03,textres)
 
 
        p = Ngl.contour_map(wks,A_xy,res)
@@ -279,7 +274,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
 # observation 
 #   res.nglLeftString = obsdataset[iv]
 #  res@lbLabelBarOn = True 
-#  res@lbOrientation        = "vertical"         # vertical label bars
+#  res@lbOrientation        = 'vertical'         # vertical label bars
    res.lbLabelFont          = _Font
    res.tiYAxisOn  = True
    res.tiXAxisOn  = True
@@ -304,23 +299,30 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
 
    for j in range(0, jlat-1):
       for i in range(0, len(lonobs)-1):
-        if (np.isnan(B[j][i]) != "--"):
+        if (np.isnan(B[j][i]) != '--'):
            sum1= sum1+area_wgt[j]*B[j][i]
            sum2= sum2+area_wgt[j]
    
    glb=sum1/sum2
    res.sfXArray     = lonobs
    res.sfYArray     = latobs
-   res.mpLimitMode  = "LatLon"
+   res.mpLimitMode  = 'LatLon'
    res.mpMaxLonF    = max(lonobs)
    res.mpMinLonF    = min(lonobs)
    res.mpMinLatF    = min(latobs)
    res.mpMaxLatF    = max(latobs)
-   res.tiMainString   =  "GLB="+str(glb)
-
+   res.tiMainString   =  'GLB='+str(glb)
 
    p =Ngl.contour_map(wks,B,res)
+   if (iv == 0) :
+      poly_res               = Ngl.Resources()
+      poly_res.gsMarkerIndex = 16
+      poly_res.gsMarkerSizeF = 0.005
+      poly_res.gsMarkerColor = 'green'
+      dum = Ngl.add_polymarker(wks,p,lons,lats,poly_res)
+
    plot.append(p)
+
 
    if(np.mod(ncases+1,2)==1):
       Ngl.panel(wks,plot[:],[(ncases+1)/2+1,2],pres) 

@@ -163,10 +163,25 @@ def clubb_std_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, f
 
                  else:
                      tmp=inptrs.variables[varis[iv]][0,:,npoint]
-                     if (varis[iv] == 'tau_zm' or varis[iv] == 'tau_wp2_zm' \
-                        or varis[iv] == 'tau_wp3_zm' or varis[iv] == 'tau_xp2_zm' \
-                        or varis[iv] == 'tau_no_N2_zm' or varis[iv] == 'tau_wpxp_zm'):
-                        tmp=1/tmp
+#                     tmp2=inptrs.variables['C6rt_Skw_fnc'][0,:,npoint]
+#                     tmp3=inptrs.variables['tau_zm'][0,:,npoint]
+#                     tmp4=inptrs.variables['tau_wpxp_zm'][0,:,npoint]
+#                     if (varis[iv] == 'tau_zm' or varis[iv] == 'tau_wp2_zm' \
+#                        or varis[iv] == 'tau_wp3_zm' or varis[iv] == 'tau_xp2_zm' \
+#                        or varis[iv] == 'tau_no_N2_zm' or varis[iv] == 'tau_wpxp_zm'):
+#                        tmp=1/tmp
+#                        tmp [0:10] = 0.0
+#                     if (varis[iv] == 'cloud_frac'):
+#                        tmp=(1/tmp4)*tmp2
+#                        print(lons[ire])
+#                        print(tmp[65:])
+#                        tmp [0:10] = 0.0
+#                     if (varis[iv] == 'bv_freq_sqd'):
+#                       tmp=(1/tmp4)*tmp2
+#                       tmp [0:10] = 0.0
+
+
+
                      theunits=str(chscale[iv])+'x'+inptrs.variables[varis[iv]].units
 
                  A_field[im,:] = (A_field[im,:]+tmp[:]/n[ire]).astype(np.float32 )

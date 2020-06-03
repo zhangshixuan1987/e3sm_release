@@ -368,6 +368,15 @@ module surface_varnce_module
        up2_sfc = up2_vp2_factor * a_const * uf**2  ! From Andre, et al. 1978
        vp2_sfc = up2_vp2_factor * a_const * uf**2  ! "  "
 
+!        write(*,*) "SCAM vpwp_sfc=",vpwp_sfc
+!        write(*,*) "SCAM upwp_sfc=",upwp_sfc
+!        write(*,*) "SCAM wp2_sfc=",wp2_sfc
+!        write(*,*) "SCAM up2_sfc=",up2_sfc
+!        write(*,*) "SCAM vp2_sfc=",vp2_sfc
+!        write(*,*) "SCAM ustar2=",ustar2
+!        write(*,*) "SCAM wstar=",wstar
+
+
        ! Notes:  1) With "a" having a value of 1.8, the surface correlations of
        !            both w & rt and w & thl have a value of about 0.878.
        !         2) The surface correlation of rt & thl is 0.5.
@@ -402,6 +411,10 @@ module surface_varnce_module
        end if
        up2_sfc = up2_sfc - 0.5_core_rknd * wp2_splat_sfc_correction
        vp2_sfc = vp2_sfc - 0.5_core_rknd * wp2_splat_sfc_correction
+
+!       wp2_sfc = min( 1.0, wp2_sfc )
+!       up2_sfc = min( 1.0, up2_sfc )
+!       vp2_sfc = min( 1.0, vp2_sfc )
 
        ! Passive scalars
        if ( sclr_dim > 0 ) then

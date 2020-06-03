@@ -176,6 +176,8 @@ contains
          lnd2atm_vars%taux_grc      (bounds%begg:bounds%endg), &
          p2c_scale_type='unity', c2l_scale_type= 'unity', l2g_scale_type='unity')
 
+
+
     call p2g(bounds, &
          veg_ef%tauy (bounds%begp:bounds%endp), &
          lnd2atm_vars%tauy_grc      (bounds%begg:bounds%endg), &

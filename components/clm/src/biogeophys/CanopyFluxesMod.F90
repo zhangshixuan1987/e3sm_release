@@ -721,6 +721,7 @@ contains
 
       end do
 
+
       if (found) then
          if ( .not. use_fates ) then
             write(iulog,*)'Error: Forcing height is below canopy height for pft index '
@@ -736,7 +737,21 @@ contains
 
          call MoninObukIni(ur(p), thv(c), dthv(p), zldis(p), z0mv(p), um(p), obu(p))
 
+         if (abs(obu(p)) > 5000 .or. abs(um(p)) > 100 ) then 
+             write(iulog,*) "ur=",p, ur(p)
+             write(iulog,*) "thv=",c, thv(c)
+             write(iulog,*) "dthv=",p, dthv(p)
+             write(iulog,*) "z0mv=",p, z0mv(p)
+             write(iulog,*) "um=",p, um(p)
+             write(iulog,*) "obu=",p, obu(p)
+             write(iulog,*) "forc_hgt_u_patch_flx=",p,forc_hgt_u_patch(p)
+             write(iulog,*) "displa_flx=",p,displa(p)
+             write(iulog,*) "zldis_cal=",p, forc_hgt_u_patch(p)-displa(p)
+             write(iulog,*) "zldis=",p, zldis(p)
+             write(iulog,*) "htop=",p, htop(p)
+         end if
       end do
+
 
       ! Set counter for leaf temperature iteration (itlef)
 
@@ -1196,6 +1211,13 @@ contains
          h2ocan(p) = max(0._r8,h2ocan(p)+(qflx_tran_veg(p)-qflx_evap_veg(p))*dtime)
 
       end do
+
+!      write(*,*) "CanopyFluxesMod"
+!      write(*,*) "Canopy_taux",taux
+!      write(*,*) "Canopy_ustar",ustar
+!      write(*,*) "Canopy_um",um
+!      write(*,*) "Canopy_forc_rho",forc_rho
+!      write(*,*) "Canopy_forc_u",forc_u
 
       if ( use_fates ) then
          call alm_fates%wrap_accumulatefluxes(bounds,fn,filterp(1:fn))

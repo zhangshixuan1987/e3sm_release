@@ -405,12 +405,17 @@ module advance_clubb_core_module
         irvm,          &
         irel_humidity, &
         iwpthlp_zt,    &
+        iinvrs_tau_bkgnd, &
+        iinvrs_tau_sfc,   &
+        iinvrs_tau_shear, &
         itau_no_N2_zm, &
         itau_xp2_zm,   &
         itau_wp2_zm,   &
         itau_wp3_zm,   &
         itau_wpxp_zm,  &
         ibrunt_vaisala_freq_sqd   
+
+
 
     use stats_variables, only: &
         iwprtp_zt,     &
@@ -759,6 +764,9 @@ module advance_clubb_core_module
        invrs_tau_wp3_zm,             & ! One divided by tau_wp3                       [s^-1]
        invrs_tau_N2_zm,              & ! One divided by tau with stability effects    [s^-1]
        invrs_tau_no_N2_zm,           & ! One divided by tau (without N2) on zm levels [s^-1] 
+       invrs_tau_bkgnd,              & ! One divided by tau_wp3 [s^-1]
+       invrs_tau_shear,              & ! One divided by tau with stability effects    [s^-1]
+       invrs_tau_sfc,                & ! One divided by tau (without N2) on zm levels [s^-1] 
        ustar,                        & ! Friction velocity  [m/s]
        tau_no_N2_zm,                 & ! Tau without Brunt Freq
        tau_wp2_zm,                   & ! Tau values used for advance_wp2_wpxp
@@ -1166,9 +1174,14 @@ module advance_clubb_core_module
 
         ustar = max( ( upwp_sfc**2 + vpwp_sfc**2 )**(one_fourth), ufmin )
 
-        invrs_tau_no_N2_zm = C_invrs_tau_bkgnd  / tau_const &
-         + C_invrs_tau_sfc * ( ustar / vonk ) / ( gr%zm - sfc_elevation + z_displace ) &
-         + C_invrs_tau_shear * zt2zm( zm2zt( sqrt( (ddzt( um ))**2 + (ddzt( vm ))**2 ) ) )
+        invrs_tau_bkgnd = C_invrs_tau_bkgnd  / tau_const
+
+        invrs_tau_shear = C_invrs_tau_shear * zt2zm( zm2zt( sqrt( (ddzt( um ))**2 + (ddzt( vm ))**2 ) ) ) 
+                         
+        invrs_tau_sfc   = C_invrs_tau_sfc * ( ustar / vonk ) / ( gr%zm - sfc_elevation + z_displace )
+                       !   C_invrs_tau_sfc * ( wp2 / vonk /ustar ) / ( gr%zm -sfc_elevation + z_displace ) 
+
+        invrs_tau_no_N2_zm = invrs_tau_bkgnd + invrs_tau_sfc + invrs_tau_shear
 
 !        brunt_vaisala_freq_sqd_smth = zt2zm( zm2zt( brunt_vaisala_freq_sqd ) )
 !       The min function below smooths the slope discontinuity in brunt freq
@@ -1190,15 +1203,19 @@ module advance_clubb_core_module
         invrs_tau_wp2_zm = invrs_tau_no_N2_zm &
               + C_invrs_tau_N2_wp2 * brunt_freq_pos  
 
-        invrs_tau_xp2_zm =  0.1 * C_invrs_tau_bkgnd  / tau_const &
-              + C_invrs_tau_sfc * ( ustar / vonk ) / ( gr%zm - sfc_elevation + z_displace ) &
-              + 5 * C_invrs_tau_shear * zt2zm( zm2zt( sqrt( (ddzt( um ))**2 + (ddzt( vm ))**2 ) ) )& 
+        invrs_tau_xp2_zm =  ( invrs_tau_bkgnd  + invrs_tau_sfc + invrs_tau_shear & 
               + C_invrs_tau_N2_xp2 * brunt_freq_pos & 
-              + C_invrs_tau_sfc *2 * sqrt(em)/(gr%zm - sfc_elevation + z_displace)
+              + C_invrs_tau_sfc *2 * sqrt(em)/(gr%zm - sfc_elevation + z_displace)) &
+              * min(max(sqrt(((ddzt(um))**2+(ddzt(vm))**2)/max(1e-7,brunt_vaisala_freq_sqd_smth)),0.3),3.0)
 
-        invrs_tau_xp2_zm = merge(0.003_core_rknd, invrs_tau_xp2_zm, &
-              zt2zm(ice_supersat_frac) <= 0.01_core_rknd &
-              .and. invrs_tau_xp2_zm  >= 0.003_core_rknd)
+!        write(*,*) "test=",sqrt(((ddzt(um))**2 + &
+!              (ddzt(vm))**2)/max(1e-7,brunt_vaisala_freq_sqd_smth))
+         
+!        invrs_tau_xp2_zm = max(invrs_tau_bkgnd, invrs_tau_xp2_zm)
+          
+!        invrs_tau_xp2_zm = merge(0.003_core_rknd, invrs_tau_xp2_zm, &
+!              zt2zm(ice_supersat_frac) <= 0.01_core_rknd &
+!              .and. invrs_tau_xp2_zm  >= 0.003_core_rknd)
 
         invrs_tau_wp3_zm = invrs_tau_wp2_zm &
               + C_invrs_tau_N2_clear_wp3 * brunt_freq_out_cloud
@@ -1438,6 +1455,9 @@ module advance_clubb_core_module
       end if ! l_stability_correction
 
       if ( l_stats_samp ) then
+      call stat_update_var( iinvrs_tau_bkgnd,invrs_tau_bkgnd , stats_zm)
+      call stat_update_var( iinvrs_tau_sfc,invrs_tau_sfc , stats_zm)
+      call stat_update_var( iinvrs_tau_shear,invrs_tau_shear, stats_zm)
       call stat_update_var( itau_no_N2_zm,tau_no_N2_zm , stats_zm)
       call stat_update_var( itau_xp2_zm,tau_xp2_zm , stats_zm)
       call stat_update_var( itau_wp2_zm,tau_wp2_zm , stats_zm)

@@ -794,7 +794,7 @@ end subroutine clubb_init_cnst
     ! Set the debug level.  Level 2 has additional computational expense since
     ! it checks the array variables in CLUBB for invalid values.
     ! ----------------------------------------------------------------- !
-    call set_clubb_debug_level_api( 2 )
+    call set_clubb_debug_level_api( 3 )
 
     ! ----------------------------------------------------------------- !
     ! use pbuf_get_fld_idx to get existing physics buffer fields from other
@@ -1605,8 +1605,8 @@ end subroutine clubb_init_cnst
    real(r8) :: vmag(pcols)
    real(r8) :: gust_fac(pcols)
    real(r8) :: umb(pcols), vmb(pcols),up2b(pcols),vp2b(pcols)
-   real(r8),parameter :: gust_facl = 1.2_r8 !gust fac for land
-   real(r8),parameter :: gust_faco = 0.9_r8 !gust fac for ocean
+   real(r8),parameter :: gust_facl = 0.2_r8 !gust fac for land
+   real(r8),parameter :: gust_faco = 1.0_r8 !gust fac for ocean
    real(r8),parameter :: gust_facc = 1.0_r8 !gust fac for clubb
 
 ! ZM gustiness equation below from Redelsperger et al. (2000)
@@ -2213,7 +2213,6 @@ end subroutine clubb_init_cnst
         !  Compute the surface momentum fluxes, if this is a SCAM simulation       
         upwp_sfc = -um(i,pver)*ustar**2/ubar
         vpwp_sfc = -vm(i,pver)*ustar**2/ubar
-    
       endif   
 
       !  Define surface sources for transported variables for diffusion, will 
@@ -2280,13 +2279,18 @@ end subroutine clubb_init_cnst
       invrs_rho_ds_zm = zt2zm_api(invrs_rho_ds_zt)
       thv_ds_zm       = zt2zm_api(thv_ds_zt)
       wm_zm           = zt2zm_api(wm_zt)
-      
+ 
       !  Surface fluxes provided by host model
       wpthlp_sfc = cam_in%shf(i)/(cpair*rho_ds_zm(1))       ! Sensible heat flux
       wprtp_sfc  = cam_in%cflx(i,1)/(rho_ds_zm(1))      ! Latent heat flux
       upwp_sfc   = cam_in%wsx(i)/rho_ds_zm(1)               ! Surface meridional momentum flux
       vpwp_sfc   = cam_in%wsy(i)/rho_ds_zm(1)               ! Surface zonal momentum flux  
       
+!        write(*,*) "upwp_sfc_intr2",upwp_sfc
+!        write(*,*) "vpwp_sfc_intr2",vpwp_sfc
+!        write(*,*) "um_sfc_intr2",um(i,pver)
+!        write(*,*) "vm_sfc_intr2",vm(i,pver)
+
       ! ------------------------------------------------- !
       ! Apply TMS                                         !
       ! ------------------------------------------------- !    
@@ -2389,7 +2393,7 @@ end subroutine clubb_init_cnst
             up2_in(k)=max(w_tol_sqd,up2_in(k))
             vp2_in(k)=max(w_tol_sqd,vp2_in(k))
           enddo
-       endif
+        endif
       endif
       if(clubb_do_adv.and.clubb_interp_advtend) then
            do k=1,pverp
@@ -3294,7 +3298,7 @@ end subroutine clubb_init_cnst
            vmag(i)         = max(1.e-5_r8,sqrt( umb(i)**2._r8 + vmb(i)**2._r8))
            vmag_gust_dp(i) = ugust(min(prec_gust(i),6.94444e-4_r8),gust_fac(i)) ! Limit for the ZM gustiness equation set in Redelsperger et al. (2000) 
            vmag_gust_dp(i) = max(0._r8, vmag_gust_dp(i) )!/ vmag(i))
-           vmag_gust_cl(i) = gust_facc*(sqrt(max(0._r8,up2b(i)+vp2b(i))+vmag(i)**2._r8)-vmag(i))
+           vmag_gust_cl(i) = gust_fac(i)*(sqrt(max(0._r8,up2b(i)+vp2b(i))+vmag(i)**2._r8)-vmag(i))
            vmag_gust_cl(i) = max(0._r8, vmag_gust_cl(i) )!/ vmag(i))
            vmag_gust(i)    = vmag_gust_cl(i) + vmag_gust_dp(i)
           do k=1,pver

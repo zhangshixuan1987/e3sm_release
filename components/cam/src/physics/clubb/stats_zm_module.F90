@@ -61,7 +61,10 @@ module stats_zm_module
         ircp2,   &
         iSkw_zm, &
         iSkthl_zm, &
-        iSkrt_zm
+        iSkrt_zm,  &
+        iinvrs_tau_bkgnd, &
+        iinvrs_tau_sfc, &
+        iinvrs_tau_shear
 
     use stats_variables, only: &
         iupwp, & 
@@ -655,6 +658,31 @@ module stats_zm_module
              var_description="Time-scale tau on momentum levels [s]", var_units="s", &
              l_silhs=.false., grid_kind=stats_zm )
         k = k + 1
+
+      case ('invrs_tau_bkgnd')
+        iinvrs_tau_bkgnd = k
+
+        call stat_assign( var_index=iinvrs_tau_bkgnd, var_name="invrs_tau_bkgnd", &
+             var_description="invrs tau of bkgnd on momentum levels [s-1]", var_units="s^-1", &
+             l_silhs=.false., grid_kind=stats_zm )
+        k = k + 1
+
+      case ('invrs_tau_sfc')
+        iinvrs_tau_sfc = k
+
+        call stat_assign( var_index=iinvrs_tau_sfc, var_name="invrs_tau_sfc", &
+             var_description="invrs tau of surface on momentum levels [s-1]", var_units="s^-1", &
+             l_silhs=.false., grid_kind=stats_zm )
+        k = k + 1
+
+      case ('invrs_tau_shear')
+        iinvrs_tau_shear = k
+
+        call stat_assign( var_index=iinvrs_tau_shear, var_name="invrs_tau_shear", &
+             var_description="invrs tau of shear on momentum levels [s-1]", var_units="s^-1", &
+             l_silhs=.false., grid_kind=stats_zm )
+        k = k + 1
+
 
       case ('tau_no_N2_zm')
         itau_no_N2_zm = k

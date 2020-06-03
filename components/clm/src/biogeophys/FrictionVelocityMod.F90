@@ -148,6 +148,19 @@ contains
                  +(5._r8*log(zeta(n))+zeta(n)-1._r8))
          end if
 
+               if (ustar(n)< 0) then
+                  write(*,*) 'friction Vel is neg'
+                  write(*,*) 'ustar=',n, ustar(n)
+                  write(*,*) 'zeta=',n, zeta(n)
+                  write(*,*) 'um', n , um(n)
+                  write(*,*) 'obu', n, obu(n)
+                  write(*,*) 'z0m', n, z0m(n)
+                  write(*,*) 'StabilityFunc1(z0m/obu)', n, StabilityFunc1(z0m(n)/obu(n))
+                  write(*,*) '-StabilityFunc1(-zetam)', -1* StabilityFunc1(-zetam)
+                  write(*,*) 'log(zldis(n)/z0m(n)) ', n, log(zldis(n)/z0m(n)) 
+               end if
+
+
          if (zeta(n) < 0._r8) then
             vds_tmp = 2.e-3_r8*ustar(n) * ( 1._r8 + (300._r8/(-obu(n)))**0.666_r8)
          else

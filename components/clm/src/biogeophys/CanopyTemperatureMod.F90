@@ -413,6 +413,10 @@ contains
             displa(p) = displar(veg_pp%itype(p)) * htop(p)
          end if
       end do
+!      write(*,*) "displa=",displa
+!      write(*,*) "displar=",displar
+!      write(*,*) "htop=",htop
+
 
       ! Initialization
 
@@ -455,6 +459,7 @@ contains
          z0qv(p)   = z0mv(p)
       end do
 
+
       ! Make forcing height a pft-level quantity that is the atmospheric forcing 
       ! height plus each pft's z0m+displa
       do p = bounds%begp,bounds%endp
@@ -465,13 +470,13 @@ contains
             c = veg_pp%column(p)
             if (lun_pp%itype(l) == istsoil .or. lun_pp%itype(l) == istcrop) then
                if (frac_veg_nosno(p) == 0) then
-                  forc_hgt_u_patch(p) = forc_hgt_u(t) + z0mg(c) + displa(p)
-                  forc_hgt_t_patch(p) = forc_hgt_t(t) + z0mg(c) + displa(p)
-                  forc_hgt_q_patch(p) = forc_hgt_q(t) + z0mg(c) + displa(p)
+                  forc_hgt_u_patch(p) = forc_hgt_u(t) + 0 + z0mg(c) + displa(p)
+                  forc_hgt_t_patch(p) = forc_hgt_t(t) + 0 + z0mg(c) + displa(p)
+                  forc_hgt_q_patch(p) = forc_hgt_q(t) + 0 + z0mg(c) + displa(p)
                else
-                  forc_hgt_u_patch(p) = forc_hgt_u(t) + z0m(p) + displa(p)
-                  forc_hgt_t_patch(p) = forc_hgt_t(t) + z0m(p) + displa(p)
-                  forc_hgt_q_patch(p) = forc_hgt_q(t) + z0m(p) + displa(p)
+                  forc_hgt_u_patch(p) = forc_hgt_u(t) + 0 + z0m(p) + displa(p)
+                  forc_hgt_t_patch(p) = forc_hgt_t(t) + 0 + z0m(p) + displa(p)
+                  forc_hgt_q_patch(p) = forc_hgt_q(t) + 0 + z0m(p) + displa(p)
                end if
             else if (lun_pp%itype(l) == istwet .or. lun_pp%itype(l) == istice      &
                  .or. lun_pp%itype(l) == istice_mec) then

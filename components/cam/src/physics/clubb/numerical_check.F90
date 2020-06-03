@@ -833,17 +833,15 @@ module numerical_check
     implicit none
 
     ! Input Variables
+
     real( kind = core_rknd ), intent(in) :: xarg
 
     ! ---- Begin Code ---
-
     if (.not. ieee_is_finite(xarg) .or. ieee_is_nan(xarg)) then
-      ! Try ieee_is_finite ieee_is_nan 
-      is_nan_sclr = .true.
+        is_nan_sclr = .true.
     else
-      is_nan_sclr = .false.
+        is_nan_sclr = .false.
     end if
-
 
     return
   end function is_nan_sclr

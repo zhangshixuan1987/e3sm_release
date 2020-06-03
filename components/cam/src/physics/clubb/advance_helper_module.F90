@@ -455,7 +455,7 @@ module advance_helper_module
       Richardson_num_min = 100._core_rknd, &
       Richardson_num_max = 400._core_rknd,       &
       Cx_min            = 0.95_core_rknd,& !one_third,   &
-      Cx_max            = 0.4_core_rknd,         &
+      Cx_max            = 0.6_core_rknd,         &
       Cx_fnc_Richardson_below_ground_value = one
 
     logical, parameter :: &

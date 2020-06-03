@@ -455,6 +455,18 @@ contains
                um(p) = max(ur(p),0.1_r8)
             else                     !unstable
                zeta = max(-100._r8,min(zeta,-0.01_r8))
+               if (-grav*ustar(p)*thvstar*zii/thv(c) < 0) then 
+                  write(*,*) 'Lake flux has bad value' 
+                  write(*,*) 'ustar=',p,ustar(p)
+                  write(*,*) 'thvstar=',thvstar
+                  write(*,*) 'thv=',c,thv(c)
+                  write(*,*) "forc_hgt_u_patch=",forc_hgt_u_patch
+                  write(*,*) "forc_hgt_u_patch_flx=",p,forc_hgt_u_patch(p)
+                  write(*,*) "displa_flx=",p,displa(p)
+                  write(*,*) "zldis_cal=",p, forc_hgt_u_patch(p)-displa(p)
+                  write(*,*) "zldis=",p, zldis(p)
+               end if
+
                wc = beta1*(-grav*ustar(p)*thvstar*zii/thv(c))**0.333_r8
                um(p) = sqrt(ur(p)*ur(p)+wc*wc)
             end if

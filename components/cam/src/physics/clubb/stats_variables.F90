@@ -119,13 +119,16 @@ module stats_variables
 !$omp   isigma_sqd_w_zt, irho )
 
   integer, public :: &
+     iinvrs_tau_bkgnd = 0,  &
+     iinvrs_tau_sfc   = 0,  &
+     iinvrs_tau_shear = 0,  &
      itau_no_N2_zm = 0,     & 
      itau_xp2_zm   = 0,     &
      itau_wp2_zm   = 0,     &
      itau_wp3_zm   = 0,     &
      itau_wpxp_zm  = 0
 !$omp threadprivate( itau_no_N2_zm,itau_wp2_zm, itau_xp2_zm, itau_wp3_zm )
-
+!$omp threadprivate( iinvrs_tau_bkgnd,iinvrs_tau_sfc, iinvrs_tau_shear)
 
 
   integer, dimension(:), allocatable, public :: & 

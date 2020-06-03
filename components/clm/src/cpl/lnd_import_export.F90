@@ -1061,7 +1061,7 @@ contains
      
   !-----------------------------------------------------------------------------------------------------
 #else
-
+!      write(*,*) "x2l(index_x2l_Sa_u,i)=",g,x2l(index_x2l_Sa_u,i)
        atm2lnd_vars%forc_hgt_grc(g)     = x2l(index_x2l_Sa_z,i)         ! zgcmxy  Atm state m
        atm2lnd_vars%forc_u_grc(g)       = x2l(index_x2l_Sa_u,i)         ! forc_uxy  Atm state m/s
        atm2lnd_vars%forc_v_grc(g)       = x2l(index_x2l_Sa_v,i)         ! forc_vxy  Atm state m/s
@@ -1107,6 +1107,8 @@ contains
          top_as%ubot(topo)    = x2l(index_x2l_Sa_u,i)         ! forc_uxy  Atm state m/s
          top_as%vbot(topo)    = x2l(index_x2l_Sa_v,i)         ! forc_vxy  Atm state m/s
          top_as%zbot(topo)    = x2l(index_x2l_Sa_z,i)         ! zgcmxy    Atm state m
+!       write(*,*) "top_as%ubot=",topo, top_as%ubot(topo)
+
          ! assign the state forcing fields derived from other inputs
          ! Horizontal windspeed (m/s)
          top_as%windbot(topo) = sqrt(top_as%ubot(topo)**2 + top_as%vbot(topo)**2)

@@ -9,7 +9,7 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = xp2_cxmnp6_smldp2_c21_c15p5_shrp3_dcs3h
+set job_name       = revxp2_c15p5_all1_n2p65_wp2p15_300
 set compset        = FC5CLBMG2BCL72 
 #set compset        = FAMIPC5 
 set resolution     = ne16_ne16
@@ -1127,17 +1127,17 @@ clubb_do_icesuper= .false.
 
 
  clubb_beta             = 2.
- clubb_c1               = 0.75
+ clubb_c1               = 1.0
  clubb_c11              = .5
  clubb_c11b             = .5
  clubb_c11c             = 0.85
- clubb_c14              = 0.75
+ clubb_c14              = 1.0
  clubb_c15              = 0.5
- clubb_c1b              = 0.75
+ clubb_c1b              = 1.0
  clubb_c1c              = 0.75
  clubb_c2rt             = 1
  clubb_c2rtthl          = 1
- clubb_c2thl            = 1 
+ clubb_c2thl            = 1
  clubb_c4               = 1
  clubb_c5               = 0
  clubb_c6rt             = 1
@@ -1149,14 +1149,14 @@ clubb_do_icesuper= .false.
  clubb_c7b              = 0.7
  clubb_c8               = 0.5
 
- clubb_c_invrs_tau_bkgnd                = 2.2
- clubb_c_invrs_tau_n2                   = 0.8
- clubb_c_invrs_tau_n2_clear_wp3         = 2
- clubb_c_invrs_tau_n2_wp2               = 0.2
+ clubb_c_invrs_tau_bkgnd                = 1.65
+ clubb_c_invrs_tau_n2                   = 0.65
+ clubb_c_invrs_tau_n2_clear_wp3         = 2.0
+ clubb_c_invrs_tau_n2_wp2               = 0.15
  clubb_c_invrs_tau_n2_wpxp              = 2.
  clubb_c_invrs_tau_n2_xp2               = 0.0  
- clubb_c_invrs_tau_sfc                  = 0.4
- clubb_c_invrs_tau_shear                = 0.3
+ clubb_c_invrs_tau_sfc                  = 0.3
+ clubb_c_invrs_tau_shear                = 0.15
 
  clubb_c_k1             = 1
  clubb_c_k10            = 0.5

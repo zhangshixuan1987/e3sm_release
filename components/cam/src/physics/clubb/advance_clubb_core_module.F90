@@ -1174,7 +1174,7 @@ module advance_clubb_core_module
 
         ustar = max( ( upwp_sfc**2 + vpwp_sfc**2 )**(one_fourth), ufmin )
 
-        invrs_tau_bkgnd = C_invrs_tau_bkgnd  / tau_const
+        invrs_tau_bkgnd = C_invrs_tau_bkgnd / tau_const
 
         invrs_tau_shear = C_invrs_tau_shear * zt2zm( zm2zt( sqrt( (ddzt( um ))**2 + (ddzt( vm ))**2 ) ) ) 
                          
@@ -1193,9 +1193,13 @@ module advance_clubb_core_module
 
         brunt_freq_pos = sqrt( max( zero_threshold, brunt_vaisala_freq_sqd_smth ) )
 
+!        if ( gr%zt > 300) then
         brunt_freq_out_cloud =  brunt_freq_pos &
               * min(one, max(zero_threshold,&
               one - ( (zt2zm(ice_supersat_frac) / 0.007_core_rknd) )))
+!        else
+!        brunt_freq_out_cloud =0.0
+!        end if
 
         invrs_tau_zm = invrs_tau_no_N2_zm & 
               + C_invrs_tau_N2 * brunt_freq_pos 
@@ -1204,8 +1208,8 @@ module advance_clubb_core_module
               + C_invrs_tau_N2_wp2 * brunt_freq_pos  
 
         invrs_tau_xp2_zm =  ( invrs_tau_bkgnd  + invrs_tau_sfc + invrs_tau_shear & 
-              + C_invrs_tau_N2_xp2 * brunt_freq_pos & 
-              + C_invrs_tau_sfc *2 * sqrt(em)/(gr%zm - sfc_elevation + z_displace)) &
+              + C_invrs_tau_N2_xp2 * brunt_freq_pos & ! 0 
+              + C_invrs_tau_sfc *2 * sqrt(em)/(gr%zm - sfc_elevation + z_displace)) & ! small
               * min(max(sqrt(((ddzt(um))**2+(ddzt(vm))**2)/max(1e-7,brunt_vaisala_freq_sqd_smth)),0.3),3.0)
 
 !        write(*,*) "test=",sqrt(((ddzt(um))**2 + &

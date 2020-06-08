@@ -1193,13 +1193,12 @@ module advance_clubb_core_module
 
         brunt_freq_pos = sqrt( max( zero_threshold, brunt_vaisala_freq_sqd_smth ) )
 
-!        if ( gr%zt > 300) then
         brunt_freq_out_cloud =  brunt_freq_pos &
               * min(one, max(zero_threshold,&
               one - ( (zt2zm(ice_supersat_frac) / 0.007_core_rknd) )))
-!        else
-!        brunt_freq_out_cloud =0.0
-!        end if
+        where ( gr%zt < 300.0 )
+        brunt_freq_out_cloud =0.0
+        end where
 
         invrs_tau_zm = invrs_tau_no_N2_zm & 
               + C_invrs_tau_N2 * brunt_freq_pos 

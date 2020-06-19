@@ -42,7 +42,9 @@ casenames=[
 ]
 
 years=[\
-        '0001', '0001','0001', '0001','0001','0001']
+        1, 1,1, 1,1,1] # start year? 1 or 1979 etc.
+nyear=[\
+        3, 3, 3, 3,1,1] # how long? unit:year
 dpsc=[\
       'none','none','zm','zm','none','none']
 # NOTE, dpsc,deep scheme, has to be 'none', if silhs is turned on. 
@@ -124,7 +126,7 @@ if not os.path.exists(casedir):
 
 if calmean:
     print('Getting climatological mean')
-    function_cal_mean.cal_mean(ncases, cases, years,nsite, lats, lons, area, filepath)
+    function_cal_mean.cal_mean(ncases, cases, years,nyear, nsite, lats, lons, area, filepath)
 
 if findout:
     print('Find out the sites')

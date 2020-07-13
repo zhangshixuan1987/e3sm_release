@@ -85,7 +85,7 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          res.pmLegendHeightF        = 0.15                  # height of legend.
          res.lgLabelFontHeightF     = .01                   # change font height
          res.lgLabelFontThicknessF  = 1.
-#         res.lgBoxMinorExtentF      = 0.2
+         res.lgBoxMinorExtentF      = 0.1
          res.lgPerimOn              = True
          res.tiYAxisString   = "PRESSURE"
      

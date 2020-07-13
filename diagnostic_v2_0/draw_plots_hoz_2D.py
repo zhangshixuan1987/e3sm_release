@@ -56,7 +56,7 @@ def draw_2D_plot (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, fi
    if(varis[iv] =='SWCF' or varis[iv] =='FLUT'):
        cntrs[iv,:] = [-40, -50, -60, -70, -80, -90, -100, -110, -120, -130,-140]
    if(varis[iv]=='PRECT' or varis[iv]=='QFLX'):
-       cntrs[iv,:] = [0.5, 1, 2, 3, 4, 5, 6, 7, 8,9,10]
+       cntrs[iv,:] = [0.5, 1.5, 3, 4.5, 6, 7.5, 9, 10.5, 12,13.5,15]
    if(varis[iv] == 'LHFLX'):
        cntrs[iv,:] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
    if(varis[iv] == 'SHFLX'):

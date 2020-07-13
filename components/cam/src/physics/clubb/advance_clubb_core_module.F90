@@ -222,7 +222,8 @@ module advance_clubb_core_module
         C_invrs_tau_N2_xp2, &
         C_invrs_tau_N2_wp2, &
         C_invrs_tau_N2_wpxp, &
-        C_invrs_tau_N2_clear_wp3
+        C_invrs_tau_N2_clear_wp3, &
+        alt_thresh
 
     use parameters_model, only: &
         sclr_dim, & ! Variable(s)
@@ -413,7 +414,8 @@ module advance_clubb_core_module
         itau_wp2_zm,   &
         itau_wp3_zm,   &
         itau_wpxp_zm,  &
-        ibrunt_vaisala_freq_sqd   
+        ibrunt_vaisala_freq_sqd, &
+        iRi_zm   
 
 
 
@@ -622,8 +624,7 @@ module advance_clubb_core_module
     ! BUGSrad (cloud_cover).
     real( kind = core_rknd ), intent(out), dimension(gr%nz) ::  &
       rcm_in_layer, & ! rcm within cloud layer                          [kg/kg]
-      cloud_cover,  &   ! cloud cover                                     [-]
-      invrs_tau_zm
+      cloud_cover     ! cloud cover                                     [-]
 
     ! Variables that need to be output for use in host models
     real( kind = core_rknd ), intent(out), dimension(gr%nz) ::  &
@@ -757,7 +758,8 @@ module advance_clubb_core_module
        brunt_vaisala_freq_sqd_moist, & ! moist N^2
        brunt_vaisala_freq_sqd_plus,  & ! N^2 from another way
        brunt_freq_out_cloud,         & !
-!       invrs_tau_zm,                 & ! One divided by tau on zm levels              [s^-1]
+       Ri_zm,                        & ! Richardson number
+       invrs_tau_zm,                 & ! One divided by tau on zm levels              [s^-1]
        invrs_tau_xp2_zm,             & ! One divided by tau_xp2                       [s^-1]
        invrs_tau_wp2_zm,             & ! One divided by tau_wp2                       [s^-1]
        invrs_tau_wpxp_zm,            & ! One divided by tau_wpxp                      [s^-1]
@@ -793,9 +795,9 @@ module advance_clubb_core_module
     ! pdf_closure_driver.
     logical :: l_samp_stats_in_pdf_call
 
-   real( kind = core_rknd ), dimension(gr%nz) :: &
-     wp2_splat, &   ! Tendency of <w'2> due to eddies compressing  [m^2/s^3]
-     wp3_splat      ! Tendency of <w'3> due to eddies compressing  [m^3/s^4]
+    real( kind = core_rknd ), dimension(gr%nz) :: &
+       wp2_splat, &   ! Tendency of <w'2> due to eddies compressing  [m^2/s^3]
+       wp3_splat      ! Tendency of <w'3> due to eddies compressing  [m^3/s^4]
 
     ! Variables associated with upgradient momentum contributions due to cumuli
     !real( kind = core_rknd ), dimension(gr%nz) :: &
@@ -1178,8 +1180,8 @@ module advance_clubb_core_module
 
         invrs_tau_shear = C_invrs_tau_shear * zt2zm( zm2zt( sqrt( (ddzt( um ))**2 + (ddzt( vm ))**2 ) ) ) 
                          
-        invrs_tau_sfc   = C_invrs_tau_sfc * ( ustar / vonk ) / ( gr%zm - sfc_elevation + z_displace )
-                       !   C_invrs_tau_sfc * ( wp2 / vonk /ustar ) / ( gr%zm -sfc_elevation + z_displace ) 
+        invrs_tau_sfc   =  C_invrs_tau_sfc * ( ustar / vonk ) / ( gr%zm - sfc_elevation + z_displace )
+                          !C_invrs_tau_sfc * ( wp2 / vonk /ustar ) / ( gr%zm -sfc_elevation + z_displace ) 
 
         invrs_tau_no_N2_zm = invrs_tau_bkgnd + invrs_tau_sfc + invrs_tau_shear
 
@@ -1191,37 +1193,33 @@ module advance_clubb_core_module
         brunt_vaisala_freq_sqd_smth = zt2zm( zm2zt( &
               min( brunt_vaisala_freq_sqd, 1.e8_core_rknd * abs(brunt_vaisala_freq_sqd)**3 ) ) )
 
+        Ri_zm = sqrt(max(1e-7,brunt_vaisala_freq_sqd_smth)/max((ddzt(um)**2+ddzt(vm)**2),1e-7))
+
         brunt_freq_pos = sqrt( max( zero_threshold, brunt_vaisala_freq_sqd_smth ) )
 
         brunt_freq_out_cloud =  brunt_freq_pos &
               * min(one, max(zero_threshold,&
               one - ( (zt2zm(ice_supersat_frac) / 0.007_core_rknd) )))
-        where ( gr%zt < 300.0 )
-        brunt_freq_out_cloud =0.0
+
+        where ( gr%zt < alt_thresh )
+           brunt_freq_out_cloud =0.0
         end where
 
         invrs_tau_zm = invrs_tau_no_N2_zm & 
-              + C_invrs_tau_N2 * brunt_freq_pos 
+              + C_invrs_tau_N2 * brunt_freq_pos! * (1.0-5.0* cloud_frac*(1.0-cloud_frac)**4 )
 
         invrs_tau_wp2_zm = invrs_tau_no_N2_zm &
               + C_invrs_tau_N2_wp2 * brunt_freq_pos  
 
-        invrs_tau_xp2_zm =  ( invrs_tau_bkgnd  + invrs_tau_sfc + invrs_tau_shear & 
+        invrs_tau_xp2_zm =   invrs_tau_bkgnd  + invrs_tau_sfc + invrs_tau_shear & 
               + C_invrs_tau_N2_xp2 * brunt_freq_pos & ! 0 
-              + C_invrs_tau_sfc *2 * sqrt(em)/(gr%zm - sfc_elevation + z_displace)) & ! small
-              * min(max(sqrt(((ddzt(um))**2+(ddzt(vm))**2)/max(1e-7,brunt_vaisala_freq_sqd_smth)),0.3),3.0)
+              + C_invrs_tau_sfc *2 * sqrt(em)/(gr%zm - sfc_elevation + z_displace)  ! small
 
-!        write(*,*) "test=",sqrt(((ddzt(um))**2 + &
-!              (ddzt(vm))**2)/max(1e-7,brunt_vaisala_freq_sqd_smth))
-         
-!        invrs_tau_xp2_zm = max(invrs_tau_bkgnd, invrs_tau_xp2_zm)
-          
-!        invrs_tau_xp2_zm = merge(0.003_core_rknd, invrs_tau_xp2_zm, &
-!              zt2zm(ice_supersat_frac) <= 0.01_core_rknd &
-!              .and. invrs_tau_xp2_zm  >= 0.003_core_rknd)
+        invrs_tau_xp2_zm =invrs_tau_xp2_zm * &
+          min(max(sqrt((ddzt(um)**2+ddzt(vm)**2)/max(1e-7,brunt_vaisala_freq_sqd_smth)),0.3),3.0)
 
         invrs_tau_wp3_zm = invrs_tau_wp2_zm &
-              + C_invrs_tau_N2_clear_wp3 * brunt_freq_out_cloud
+          + C_invrs_tau_N2_clear_wp3 * brunt_freq_out_cloud
 
         tau_no_N2_zm = one / invrs_tau_no_N2_zm
         tau_zm       = one / invrs_tau_zm * 2
@@ -1240,9 +1238,14 @@ module advance_clubb_core_module
         invrs_tau_wpxp_zm = invrs_tau_zm & 
               + C_invrs_tau_N2_wpxp * brunt_freq_out_cloud 
 
-        where( Lscale < wpxp_L_thresh .and. gr%zt > 300)
-           invrs_tau_wpxp_zm = invrs_tau_wpxp_zm * 5 !(14 - 0.13 * Lscale )
+        where( gr%zt > alt_thresh .and. brunt_vaisala_freq_sqd_smth > 3.3E-4)
+             invrs_tau_wpxp_zm = invrs_tau_wpxp_zm *(1+3.*min(max( Ri_zm, 0.), 12.))
         end where
+
+!        where( Lscale < wpxp_L_thresh .and. gr%zt > alt_thresh )
+!        where( tau_zm < 160 .and. gr%zt > 300)
+!           invrs_tau_wpxp_zm = invrs_tau_wpxp_zm * 5 !(14 - 0.13 * Lscale )
+!        end where
 
         if ( gr%zm(1) - sfc_elevation + z_displace < eps ) then
              stop  "Lowest zm grid level is below ground in CLUBB."
@@ -1467,6 +1470,8 @@ module advance_clubb_core_module
       call stat_update_var( itau_wp3_zm,tau_wp3_zm , stats_zm)
       call stat_update_var( itau_wpxp_zm,tau_wpxp_zm , stats_zm)
       call stat_update_var( ibrunt_vaisala_freq_sqd,brunt_vaisala_freq_sqd , stats_zm)
+      call stat_update_var( iRi_zm,Ri_zm ,stats_zm)
+
 
       end if
 

@@ -3427,6 +3427,12 @@ Lscale threshold: damp C6 & C7  [m]
 Default: 60.0D0
 </entry>
 
+<entry id="clubb_alt_thresh"  type="real" category="pblrad"
+       group="clubb_param_nl" valid_values="" >
+altitude threshold: damp C6 & C7  [m]
+Default: 60.0D0
+</entry>
+
 <entry id="clubb_C_invrs_tau_bkgnd"  type="real" category="pblrad"
        group="clubb_param_nl" valid_values="" >
 Coefficient of inverse tau term contributed by background constant value [-]

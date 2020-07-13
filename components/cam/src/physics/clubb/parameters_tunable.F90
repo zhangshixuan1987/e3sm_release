@@ -85,8 +85,10 @@ module parameters_tunable
     C6rt_Lscale0  = 14.0_core_rknd,      & ! Damp C6rt as a fnct. of Lscale  [-]
     C6thl_Lscale0 = 14.0_core_rknd,      & ! Damp C6thl as a fnct. of Lscale [-]
     C7_Lscale0    = 0.8500000_core_rknd, & ! Damp C7 as a fnct. of Lscale    [-]
-    wpxp_L_thresh = 60.0_core_rknd         ! Lscale threshold: damp C6 & C7  [m]
+    wpxp_L_thresh = 100.0_core_rknd,     & ! Lscale threshold: damp C6 & C7  [m]
+    alt_thresh    = 300.0_core_rknd        ! altitud threshold: damp C6
 !$omp threadprivate(C6rt_Lscale0, C6thl_Lscale0, C7_Lscale0, wpxp_L_thresh)
+!$omp threadprivate(alt_thresh)
 
   ! Note: DD 1987 is Duynkerke & Driedonks (1987).
   real( kind = core_rknd ), public :: & 
@@ -304,7 +306,7 @@ module parameters_tunable
     thlp2_rad_coef, thlp2_rad_cloud_frac_thresh, up2_vp2_factor, Skw_max_mag, &
     C_invrs_tau_bkgnd, C_invrs_tau_sfc, C_invrs_tau_shear, C_invrs_tau_N2, &
     C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
-    C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3
+    C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, alt_thresh
 
   ! These are referenced together often enough that it made sense to
   ! make a list of them.  Note that lmin_coef is the input parameter,
@@ -361,7 +363,7 @@ module parameters_tunable
        "C_invrs_tau_sfc             ", "C_invrs_tau_shear           ", &
        "C_invrs_tau_N2              ", "C_invrs_tau_N2_wp2          ", &
        "C_invrs_tau_N2_xp2          ", "C_invrs_tau_N2_wpxp         ", &
-       "C_invrs_tau_N2_clear_wp3    "  /)
+       "C_invrs_tau_N2_clear_wp3    ", "alt_thresh"  /)
 
   real( kind = core_rknd ), parameter, private :: &
     init_value = -999._core_rknd ! Initial value for the parameters, used to detect missing values
@@ -417,7 +419,8 @@ module parameters_tunable
     clubb_C_invrs_tau_N2_xp2,      &
     clubb_C_invrs_tau_N2_wpxp,     &
     clubb_C_invrs_tau_N2_clear_wp3,&
-    clubb_C_wp2_splat
+    clubb_C_wp2_splat,             &
+    clubb_alt_thresh
 #endif /*E3SM*/
 
   contains
@@ -545,7 +548,7 @@ module parameters_tunable
                C_invrs_tau_bkgnd, C_invrs_tau_sfc, &
                C_invrs_tau_shear, C_invrs_tau_N2, & 
                C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
-               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3 )
+               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3,alt_thresh )
 
 
     ! It was decided after some experimentation, that the best
@@ -1030,7 +1033,8 @@ module parameters_tunable
     clubb_C_invrs_tau_N2_xp2,      &
     clubb_C_invrs_tau_N2_wpxp,     &
     clubb_C_invrs_tau_N2_clear_wp3,&
-    clubb_C_wp2_splat
+    clubb_C_wp2_splat,             &
+    clubb_alt_thresh
 
     integer :: read_status
     integer :: iunit
@@ -1083,6 +1087,7 @@ module parameters_tunable
     clubb_C_invrs_tau_N2_wpxp = init_value
     clubb_C_invrs_tau_N2_clear_wp3 = init_value
     clubb_C_wp2_splat = init_value
+    clubb_alt_thresh  = init_value
 
     if (masterproc) then
       iunit = getunit()
@@ -1142,6 +1147,7 @@ module parameters_tunable
    call mpibcast(clubb_C_invrs_tau_N2_wpxp , 1, mpir8,  0, mpicom)
    call mpibcast(clubb_C_invrs_tau_N2_clear_wp3 , 1, mpir8,  0, mpicom)
    call mpibcast(clubb_C_wp2_splat, 1, mpir8,  0, mpicom)
+   call mpibcast(clubb_alt_thresh, 1, mpir8,  0, mpicom)
 #endif
 
 
@@ -1262,6 +1268,8 @@ module parameters_tunable
     if (clubb_C_invrs_tau_N2_clear_wp3 /= init_value) &
        C_invrs_tau_N2_clear_wp3 = clubb_C_invrs_tau_N2_clear_wp3
     if (clubb_C_wp2_splat  /= init_value ) C_wp2_splat = clubb_C_wp2_splat
+    if (clubb_alt_thresh  /= init_value ) alt_thresh = clubb_alt_thresh
+
 #endif /*E3SM*/
 
     ! Put the variables in the output array
@@ -1284,7 +1292,8 @@ module parameters_tunable
                C_invrs_tau_bkgnd, C_invrs_tau_sfc, &
                C_invrs_tau_shear, C_invrs_tau_N2, &
                C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &  
-               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, params )
+               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, &
+               alt_thresh, params )
 
     l_error = .false.
 
@@ -1364,7 +1373,8 @@ module parameters_tunable
       thlp2_rad_coef, thlp2_rad_cloud_frac_thresh, up2_vp2_factor, Skw_max_mag, &
       C_invrs_tau_bkgnd, C_invrs_tau_sfc, &
       C_invrs_tau_shear, C_invrs_tau_N2, &
-      C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3
+      C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
+      C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, alt_thresh
 
     ! Initialize values to -999.
     call init_parameters_999( )
@@ -1396,7 +1406,8 @@ module parameters_tunable
                C_invrs_tau_bkgnd, C_invrs_tau_sfc, &
                C_invrs_tau_shear, C_invrs_tau_N2, &
                C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
-               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, param_max )
+               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, &
+               alt_thresh,  param_max )
 
     l_error = .false.
 
@@ -1448,7 +1459,8 @@ module parameters_tunable
                C_invrs_tau_bkgnd, C_invrs_tau_sfc, &
                C_invrs_tau_shear, C_invrs_tau_N2, &
                C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
-               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, params )
+               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, &
+               alt_thresh, params )
 
     ! Description:
     ! Takes the list of scalar variables and puts them into a 1D vector.
@@ -1496,7 +1508,8 @@ module parameters_tunable
       iC6rt_Lscale0, &
       iC6thl_Lscale0, &
       iC7_Lscale0, &
-      iwpxp_L_thresh
+      iwpxp_L_thresh, &
+      ialt_thresh
 
     use parameter_indices, only: & 
       ic_K,  & 
@@ -1572,7 +1585,7 @@ module parameters_tunable
       thlp2_rad_coef, thlp2_rad_cloud_frac_thresh, up2_vp2_factor, Skw_max_mag, &
       C_invrs_tau_bkgnd, C_invrs_tau_sfc, C_invrs_tau_shear, C_invrs_tau_N2, &
       C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
-      C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3
+      C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, alt_thresh
 
     ! Output variables
     real( kind = core_rknd ), intent(out), dimension(nparams) :: params
@@ -1614,6 +1627,8 @@ module parameters_tunable
     params(iC6thl_Lscale0)      = C6thl_Lscale0
     params(iC7_Lscale0)         = C7_Lscale0
     params(iwpxp_L_thresh)    = wpxp_L_thresh
+    params(ialt_thresh)    = alt_thresh
+
 
     params(ic_K)       = c_K
     params(ic_K1)      = c_K1
@@ -1701,7 +1716,7 @@ module parameters_tunable
                C_invrs_tau_bkgnd, C_invrs_tau_sfc, &
                C_invrs_tau_shear, C_invrs_tau_N2, & 
                C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
-               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3  )
+               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, alt_thresh)
 
     ! Description:
     ! Takes the 1D vector and returns the list of scalar variables.
@@ -1749,7 +1764,9 @@ module parameters_tunable
       iC6rt_Lscale0, &
       iC6thl_Lscale0, &
       iC7_Lscale0, &
-      iwpxp_L_thresh
+      iwpxp_L_thresh, &
+      ialt_thresh
+
 
     use parameter_indices, only: & 
       ic_K,  & 
@@ -1828,7 +1845,7 @@ module parameters_tunable
       thlp2_rad_coef, thlp2_rad_cloud_frac_thresh, up2_vp2_factor, Skw_max_mag, &
       C_invrs_tau_bkgnd, C_invrs_tau_sfc, C_invrs_tau_shear, C_invrs_tau_N2, &
       C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
-      C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3
+      C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, alt_thresh
 
     C1      = params(iC1)
     C1b     = params(iC1b)
@@ -1865,7 +1882,9 @@ module parameters_tunable
     C6rt_Lscale0       = params(iC6rt_Lscale0)
     C6thl_Lscale0      = params(iC6thl_Lscale0)
     C7_Lscale0         = params(iC7_Lscale0)
-    wpxp_L_thresh    = params(iwpxp_L_thresh)
+    wpxp_L_thresh      = params(iwpxp_L_thresh)
+    alt_thresh         = params(ialt_thresh)
+
 
     c_K       = params(ic_K)
     c_K1      = params(ic_K1)
@@ -1966,7 +1985,8 @@ module parameters_tunable
                C_invrs_tau_bkgnd, C_invrs_tau_sfc, &
                C_invrs_tau_shear, C_invrs_tau_N2, &
                C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
-               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, params )
+               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3,&
+               alt_thresh,  params )
 
     return
 
@@ -2072,6 +2092,7 @@ module parameters_tunable
     C_invrs_tau_N2_wp2           = init_value
     C_invrs_tau_N2_wpxp          = init_value
     C_invrs_tau_N2_clear_wp3     = init_value
+    alt_thresh                   = init_value
 
     return
 

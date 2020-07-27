@@ -127,6 +127,7 @@
 <so4_a1_emis_file     >atm/cam/chem/trop_mozart_aero/emis/DECK_ne30/cmip6_mam4_so4_a1_surf_1x1_2010_clim_c20190821.nc </so4_a1_emis_file>
 <so4_a2_emis_file     >atm/cam/chem/trop_mozart_aero/emis/DECK_ne30/cmip6_mam4_so4_a2_surf_1x1_2010_clim_c20190821.nc </so4_a2_emis_file>
 
+
 <!-- Prescribed oxidants for aerosol chemistry.   Ozone is from CMIP6 input4MIPS file -->
 <tracer_cnst_type    >CYCLICAL</tracer_cnst_type>
 <tracer_cnst_cycle_yr>2015</tracer_cnst_cycle_yr>

@@ -31,7 +31,6 @@ def cal_mean(ncases, cases,years,nyear, nsite,lats, lons,area, filepath):
      infile=' '
      for yr in range (0, nyear[im] ):
          infile=infile+datalocal+cases[im]+'.cam.h0.'+str(years[im]+1+yr).rjust(4,'0')+'-01.nc '+ datalocal+cases[im]+'.cam.h0.'+str(years[im]+1+yr).rjust(4,'0')+'-02.nc '+ datalocal+cases[im]+'.cam.h0.'+str(years[im]+yr).rjust(4,'0')+'-12.nc '
-
      os.system(ncea_str+infile +' -O '+outfile)
      
      outfile=filepath[im]+cases[im]+'/'+cases[im]+'_MAM_climo.nc'
@@ -44,12 +43,14 @@ def cal_mean(ncases, cases,years,nyear, nsite,lats, lons,area, filepath):
      infile=' '
      for yr in range (0, nyear[im]):
          infile=infile+datalocal+cases[im]+'.cam.h0.'+str(years[im]+yr).rjust(4,'0')+'-06.nc '+ datalocal+cases[im]+'.cam.h0.'+str(years[im]+yr).rjust(4,'0')+'-07.nc '+ datalocal+cases[im]+'.cam.h0.'+str(years[im]+yr).rjust(4,'0')+'-08.nc '
+
      os.system(ncea_str+infile +' -O '+outfile)
    
      outfile=filepath[im]+cases[im]+'/'+cases[im]+'_SON_climo.nc'
      infile=' '
      for yr in range (0, nyear[im]):
-         infile=infile+datalocal+cases[im]+'.cam.h0.000'+str(years[im]+yr)+'-09.nc '+ datalocal+cases[im]+'.cam.h0.000'+str(years[im]+yr)+'-10.nc '+ datalocal+cases[im]+'.cam.h0.000'+str(years[im]+yr)+'-11.nc '
+         infile=infile+datalocal+cases[im]+'.cam.h0.'+str(years[im]+yr).rjust(4,'0')+'-09.nc '+ datalocal+cases[im]+'.cam.h0.'+str(years[im]+yr).rjust(4,'0')+'-10.nc '+ datalocal+cases[im]+'.cam.h0.'+str(years[im]+yr).rjust(4,'0')+'-11.nc '
+
      os.system(ncea_str+infile +' -O '+outfile)
    
      outfile=filepath[im]+cases[im]+'/'+cases[im]+'_ANN_climo.nc'

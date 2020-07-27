@@ -11,7 +11,7 @@ Main code to make 1) 2D plots,2) profiles, 3) budgets on selected stations,
 # Begin User Defined Settings
 # User defined name used for this comparison, this will be the name 
 #   given the directory for these diagnostics
-case='Riwpxptest2' # A general case name
+case='paper4' # A general case name
 outdir='/lcrc/group/acme/zhun/plots/' # Location of plots
 
 filepath=[ \
@@ -22,47 +22,29 @@ filepath=[ \
 '/lcrc/group/acme/ac.zguo/E3SM_simulations/',\
 '/lcrc/group/acme/zhun/E3SM_simulations/',\
           ]
-#cases=[ \
-#       'anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_acc_try8.ne16_ne16',\   # n2p5 acc4 
-##       'anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_acc_try6.ne16_ne16',\
-#       'anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_acc_try14.ne16_ne16',\
-#       'anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_acc_try15.ne16_ne16',\
-#       'anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_acc_try3.ne16_ne16',\
-##       'anvil-centos7.clubb_silhs_v2_tau.facc1_kmax3o_berg2_dcs4h_test4.ne16_ne16',\
-##       'anvil-centos7.clubb_silhs_v2_tau.ice_c50_rtclp10_bvm_facc1_kmax3o_berg2_4.ne16_ne16', \
-#         'anvil-centos7.master_20191113.gust_polun_run3.ne16_ne16',\
-#]
-
-
 cases=[ \
-#'anvil.E3SM_v1.golaz.ne16_ne16',\
-#'anvil.E3SM_v1.golaz.ne30_ne30',\
-'anvil-centos7.base.revxp2_c15p5_all1_n2p65_wp2p2_bk1p5_alt.ne16_ne16',\
-#'anvil-centos7.base.c15p5_all1_n2p65_bk1p5_alt.ne30_ne30',\
-'anvil-centos7.base2.base_wpxpri_3e4_1_2_0_12.ne16_ne16',\
-'anvil-centos7.base2.base_wpxpri_3e4_1_2_0_12_cf.ne16_ne16',\
-'anvil-centos7.base2.base_wpxpri_3p3e4_1_3_0_12.ne16_ne16',\
-'anvil-centos7.base2.base_wpxpri_3p3e4_1_2_0_15.ne16_ne16',\
+'anvil.EAMv1.F2010SC5-CMIP6_t1.ne30_ne30',\
+'anvil-centos7.base2.wpxpri_3p3e4_1_3_0_12_C7ri.ne30_ne30',\
+'anvil.EAMv1.FC5AV1C.ne30_ne30',\
+'anvil-centos7.base2.wpxpri_3p3e4_1_3_0_12_C7ri_FC5AV1C.ne30_ne30',\
+'anvil-centos7.base2.wpxpri_3p35e4_1_2p5_0_12_C7ri_F2010SC5-CMIP6.ne30_ne30',\
 ]
 
        
 # Give a short name for your experiment which will appears on plots
 
 casenames=[
-#'E3SMv1_2d',\
-#'E3SMv1_1d',\
-'base_20200608_2d',\
-#'base_20200608_1d',\
-'base_wpxpri_3e4_1_2_0_12',\
-'base_wpxpri_3e4_1_2_0_12_cf',\
-'base_wpxpri_3p3e4_1_3_0_12',\
-'base_wpxpri_3p3e4_1_2_0_15',\
+'EAMv1.F2010SC5-CMIP6',\
+'wpxpri_3p3e4_1_3_0_12_C7ri',\
+'EAMv1.FC5AV1C',\
+'wpxpri_3p3e4_1_3_0_12_C7ri_FC5AV1C',\
+'wpxpri_3p35e4_1_2p5_0_12_C7ri_F2010SC5-CMIP6',\
 ]
 
 years=[\
         1, 1, 1, 1,1,1]
 nyear=[\
-        1, 1, 1, 1,1,1]
+        10, 5, 1, 5,3,1]
 
 dpsc=[\
       'none','none','none','none','none','none']
@@ -81,14 +63,13 @@ casename      =case+'_'+cseason
 calmean          = True       # make mean states
 findout          = True       # pick out the locations of your sites
 draw2d           = True       # 2D plots, SWCF etc.
-drawclm          = False      # Plots of global land surface?
 drawlarge        = True       # profiles for large-scale variable on your sites 
 drawclubb        = True       # profiles for standard clubb output
 drawskw          = False       # profiles for skewness functions
 drawrain         = True       # profiles for SNOW, Rain etc.
 drawbgt          = True       # budgets of CLUBB prognostic Eqs 
 drawe3smbgt      = True       # budgets of e3sm tendency
-drawmicrobgt     = True       # budgets of MG2
+drawmicrobgt     = False       # budgets of MG2
 drawaero         = False       # AERO for cloud brone
 # ONLY for SILHS
 drawhf           = False      # Tendency of holl filler 
@@ -136,7 +117,6 @@ import draw_micro_budget
 import draw_e3sm_budget
 import Common_functions
 import Diagnostic_webpage
-import draw_plots_hoz_clm
 
 casedir=outdir+casename
 
@@ -156,11 +136,6 @@ if draw2d:
     plot2d=draw_plots_hoz_2D.draw_2D_plot(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
     clevel=500
     plot3d=draw_plots_hoz_3D.draw_3D_plot(ptype,clevel,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
-
-if drawclm:
-    print('Drawing CLM')
-    plotclm=draw_plots_hoz_clm.draw_clm_plot(ptype,cseason, ncases, cases, casenames, nsite, lats, lons, filepath, filepathobs,casedir)
-
 
 if drawlarge:
     print('Drawing Large-scale variables on selected sites')
@@ -312,8 +287,6 @@ if makeweb:
 
     if (draw2d):
         plot2d.extend(plot3d[:])
-        if (drawclm):
-            plot2d.extend(plotclm[:])
 
         Diagnostic_webpage.sets_web(casename,casedir,plot2d,'2D',\
 				'Horizontal Plots','1000','1000')

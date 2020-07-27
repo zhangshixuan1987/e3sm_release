@@ -363,6 +363,7 @@ module surface_varnce_module
        uf = sqrt( ustar2 + 0.3_core_rknd * wstar * wstar )
        uf = max( ufmin, uf )
 
+
        ! Compute estimate for surface second order moments
        wp2_sfc = a_const * uf**2
        up2_sfc = up2_vp2_factor * a_const * uf**2  ! From Andre, et al. 1978
@@ -387,6 +388,9 @@ module surface_varnce_module
 
        rtp2_sfc = 0.4_core_rknd * a_const * ( wprtp_sfc / uf )**2
        rtp2_sfc = max( rt_tol**2, rtp2_sfc )
+
+!       rtp2_sfc  =  min(rtp2_sfc, 1e-7)
+!       thlp2_sfc =  min(thlp2_sfc, 0.1)
 
        rtpthlp_sfc = 0.2_core_rknd * a_const &
                      * ( wpthlp_sfc / uf ) * ( wprtp_sfc / uf )

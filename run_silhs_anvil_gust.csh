@@ -9,15 +9,15 @@
 
 
 ### BASIC INFO ABOUT RUN
-set job_name       = base_wpxpri_3e4_1_2_0_12_cf
-set compset        = FC5CLBMG2BCL72 
+set job_name       = base 
+set compset        = F2010SC5-CMIP6 # FC5CLBMG2BCL72 
 #set compset        = FAMIPC5 
 set resolution     = ne16_ne16
 set machine        = anvil-centos7
 setenv NUMSC 4
 setenv MGVER 2
 
-set walltime       = 06:00:00
+set walltime       = 12:00:00
 setenv project condo      
 setenv ntasks 960
 setenv nthrds 1
@@ -72,7 +72,7 @@ set num_resubmits               = 0
 set do_short_term_archiving     = false
 
 ### SIMULATION OPTIONS
-set atm_output_freq             = 1
+set atm_output_freq             = 0
 set records_per_atm_output_file = 1
 set start_date                  = 0001-01-01# default
 
@@ -1061,70 +1061,7 @@ EOF
 cat <<EOF >> user_nl_cam 
 
 state_debug_checks=.true.
-!ice_supersat = .true.
 clubb_do_icesuper= .false.
-
-!microp_aero_wsubmin  = 0.1
-
-! clubb_beta             = 2     ! 1.1160
-! clubb_c1               = 2     ! 4.58330
-! clubb_c11              = .5    ! .50896
-! clubb_c11b             = .5    ! .50896
-! clubb_c14              = 2     ! 0.85
-! clubb_c15              = 0     ! 4.58330
-! clubb_c1b              = 2     ! 
-! clubb_c2rt             = 1.6   ! 2.3
-! clubb_c2rtthl          = 1.6   ! 
-! clubb_c2thl            = 1.6
-! clubb_c4               = 4     ! 3.8
-! clubb_c5               = .4    ! 0.025
-! clubb_c6rt             = 3     ! 4.87
-! clubb_c6rtb            = 3 
-! clubb_c6thlb           = 3 
-! clubb_c8               = 2     ! 2.57
-! clubb_c_invrs_tau_bkgnd                = 1.1  ! 1.38
-! clubb_c_invrs_tau_n2                   = .1   ! 0.07
-! clubb_c_invrs_tau_n2_clear_wp3         = 1.   ! 1.1
-! clubb_c_invrs_tau_n2_wp2               = .4   ! 0.37
-! clubb_c_invrs_tau_n2_wpxp              = 1.   ! 1.4
-! clubb_c_invrs_tau_n2_xp2               = 1.   ! 0.02
-! clubb_c_invrs_tau_sfc          = .2           ! 0.2
-! clubb_c_invrs_tau_shear                = .03  ! 0.04
-! clubb_c_k10            = 0.3                  ! 0.14
-! clubb_c_k2             = 0.2                  ! 0.1
-! clubb_c_wp2_splat              = .7           ! 1.6
-! clubb_gamma_coef               = .3           ! 0.57
-! clubb_gamma_coefb              = .3
-! clubb_nu2              = 1
-! clubb_wpxp_l_thresh            = 100.0D0
-
-! clubb_beta             = 1.
-! clubb_c1               = 2.
-! clubb_c11              = 0.5
-! clubb_c11b             = 0.5
-! clubb_c14              = 2.
-! clubb_c15              = 0
-! clubb_c1b              = 2.
-! clubb_c2rt             = 2.
-! clubb_c2rtthl          = 2.
-! clubb_c2thl            = 2.
-! clubb_c4               = 4
-! clubb_c5               = 0.4
-! clubb_c6rt             = 4.!8
-! clubb_c6rtb            = 4.!8
-! clubb_c6thlb           = 4.!8
-! clubb_c8               = 2.
-! clubb_c_invrs_tau_bkgnd                = 1.1
-! clubb_c_invrs_tau_n2           = 0.1
-! clubb_c_invrs_tau_n2_clear_wp3         = 1.0
-! clubb_c_invrs_tau_n2_wp2               = 0.4
-! clubb_c_invrs_tau_n2_wpxp              = 1.0
-! clubb_c_invrs_tau_n2_xp2               = 0.03
-! clubb_c_invrs_tau_sfc          = 0.2
-! clubb_c_invrs_tau_shear                = 0.03
-! clubb_c_k10            = 0.3
-! clubb_c_k2             = 0.1
-
 
  clubb_beta             = 2.
  clubb_c1               = 1.0
@@ -1181,11 +1118,10 @@ clubb_do_icesuper= .false.
  clubb_vars_zt = $clubb_vars_zt_list
  clubb_vars_zm = $clubb_vars_zm_list
  
- nhtfrq = $atm_output_freq                                                        
- mfilt  = $records_per_atm_output_file                                 
- avgflag_pertape = 'A','A','I','A','A','A'
+ nhtfrq = $atm_output_freq, -24,-6,-3                                                        
+ mfilt  = $records_per_atm_output_file, 5000, 5000, 5000                                 
+ avgflag_pertape = 'A','A','A','A','A','A'
 
-!dtime = 3600
 
 fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
 'U','PS','T','V','OMEGA','Z3','PRECT',
@@ -1214,6 +1150,11 @@ fincl1 = $clubb_vars_zt_list,$clubb_vars_zm_list,
 'DSTFREZIMM','DSTFREZCNT','DSTFREZDEP','BCFREZIMM', 'BCFREZCNT', 'BCFREZDEP', 'NIMIX_IMM', 'NIMIX_CNT', 'NIMIX_DEP'
 'DSTNIDEP','DSTNICNT','DSTNIIMM','BCNIDEP', 'BCNICNT', 'BCNIIMM', 'NUMICE10s','NUMIMM10sDST', 'NUMIMM10sBC' 
 
+ fincl2 = 'PRECT','U200','V200','U850','V850','FLUT' 
+ fincl3 = 'OMEGA500','PRECT','U200','U850','FLUT' 
+ fincl4 = 'PRECT' 
+
+
 
 macrop_scheme = 'CLUBB_SGS'
 eddy_scheme = 'CLUBB_SGS'
@@ -1223,10 +1164,6 @@ clubb_do_adv = .false.
 clubb_expldiff = .false.
 clubb_rainevap_turb = .false.
 clubb_cloudtop_cooling = .false.
-
-
- ncdata         = '/home/ccsm-data/inputdata/atm/cam/inic/homme/cami_mam3_Linoz_ne16np4_L72_c160614.nc'
-!  ncdata         = '/home/ccsm-data/inputdata/atm/cam/inic/homme/cami-mam3_0000-01-ne16np4_L30_c090306.nc'
 
 
  relvar_fix = .true. 
@@ -1261,12 +1198,9 @@ clubb_cloudtop_cooling = .false.
   mam_amicphys_optaa             = 1
   micro_mg_accre_enhan_fac               = 1.75D0
   n_so4_monolayers_pcage         = 8.0D0 
-!  prc_coef1 = 1350.0D0
-!  prc_exp = 2.45 !2.47D0
-!  prc_exp1 = -1.4!-1.79D0
-prc_coef1 = 30500.0D0
-prc_exp =  3 !3.19D0
-prc_exp1 = -1.2D0
+  prc_coef1 = 30500.0D0
+  prc_exp =  3 !3.19D0
+  prc_exp1 = -1.2D0
 
 
   radiation_scheme               = 'rrtmg'                                                              
@@ -1279,6 +1213,7 @@ prc_exp1 = -1.2D0
   use_gw_front           = .true.                                                                       
   use_gw_oro             = .true.                                                                       
   use_hetfrz_classnuc    = .true.
+  co2vmr         = 367.000000e-6 
   waccmx_opt             = 'off'
   nucleate_ice_subgrid           = 1.2D0 
   so4_sz_thresh_icenuc           = 0.080e-6

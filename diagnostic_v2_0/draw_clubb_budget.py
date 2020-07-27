@@ -88,6 +88,8 @@ def draw_clubb_bgt (ptype,cseason, ncases, cases, casenames, nsite, lats, lons, 
          res.lgBoxMinorExtentF      = 0.1
          res.lgPerimOn              = True
          res.tiYAxisString   = "PRESSURE"
+         res.tiYAxisString   = "Pressure [hPa]"
+         res.tmYLLabelFontHeightF = 0.02
      
          res.trYReverse        = True
 

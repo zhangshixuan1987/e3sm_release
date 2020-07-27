@@ -60,39 +60,39 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
      plot = []
 
      res     = Ngl.Resources()
+     res.nglMaximize          =  False
      res.nglDraw              = False
      res.nglFrame             = False
      res.lgPerimOn              = False                 # no box around
      res.vpWidthF         = 0.30                      # set width and height
      res.vpHeightF        = 0.30
 
-#     res.txFontHeightF   = .01
-     #res.vpXF             = 0.04
-     # res.vpYF             = 0.30
+     res.tiYAxisString   = "Pressure [hPa]"
+     res.tiMainFont        = _Font
      res.tmYLLabelFont  = _Font
      res.tmXBLabelFont  = _Font
+     res.tiYAxisFont =  _Font
+     res.tiXAxisFont =  _Font
+
      res.tmXBLabelFontHeightF = 0.01
      res.tmXBLabelFontThicknessF = 1.0
+     res.xyMarkLineMode      = 'Lines'
+
 #     res.tmXBLabelAngleF = 45
-     res.xyMarkLineMode      = "Lines"
      res.xyLineThicknesses = [3.0, 3.0, 3.0, 3.0, 3.0, 3.0,3.,3.,3.,3.,3,3,3,3,3,3,3]
 
      res.xyDashPatterns    = np.arange(0,24,1)
-#     res.xyMarkers         = np.arange(16,40,1)
-#     res.xyMarkerSizeF       = 0.005
-
 
      pres            = Ngl.Resources()
-#     pres.nglMaximize = True
      pres.nglFrame = False
      pres.txString   = "Large-scale VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N"
      pres.txFont = _Font
      pres.nglPanelYWhiteSpacePercent = 5
      pres.nglPanelXWhiteSpacePercent = 5
      pres.nglPanelTop = 0.88
-     pres.wkPaperWidthF  =  17  # in inches
+     pres.wkPaperWidthF  = 17  # in inches
      pres.wkPaperHeightF = 28  # in inches
-
+     pres.nglMaximize = True
      pres.wkWidth = 10000
      pres.wkHeight = 10000
 
@@ -224,6 +224,7 @@ def large_scale_prf (ptype,cseason, ncases, cases, casenames, nsite, lats, lons,
      txres.txFont        = _Font
      Ngl.text_ndc(wks,"Large-scale VAR at"+ str(lons[ire])+"E,"+str(lats[ire])+"N",0.5,0.92+ncases*0.01,txres)
      Common_functions.create_legend(wks,casenames,np.arange(3,20,2),0.1,0.89+ncases*0.01)
+
 
      Ngl.frame(wks)
      Ngl.destroy(wks)

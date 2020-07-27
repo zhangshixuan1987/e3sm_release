@@ -498,6 +498,7 @@ module advance_helper_module
       brunt_vaisala_freq_sqd_moist, &
       brunt_vaisala_freq_sqd_plus, &
       Richardson_num, &
+      Ri_zm, &
       dum_dz, dvm_dz, &
       shear_sqd, &
       turb_freq_sqd, &
@@ -552,6 +553,9 @@ module advance_helper_module
         call stat_update_var( ishear_sqd, shear_sqd, stats_zm )
     else
       Richardson_num = brunt_vaisala_freq_sqd_mixed * invrs_num_div_thresh
+      Ri_zm = &
+          max(1e-7,brunt_vaisala_freq_sqd_mixed)/max((ddzt(um)**2+ddzt(vm)**2),1e-7)
+
     end if
 
     if ( l_Richardson_vert_avg ) then
@@ -566,7 +570,7 @@ module advance_helper_module
     ! The min function ensures that Cx does not exceed Cx_max, regardless of the
     !     value of Richardson_num_max.
     Cx_fnc_Richardson = linear_interp_factor( &
-                    ( max(min(Richardson_num_max,Richardson_num),Richardson_num_min) &
+                    ( max(min(Richardson_num_max,Ri_zm),Richardson_num_min) &
                     - Richardson_num_min )  * invrs_min_max_diff, Cx_max, Cx_min )
 
     if ( l_Cx_fnc_Richardson_vert_avg ) then

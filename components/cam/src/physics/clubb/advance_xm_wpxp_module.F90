@@ -66,8 +66,8 @@ module advance_xm_wpxp_module
                               l_predict_upwp_vpwp, &
                               l_diffuse_rtm_and_thlm, &
                               l_stability_correct_Kh_N2_zm, &
-                              l_godunov_upwind_wpxp_ta, &
                               l_upwind_wpxp_ta, &
+                              l_godunov_upwind_wpxp_ta, &
                               l_upwind_xm_ma, &
                               l_uv_nudge, &
                               l_tke_aniso, &
@@ -545,8 +545,8 @@ module advance_xm_wpxp_module
                                  pdf_implicit_coefs_terms, &
                                  l_explicit_turbulent_adv_wpxp, l_predict_upwp_vpwp, &
                                  l_scalar_calc, &
-                                 l_godunov_upwind_wpxp_ta, &
                                  l_upwind_wpxp_ta, &
+                                 l_godunov_upwind_wpxp_ta, &
                                  lhs_ta_wprtp, lhs_ta_wpthlp, lhs_ta_wpup, &
                                  lhs_ta_wpvp, lhs_ta_wpsclrp, &
                                  rhs_ta_wprtp, rhs_ta_wpthlp, rhs_ta_wpup, &
@@ -1693,8 +1693,8 @@ module advance_xm_wpxp_module
                                     pdf_implicit_coefs_terms, &
                                     l_explicit_turbulent_adv_wpxp, l_predict_upwp_vpwp, &
                                     l_scalar_calc, &
-                                    l_godunov_upwind_wpxp_ta, &
                                     l_upwind_wpxp_ta, &
+                                    l_godunov_upwind_wpxp_ta, &
                                     lhs_ta_wprtp, lhs_ta_wpthlp, lhs_ta_wpup, &
                                     lhs_ta_wpvp, lhs_ta_wpsclrp, &
                                     rhs_ta_wprtp, rhs_ta_wpthlp, rhs_ta_wpup, &

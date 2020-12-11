@@ -753,6 +753,7 @@ module advance_clubb_core_module
        brunt_vaisala_freq_sqd,       & ! Buoyancy frequency squared, N^2              [s^-2]
        brunt_vaisala_freq_sqd_smth,  & ! smoothed Buoyancy frequency squared, N^2     [s^-2]
        brunt_freq_pos,               & ! 
+       brunt_freq_nosmooth,          & ! 
        brunt_vaisala_freq_sqd_mixed, & ! A mixture of dry and moist N^2
        brunt_vaisala_freq_sqd_dry,   & ! dry N^2
        brunt_vaisala_freq_sqd_moist, & ! moist N^2
@@ -1076,24 +1077,37 @@ module advance_clubb_core_module
     rtp2_zt    = max( zm2zt( rtp2 ), rt_tol**2 )   ! Positive def. quantity
     rtpthlp_zt = zm2zt( rtpthlp )
 
-    ! Compute wp3 / wp2 on zt levels.  Always use the interpolated value in the
-    ! denominator since it's less likely to create spikes
-    wp3_on_wp2_zt = ( wp3(1:gr%nz) / max( wp2_zt(1:gr%nz), w_tol_sqd ) )
+    if( .not. clubb_config_flags%l_smooth_wp3_on_wp2)then
 
-    ! Clip wp3_on_wp2_zt if it's too large
-    do k=1, gr%nz
-      if( wp3_on_wp2_zt(k) < 0._core_rknd ) then
-        wp3_on_wp2_zt = max( -1000._core_rknd, wp3_on_wp2_zt )
-      else
-        wp3_on_wp2_zt = min( 1000._core_rknd, wp3_on_wp2_zt )
-      end if
-    end do
+      ! Compute wp3 / wp2 on zt levels.  Always use the interpolated value in
+      ! the
+      ! denominator since it's less likely to create spikes
+      wp3_on_wp2_zt = ( wp3(1:gr%nz) / max( wp2_zt(1:gr%nz), w_tol_sqd ) )
 
-    ! Compute wp3_on_wp2 by interpolating wp3_on_wp2_zt
-    wp3_on_wp2 = zt2zm( wp3_on_wp2_zt )
+      wp3_on_wp2    = ( wp3_zm(1:gr%nz) / max(wp2(1:gr%nz), w_tol_sqd ) )
 
-    ! Smooth again as above
-    wp3_on_wp2_zt = zm2zt( wp3_on_wp2 )
+    else
+
+      ! Compute wp3 / wp2 on zt levels.  Always use the interpolated value in the
+      ! denominator since it's less likely to create spikes
+      wp3_on_wp2_zt = ( wp3(1:gr%nz) / max( wp2_zt(1:gr%nz), w_tol_sqd ) )
+
+      ! Clip wp3_on_wp2_zt if it's too large
+      do k=1, gr%nz
+        if( wp3_on_wp2_zt(k) < 0._core_rknd ) then
+          wp3_on_wp2_zt = max( -1000._core_rknd, wp3_on_wp2_zt )
+        else
+          wp3_on_wp2_zt = min( 1000._core_rknd, wp3_on_wp2_zt )
+        end if
+      end do
+
+      ! Compute wp3_on_wp2 by interpolating wp3_on_wp2_zt
+      wp3_on_wp2 = zt2zm( wp3_on_wp2_zt )
+
+      ! Smooth again as above
+      wp3_on_wp2_zt = zm2zt( wp3_on_wp2 )
+
+    end if
 
       !----------------------------------------------------------------
       ! Compute thvm
@@ -1190,6 +1204,26 @@ module advance_clubb_core_module
 !           and thereby allows tau to remain large in Sc layers in which thlm may
 !           be slightly stably stratified.
 
+       if (clubb_config_flags%l_smooth_brunt_vaisala_freq) then
+
+          brunt_vaisala_freq_sqd_smth = &
+                min( brunt_vaisala_freq_sqd, 1.e8_core_rknd * abs(brunt_vaisala_freq_sqd)**3 )
+
+          brunt_freq_nosmooth = sqrt( max(zero_threshold, brunt_vaisala_freq_sqd_smth) )
+          brunt_freq_pos      = zt2zm( zm2zt( brunt_freq_nosmooth ))
+
+          Ri_zm = sqrt(max(1e-7,brunt_freq_pos**2)/max((ddzt(um)**2+ddzt(vm)**2),1e-7))
+
+          brunt_freq_out_cloud = brunt_freq_pos &
+                 * min(one, max(zero_threshold,&
+                 one - ( (zt2zm(ice_supersat_frac) / 0.007_core_rknd) )))
+
+          where ( gr%zt < alt_thresh )
+             brunt_freq_out_cloud =0.0
+          end where
+
+       else 
+
         brunt_vaisala_freq_sqd_smth = zt2zm( zm2zt( &
               min( brunt_vaisala_freq_sqd, 1.e8_core_rknd * abs(brunt_vaisala_freq_sqd)**3 ) ) )
 
@@ -1204,6 +1238,8 @@ module advance_clubb_core_module
         where ( gr%zt < alt_thresh )
            brunt_freq_out_cloud =0.0
         end where
+
+       end if
 
         invrs_tau_zm = invrs_tau_no_N2_zm & 
               + C_invrs_tau_N2 * brunt_freq_pos !* (1.0-5.0* cloud_frac*(1.0-cloud_frac)**4 )
@@ -1519,6 +1555,7 @@ module advance_clubb_core_module
                             clubb_config_flags%l_predict_upwp_vpwp,          & ! intent(in)
                             clubb_config_flags%l_diffuse_rtm_and_thlm,       & ! intent(in)
                             clubb_config_flags%l_stability_correct_Kh_N2_zm, & ! intent(in)
+                            clubb_config_flags%l_godunov_upwind_wpxp_ta,     & ! intent(in)
                             clubb_config_flags%l_upwind_wpxp_ta,             & ! intent(in)
                             clubb_config_flags%l_upwind_xm_ma,               & ! intent(in)
                             clubb_config_flags%l_uv_nudge,                   & ! intent(in)
@@ -1581,6 +1618,7 @@ module advance_clubb_core_module
                              clubb_config_flags%l_predict_upwp_vpwp,    & ! intent(in)
                              clubb_config_flags%l_min_xp2_from_corr_wx, & ! intent(in)
                              clubb_config_flags%l_C2_cloud_frac,        & ! intent(in)
+                             clubb_config_flags%l_godunov_upwind_xpyp_ta, & ! intent(in)
                              clubb_config_flags%l_upwind_xpyp_ta,       & ! intent(in)
                              clubb_config_flags%l_single_C2_Skw,        & ! intent(in)
                              rtp2, thlp2, rtpthlp, up2, vp2,            & ! intent(inout)
@@ -1638,6 +1676,7 @@ module advance_clubb_core_module
              wprtp, wpthlp, rtp2, thlp2,                         & ! intent(in)
              clubb_config_flags%l_min_wp2_from_corr_wx,          & ! intent(in)
              clubb_config_flags%l_upwind_xm_ma,                  & ! intent(in)
+             clubb_config_flags%l_godunov_upwind_wp3_ta,         & ! intent(in)
              clubb_config_flags%l_tke_aniso,                     & ! intent(in)
              clubb_config_flags%l_standard_term_ta,              & ! intent(in)
              clubb_config_flags%l_damp_wp2_using_em,             & ! intent(in)

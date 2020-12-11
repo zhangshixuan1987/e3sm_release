@@ -2800,6 +2800,7 @@ module advance_xp2_xpyp_module
 
     use turbulent_adv_pdf, only: &
       xpyp_term_ta_pdf_lhs_all, &  ! Procedures
+      xpyp_term_ta_pdf_lhs_godunov, &
       xpyp_term_ta_pdf_rhs_all, &
       sgn_turbulent_velocity
       

@@ -605,6 +605,9 @@ module turbulent_adv_pdf
 
         implicit none
 
+        ! External
+        intrinsic :: max, min, sqrt
+
         !------------------- Input Variables -------------------
         real( kind = core_rknd ), dimension(gr%nz), intent(in) :: &
             coef_wpxpyp_implicit,     & ! Coef. of <x'y'> in <w'x'y'>; t-lev [m/s]

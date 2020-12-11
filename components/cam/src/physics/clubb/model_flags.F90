@@ -109,19 +109,6 @@ module model_flags
 
 !$omp threadprivate(saturation_formula)
 
-  logical, public :: &
-    l_smooth_wp3_on_wp2 = .true. ! Apply back and forth vertical interpolation
-  ! to smooth the calculated wp3/wp2 (wp3_on_wp2). Setting to .false. means that 
-  ! the smoothing on wp3/wp2 are turned off in advance_clubb_core.F90. Default set up is .true. 
-
-!$omp threadprivate(l_smooth_wp3_on_wp2)
-
-  logical, public :: &
-    l_smooth_brunt_vaisala_freq = .false. ! Apply back and forth vertical interpolation
-  ! to smooth the calculated brunt vaisala frequency. Default set up is .true. 
-
-!$omp threadprivate(l_smooth_brunt_vaisala_freq)
-
   logical, parameter, public :: &
     l_silhs_rad = .false.    ! Resolve radiation over subcolumns using SILHS
 
@@ -232,7 +219,10 @@ module model_flags
                                       ! rtpthlp
       l_damp_wp3_Skw_squared,       & ! Set damping on wp3 to use Skw^2 rather than Skw^4
       l_prescribed_avg_deltaz,      & ! used in adj_low_res_nu. If .true., avg_deltaz = deltaz
-      l_update_pressure               ! Flag for having CLUBB update pressure and exner
+      l_update_pressure,            & ! Flag for having CLUBB update pressure and exner
+      l_smooth_wp3_on_wp2,          & ! Flag for applying smoothing on calculated wp3/wp2
+      l_smooth_brunt_vaisala_freq     ! Flag for appling smoothing on calculated brunt vaisala frequency 
+
   end type clubb_config_flags_type
 
   contains
@@ -309,12 +299,12 @@ module model_flags
                                              l_diffuse_rtm_and_thlm, &
                                              l_stability_correct_Kh_N2_zm, &
                                              l_calc_thlp2_rad, &
-                                             l_godunov_upwind_wp3_ta,  &
-                                             l_godunov_upwind_wpxp_ta,  &
-                                             l_godunov_upwind_xpyp_ta,  &
                                              l_upwind_wpxp_ta, &
                                              l_upwind_xpyp_ta, &
                                              l_upwind_xm_ma, &
+                                             l_godunov_upwind_wp3_ta,  &
+                                             l_godunov_upwind_wpxp_ta,  &
+                                             l_godunov_upwind_xpyp_ta,  &
                                              l_uv_nudge, &
                                              l_rtm_nudge, &
                                              l_tke_aniso, &
@@ -342,7 +332,9 @@ module model_flags
                                              l_single_C2_Skw, &
                                              l_damp_wp3_Skw_squared, &
                                              l_prescribed_avg_deltaz, &
-                                             l_update_pressure )
+                                             l_update_pressure, & 
+                                             l_smooth_wp3_on_wp2, &
+                                             l_smooth_brunt_vaisala_freq )
 
 ! Description:
 !   Sets all CLUBB flags to a default setting.
@@ -450,7 +442,9 @@ module model_flags
                                       ! rtpthlp
       l_damp_wp3_Skw_squared,       & ! Set damping on wp3 to use Skw^2 rather than Skw^4
       l_prescribed_avg_deltaz,      & ! used in adj_low_res_nu. If .true., avg_deltaz = deltaz
-      l_update_pressure               ! Flag for having CLUBB update pressure and exner
+      l_update_pressure,            & ! Flag for having CLUBB update pressure and exner
+      l_smooth_wp3_on_wp2,          & ! Flag for appling smoothing on calculated wp3/wp2
+      l_smooth_brunt_vaisala_freq     ! Flag for appling smoothing on calculated brunt vaisala frequency 
 
 !-----------------------------------------------------------------------
     ! Begin code
@@ -502,6 +496,10 @@ module model_flags
 #endif
     l_update_pressure = .true.
 
+    l_smooth_wp3_on_wp2 = .true.
+
+    l_smooth_brunt_vaisala_freq = .false.
+
     return
   end subroutine set_default_clubb_config_flags
 
@@ -517,6 +515,9 @@ module model_flags
                                                  l_upwind_wpxp_ta, &
                                                  l_upwind_xpyp_ta, &
                                                  l_upwind_xm_ma, &
+                                                 l_godunov_upwind_wp3_ta, & 
+                                                 l_godunov_upwind_wpxp_ta, & 
+                                                 l_godunov_upwind_xpyp_ta, & 
                                                  l_uv_nudge, &
                                                  l_rtm_nudge, &
                                                  l_tke_aniso, &
@@ -545,6 +546,8 @@ module model_flags
                                                  l_damp_wp3_Skw_squared, &
                                                  l_prescribed_avg_deltaz, &
                                                  l_update_pressure, &
+                                                 l_smooth_wp3_on_wp2, &
+                                                 l_smooth_brunt_vaisala_freq, &
                                                  clubb_config_flags )
 
 ! Description:
@@ -653,7 +656,9 @@ module model_flags
                                       ! rtpthlp
       l_damp_wp3_Skw_squared,       & ! Set damping on wp3 to use Skw^2 rather than Skw^4
       l_prescribed_avg_deltaz,      & ! used in adj_low_res_nu. If .true., avg_deltaz = deltaz
-      l_update_pressure               ! Flag for having CLUBB update pressure and exner
+      l_update_pressure,            & ! Flag for having CLUBB update pressure and exner
+      l_smooth_wp3_on_wp2,          & ! Flag for applying smoothing on calculated wp3/wp2
+      l_smooth_brunt_vaisala_freq     ! Flag for appling smoothing on calculated brunt vaisala frequency 
 
     ! Output variables
     type(clubb_config_flags_type), intent(out) :: &
@@ -704,6 +709,8 @@ module model_flags
     clubb_config_flags%l_damp_wp3_Skw_squared = l_damp_wp3_Skw_squared
     clubb_config_flags%l_prescribed_avg_deltaz = l_prescribed_avg_deltaz
     clubb_config_flags%l_update_pressure = l_update_pressure
+    clubb_config_flags%l_smooth_wp3_on_wp2 = l_smooth_wp3_on_wp2
+    clubb_config_flags%l_smooth_brunt_vaisala_freq = l_smooth_brunt_vaisala_freq
 
     return
   end subroutine initialize_clubb_config_flags_type
@@ -774,7 +781,8 @@ module model_flags
     write(iunit,*) "l_damp_wp3_Skw_squared = ", clubb_config_flags%l_damp_wp3_Skw_squared
     write(iunit,*) "l_prescribed_avg_deltaz = ", clubb_config_flags%l_prescribed_avg_deltaz
     write(iunit,*) "l_update_pressure = ", clubb_config_flags%l_update_pressure
-
+    write(iunit,*) "l_smooth_wp3_on_wp2 = ", clubb_config_flags%l_smooth_wp3_on_wp2
+    write(iunit,*) "l_smooth_brunt_vaisala_freq = ", clubb_config_flags%l_smooth_brunt_vaisala_freq
     return
   end subroutine print_clubb_config_flags
 

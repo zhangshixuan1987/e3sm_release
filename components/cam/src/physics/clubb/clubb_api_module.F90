@@ -2533,6 +2533,9 @@ contains
                                                  l_upwind_wpxp_ta, & ! Out
                                                  l_upwind_xpyp_ta, & ! Out
                                                  l_upwind_xm_ma, & ! Out
+                                                 l_godunov_upwind_wp3_ta,  & ! Out 
+                                                 l_godunov_upwind_wpxp_ta,  & ! Out 
+                                                 l_godunov_upwind_xpyp_ta,  & ! Out 
                                                  l_uv_nudge, & ! Out
                                                  l_rtm_nudge, & ! Out
                                                  l_tke_aniso, & ! Out
@@ -2560,7 +2563,9 @@ contains
                                                  l_single_C2_Skw, & ! Out
                                                  l_damp_wp3_Skw_squared, & ! Out
                                                  l_prescribed_avg_deltaz, & ! Out
-                                                 l_update_pressure ) ! Out
+                                                 l_update_pressure, & ! Out
+                                                 l_smooth_wp3_on_wp2, & ! Out 
+                                                 l_smooth_brunt_vaisala_freq ) ! Out
 
     use model_flags, only: &
       set_default_clubb_config_flags  ! Procedure
@@ -2604,6 +2609,15 @@ contains
                                       ! differencing approximation rather than a centered
                                       ! differencing for turbulent or mean advection terms. It
                                       ! affects rtm, thlm, sclrm, um and vm.
+      l_godunov_upwind_wp3_ta,      & ! This flag determines whether we want to use a Godunov-like upwind
+                                      ! differencing approximation rather than a centered differencing for 
+                                      ! turbulent advection terms. It affects wp3.
+      l_godunov_upwind_wpxp_ta,     & ! This flag determines whether we want to use a Godunov-like upwind
+                                      ! differencing approximation rather than a centered differencing for 
+                                      ! turbulent advection terms. It affects wpxp.
+      l_godunov_upwind_xpyp_ta,     & ! This flag determines whether we want to use a Godunov-like upwind
+                                      ! differencing approximation rather than a centered differencing for 
+                                      ! turbulent advection terms. It affects xpyp.
       l_uv_nudge,                   & ! For wind speed nudging.
       l_rtm_nudge,                  & ! For rtm nudging
       l_tke_aniso,                  & ! For anisotropic turbulent kinetic energy, i.e.
@@ -2655,7 +2669,9 @@ contains
                                       ! rtpthlp
       l_damp_wp3_Skw_squared,       & ! Set damping on wp3 to use Skw^2 rather than Skw^4
       l_prescribed_avg_deltaz,      & ! used in adj_low_res_nu. If .true., avg_deltaz = deltaz
-      l_update_pressure               ! Flag for having CLUBB update pressure and exner
+      l_update_pressure,            & ! Flag for having CLUBB update pressure and exner
+      l_smooth_wp3_on_wp2,          & ! Flag for applying smoothing on calculated wp3/wp2
+      l_smooth_brunt_vaisala_freq     ! Flag for appling smoothing on calculated brunt vaisala frequency 
 
     call set_default_clubb_config_flags( l_use_precip_frac, & ! Out
                                          l_predict_upwp_vpwp, & ! Out
@@ -2668,6 +2684,9 @@ contains
                                          l_upwind_wpxp_ta, & ! Out
                                          l_upwind_xpyp_ta, & ! Out
                                          l_upwind_xm_ma, & ! Out
+                                         l_godunov_upwind_wp3_ta,  & ! Out
+                                         l_godunov_upwind_wpxp_ta,  & ! Out
+                                         l_godunov_upwind_xpyp_ta,  & ! Out
                                          l_uv_nudge, & ! Out
                                          l_rtm_nudge, & ! Out
                                          l_tke_aniso, & ! Out
@@ -2695,7 +2714,9 @@ contains
                                          l_single_C2_Skw, & ! Out
                                          l_damp_wp3_Skw_squared, & ! Out
                                          l_prescribed_avg_deltaz, & ! Out
-                                         l_update_pressure ) ! Out
+                                         l_update_pressure,& ! Out
+                                         l_smooth_wp3_on_wp2, & ! Out
+                                         l_smooth_brunt_vaisala_freq) ! Out
 
   end subroutine set_default_clubb_config_flags_api
 
@@ -2713,6 +2734,9 @@ contains
                                                      l_upwind_wpxp_ta, & ! In
                                                      l_upwind_xpyp_ta, & ! In
                                                      l_upwind_xm_ma, & ! In
+                                                     l_godunov_upwind_wp3_ta,  & ! In
+                                                     l_godunov_upwind_wpxp_ta,  & ! In
+                                                     l_godunov_upwind_xpyp_ta,  & ! In
                                                      l_uv_nudge, & ! In
                                                      l_rtm_nudge, & ! In
                                                      l_tke_aniso, & ! In
@@ -2741,6 +2765,8 @@ contains
                                                      l_damp_wp3_Skw_squared, & ! In
                                                      l_prescribed_avg_deltaz, & ! In
                                                      l_update_pressure, & ! In
+                                                     l_smooth_wp3_on_wp2, & ! In
+                                                     l_smooth_brunt_vaisala_freq,  & !In
                                                      clubb_config_flags ) ! Out
 
     use model_flags, only: &
@@ -2786,6 +2812,15 @@ contains
                                       ! differencing approximation rather than a centered
                                       ! differencing for turbulent or mean advection terms. It
                                       ! affects rtm, thlm, sclrm, um and vm.
+      l_godunov_upwind_wp3_ta,      & ! This flag determines whether we want to use a Godunov-like upwind
+                                      ! differencing approximation rather than a centered differencing for 
+                                      ! turbulent advection terms. It affects wp3.
+      l_godunov_upwind_wpxp_ta,     & ! This flag determines whether we want to use a Godunov-like upwind
+                                      ! differencing approximation rather than a centered differencing for 
+                                      ! turbulent advection terms. It affects wpxp.
+      l_godunov_upwind_xpyp_ta,     & ! This flag determines whether we want to use a Godunov-like upwind
+                                      ! differencing approximation rather than a centered differencing for 
+                                      ! turbulent advection terms. It affects xpyp.
       l_uv_nudge,                   & ! For wind speed nudging.
       l_rtm_nudge,                  & ! For rtm nudging
       l_tke_aniso,                  & ! For anisotropic turbulent kinetic energy, i.e.
@@ -2837,7 +2872,9 @@ contains
                                       ! rtpthlp
       l_damp_wp3_Skw_squared,       & ! Set damping on wp3 to use Skw^2 rather than Skw^4
       l_prescribed_avg_deltaz,      & ! used in adj_low_res_nu. If .true., avg_deltaz = deltaz
-      l_update_pressure               ! Flag for having CLUBB update pressure and exner
+      l_update_pressure,            & ! Flag for having CLUBB update pressure and exner
+      l_smooth_wp3_on_wp2,          & ! Flag for applying smoothing on calculated wp3/wp2
+      l_smooth_brunt_vaisala_freq     ! Flag for appling smoothing on calculated brunt vaisala frequency 
 
     ! Output variables
     type(clubb_config_flags_type), intent(out) :: &
@@ -2854,6 +2891,9 @@ contains
                                              l_upwind_wpxp_ta, & ! In
                                              l_upwind_xpyp_ta, & ! In
                                              l_upwind_xm_ma, & ! In
+                                             l_godunov_upwind_wp3_ta,  & ! In
+                                             l_godunov_upwind_wpxp_ta,  & ! In
+                                             l_godunov_upwind_xpyp_ta,  & ! In
                                              l_uv_nudge, & ! In
                                              l_rtm_nudge, & ! In
                                              l_tke_aniso, & ! In
@@ -2882,6 +2922,8 @@ contains
                                              l_damp_wp3_Skw_squared, & ! In
                                              l_prescribed_avg_deltaz, & ! In
                                              l_update_pressure, & ! In
+                                             l_smooth_wp3_on_wp2, & ! In
+                                             l_smooth_brunt_vaisala_freq,  & !In
                                              clubb_config_flags ) ! Out
 
   end subroutine initialize_clubb_config_flags_type_api

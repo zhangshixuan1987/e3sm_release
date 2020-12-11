@@ -69,6 +69,7 @@ module advance_wp2_wp3_module
                               wprtp, wpthlp, rtp2, thlp2,              & ! In
                               l_min_wp2_from_corr_wx,                  & ! In
                               l_upwind_xm_ma,                          & ! In
+                              l_godunov_upwind_wp3_ta,                 & ! In 
                               l_tke_aniso,                             & ! In
                               l_standard_term_ta,                      & ! In
                               l_damp_wp2_using_em,                     & ! In
@@ -366,6 +367,7 @@ module advance_wp2_wp3_module
                      l_min_wp2_from_corr_wx,                & ! Intent(in)
                      l_upwind_xm_ma,                        & ! Intent(in)
                      l_tke_aniso,                           & ! Intent(in)
+                     l_godunov_upwind_wp3_ta,               & ! Intent(in) 
                      l_standard_term_ta,                    & ! Intent(in)
                      l_damp_wp2_using_em,                   & ! Intent(in)
                      l_damp_wp3_Skw_squared,                & ! Intent(in)
@@ -476,6 +478,7 @@ module advance_wp2_wp3_module
                          l_min_wp2_from_corr_wx,                & ! Intent(in)
                          l_upwind_xm_ma,                        & ! Intent(in)
                          l_tke_aniso,                           & ! Intent(in)
+                         l_godunov_upwind_wp3_ta,               & ! Intent(in)
                          l_standard_term_ta,                    & ! Intent(in)
                          l_damp_wp2_using_em,                   & ! Intent(in)
                          l_damp_wp3_Skw_squared,                & ! Intent(in)
@@ -668,6 +671,10 @@ module advance_wp2_wp3_module
                                 ! differencing approximation rather than a centered differencing
                                 ! for turbulent or mean advection terms. It affects rtm, thlm,
                                 ! sclrm, um and vm.
+      l_godunov_upwind_wp3_ta,& ! This flag determines whether we want to use an upwind
+                                ! differencing approximation rather than a centered
+                                ! differencing for turbulent advection terms. It
+                                ! affects wp3 and wp2.
       l_tke_aniso,            & ! For anisotropic turbulent kinetic energy, i.e. TKE = 1/2
                                 ! (u'^2 + v'^2 + w'^2)
       l_standard_term_ta,     & ! Use the standard discretization for the turbulent advection
@@ -788,6 +795,7 @@ module advance_wp2_wp3_module
                    thv_ds_zm, thv_ds_zt, wp2_splat, wp3_splat, &               ! intent(in)
                    l_crank_nich_diff, &                                        ! intent(in)
                    l_tke_aniso, &                                              ! intent(in)
+                   l_godunov_upwind_wp3_ta, &                                  ! intent(in)
                    l_standard_term_ta, &                                       ! intent(in)
                    l_damp_wp2_using_em, &                                      ! intent(in)
                    l_damp_wp3_Skw_squared, &                                   ! intent(in)
@@ -806,6 +814,7 @@ module advance_wp2_wp3_module
                    invrs_rho_ds_zm, invrs_rho_ds_zt, l_crank_nich_diff, &
                    l_upwind_xm_ma, &
                    l_tke_aniso, &
+                   l_godunov_upwind_wp3_ta, &
                    l_standard_term_ta, &
                    l_damp_wp3_Skw_squared, &
                    lhs, wp3_pr3_lhs )
@@ -1120,6 +1129,7 @@ module advance_wp2_wp3_module
                        invrs_rho_ds_zm, invrs_rho_ds_zt, l_crank_nich_diff, &
                        l_upwind_xm_ma, &
                        l_tke_aniso, &
+                       l_godunov_upwind_wp3_ta, &
                        l_standard_term_ta, &
                        l_damp_wp3_Skw_squared, &
                        lhs, wp3_pr3_lhs )
@@ -1285,6 +1295,10 @@ module advance_wp2_wp3_module
                                 ! sclrm, um and vm.
       l_tke_aniso,            & ! For anisotropic turbulent kinetic energy, i.e. TKE = 1/2
                                 ! (u'^2 + v'^2 + w'^2)
+      l_godunov_upwind_wp3_ta,& ! This flag determines whether we want to use an upwind
+                                ! differencing approximation rather than a centered
+                                ! differencing for turbulent advection terms. It
+                                ! affects wp3 and wp2.
       l_standard_term_ta,     & ! Use the standard discretization for the turbulent advection
                                 ! terms. Setting to .false. means that a_1 and a_3 are pulled
                                 ! outside of the derivative in advance_wp2_wp3_module.F90 and in
@@ -1569,6 +1583,7 @@ module advance_wp2_wp3_module
                                            rho_ds_zm(:), &
                                            invrs_rho_ds_zt(:), &
                                            gr%invrs_dzt(:), &
+                                           l_godunov_upwind_wp3_ta, &
                                            l_standard_term_ta, &
                                            wp3_term_ta_lhs_result(:,:) )
 
@@ -1762,6 +1777,7 @@ module advance_wp2_wp3_module
                        thv_ds_zm, thv_ds_zt, wp2_splat, wp3_splat, & 
                        l_crank_nich_diff, &
                        l_tke_aniso, &
+                       l_godunov_upwind_wp3_ta, &
                        l_standard_term_ta, &
                        l_damp_wp2_using_em, &
                        l_damp_wp3_Skw_squared, &
@@ -1902,6 +1918,10 @@ module advance_wp2_wp3_module
     logical, intent(in) :: &
       l_tke_aniso,         & ! For anisotropic turbulent kinetic energy, i.e. TKE = 1/2
                              ! (u'^2 + v'^2 + w'^2)
+      l_godunov_upwind_wp3_ta,& ! This flag determines whether we want to use an upwind
+                                ! differencing approximation rather than a centered
+                                ! differencing for turbulent advection terms. It
+                                ! affects wp3 and wp2.
       l_standard_term_ta,  & ! Use the standard discretization for the turbulent advection terms.
                              ! Setting to .false. means that a_1 and a_3 are pulled outside of the
                              ! derivative in advance_wp2_wp3_module.F90 and in
@@ -2185,6 +2205,7 @@ module advance_wp2_wp3_module
                                            rho_ds_zm(:), &
                                            invrs_rho_ds_zt(:), &
                                            gr%invrs_dzt(:), &
+                                           l_godunov_upwind_wp3_ta, &
                                            l_standard_term_ta, &
                                            wp3_term_ta_lhs_result(:,:) )
             ! Add terms
@@ -3691,6 +3712,7 @@ module advance_wp2_wp3_module
                                       rho_ds_zm, rho_ds_zmm1, &
                                       invrs_rho_ds_zt, &
                                       invrs_dzt, level, &
+                                      l_godunov_upwind_wp3_ta, &
                                       l_standard_term_ta ) &
   result( lhs )
 
@@ -3822,6 +3844,12 @@ module advance_wp2_wp3_module
       level ! Central thermodynamic level (on which calculation occurs).
 
     logical, intent(in) :: &
+      l_godunov_upwind_wp3_ta    ! This flag determines whether we want to use an upwind
+                         ! differencing approximation rather than a centered
+                         ! differencing for turbulent advection terms. It
+                         ! affects wp3 and wp2.
+
+    logical, intent(in) :: &
       l_standard_term_ta ! Use the standard discretization for the turbulent advection terms.
                          ! Setting to .false. means that a_1 and a_3 are pulled outside of the
                          ! derivative in advance_wp2_wp3_module.F90 and in
@@ -3844,11 +3872,48 @@ module advance_wp2_wp3_module
     ! and thermodynamic level (k-1).
     mkm1 = level - 1
 
+    if ( l_godunov_upwind_wp3_ta ) then
+
+      ! When using scalar, linear Godunov ("upwinding") discretization for
+      ! wp3_ta terms, the thermodynamic terms are unaffected by the 
+      ! l_standard_term_ta flag
+
+      ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
+      lhs(kp1_tdiag) &
+      = + invrs_rho_ds_zt &
+          * invrs_dzt &
+            * rho_ds_ztp1 * min(zero, a1 * wp3_on_wp2)
+
+      ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
+      lhs(k_tdiag) &
+      = + invrs_rho_ds_zt &
+          * invrs_dzt &
+            * rho_ds_zt * ( max(zero, a1 * wp3_on_wp2) -  &
+                            min(zero, a1m1 * wp3_on_wp2_m1) )
+
+      ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
+      lhs(km1_tdiag) &
+      = - invrs_rho_ds_zt &
+          * invrs_dzt &
+            * rho_ds_ztm1 * max(zero, a1m1 * wp3_on_wp2_m1)
+    end if
+
     if ( l_standard_term_ta ) then
 
        ! The turbulent advection term is discretized normally, in accordance
        ! with the model equations found in the documentation and the description
        ! listed above.
+
+       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
+       lhs(k_mdiag) &
+       = + invrs_rho_ds_zt * invrs_dzt * rho_ds_zm * a3 * wp2
+
+
+       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+       lhs(km1_mdiag) &
+       = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
+
+      if(.not.l_godunov_upwind_wp3_ta)then
 
        ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
        lhs(kp1_tdiag) &
@@ -3856,10 +3921,6 @@ module advance_wp2_wp3_module
            * invrs_dzt &
              * rho_ds_zm * a1 * wp3_on_wp2 &
              * gr%weights_zt2zm(t_above,mk)
-
-       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
-       lhs(k_mdiag) &
-       = + invrs_rho_ds_zt * invrs_dzt * rho_ds_zm * a3 * wp2
 
        ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
        lhs(k_tdiag) &
@@ -3871,16 +3932,13 @@ module advance_wp2_wp3_module
                    * gr%weights_zt2zm(t_above,mkm1) &
                )
 
-       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-       lhs(km1_mdiag) &
-       = - invrs_rho_ds_zt * invrs_dzt * rho_ds_zmm1 * a3m1 * wp2m1
-
        ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
        lhs(km1_tdiag) &
        = - invrs_rho_ds_zt &
            * invrs_dzt &
              * rho_ds_zmm1 * a1m1 * wp3_on_wp2_m1 &
              * gr%weights_zt2zm(t_below,mkm1)
+     end if
 
     else
 
@@ -3900,16 +3958,22 @@ module advance_wp2_wp3_module
        ! the momentum superdiagonal (k_mdiag) and the momentum subdiagonal
        ! (km1_mdiag).
 
+       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
+       lhs(k_mdiag) &
+       = + invrs_rho_ds_zt * a3_zt * invrs_dzt * rho_ds_zm * wp2
+
+       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+       lhs(km1_mdiag) &
+       = - invrs_rho_ds_zt * a3_zt * invrs_dzt * rho_ds_zmm1 * wp2m1
+
+      if ( .not. l_godunov_upwind_wp3_ta ) then
+
        ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
        lhs(kp1_tdiag) &
        = + invrs_rho_ds_zt &
            * a1_zt * invrs_dzt &
              * rho_ds_zm * wp3_on_wp2 &
              * gr%weights_zt2zm(t_above,mk)
-
-       ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
-       lhs(k_mdiag) &
-       = + invrs_rho_ds_zt * a3_zt * invrs_dzt * rho_ds_zm * wp2
 
        ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
        lhs(k_tdiag) &
@@ -3921,16 +3985,14 @@ module advance_wp2_wp3_module
                    * gr%weights_zt2zm(t_above,mkm1) & 
                )
 
-       ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-       lhs(km1_mdiag) &
-       = - invrs_rho_ds_zt * a3_zt * invrs_dzt * rho_ds_zmm1 * wp2m1
-
        ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
        lhs(km1_tdiag) &
        = - invrs_rho_ds_zt &
            * a1_zt * invrs_dzt &
              * rho_ds_zmm1 * wp3_on_wp2_m1 & 
              * gr%weights_zt2zm(t_below,mkm1)
+
+      end if
 
        ! End of code that pulls out a3.
        ! End of Brian's a1 change.  Feb. 14, 2008.
@@ -3950,6 +4012,7 @@ module advance_wp2_wp3_module
                                               rho_ds_zm, &
                                               invrs_rho_ds_zt, &
                                               invrs_dzt, &
+                                              l_godunov_upwind_wp3_ta, &
                                               l_standard_term_ta, &
                                               lhs_ta_wp3 )
     ! Description:
@@ -3981,6 +4044,12 @@ module advance_wp2_wp3_module
           invrs_dzt          ! Inverse of grid spacing (k)                 [1/m]
 
         logical, intent(in) :: &
+          l_godunov_upwind_wp3_ta    ! This flag determines whether we want to use an upwind
+                             ! differencing approximation rather than a centered
+                             ! differencing for turbulent advection terms. It
+                             ! affects wp3 and wp2.
+
+        logical, intent(in) :: &
           l_standard_term_ta ! Use the standard discretization for the turbulent advection terms.
                              ! Setting to .false. means that a_1 and a_3 are pulled outside of the
                              ! derivative in advance_wp2_wp3_module.F90 and in
@@ -3996,17 +4065,53 @@ module advance_wp2_wp3_module
         lhs_ta_wp3(:,1) = 0.0_core_rknd
 
 
+        if ( l_godunov_upwind_wp3_ta ) then
+
+          ! When using scalar, linear Godunov ("upwinding") discretization for
+          ! wp3_ta terms, the thermodynamic terms are unaffected by the 
+          ! l_standard_term_ta flag
+
+          do k = 2, gr%nz-1
+
+            ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
+            lhs_ta_wp3(1,k) = + invrs_rho_ds_zt(k) * invrs_dzt(k) * rho_ds_zt(k+1) &
+                              * min(zero, a1(k) * wp3_on_wp2(k))
+
+            ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
+            lhs_ta_wp3(3,k) = + invrs_rho_ds_zt(k) * invrs_dzt(k) * rho_ds_zt(k)
+&
+                                  * ( max(zero, a1(k) * wp3_on_wp2(k)) - &
+                                      min(zero, a1(k-1) * wp3_on_wp2(k-1)) )
+
+            ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
+            lhs_ta_wp3(5,k) = - invrs_rho_ds_zt(k) * invrs_dzt(k) * rho_ds_zt(k-1) &
+                              * max(zero, a1(k-1) * wp3_on_wp2(k-1))
+
+          end do
+
+        end if
+
         if ( l_standard_term_ta ) then
 
             do k = 2, gr%nz-1
 
-                ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
-                lhs_ta_wp3(1,k) = + invrs_rho_ds_zt(k) * invrs_dzt(k) * rho_ds_zm(k) &
-                                  * a1(k) * wp3_on_wp2(k) * gr%weights_zt2zm(1,k)
-
                 ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
                 lhs_ta_wp3(2,k) = + invrs_rho_ds_zt(k) * invrs_dzt(k) &
                                   * rho_ds_zm(k) * a3(k) * wp2(k)
+
+                ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+                lhs_ta_wp3(4,k) = - invrs_rho_ds_zt(k) * invrs_dzt(k) &
+                                  * rho_ds_zm(k-1) * a3(k-1) * wp2(k-1)
+
+            end do
+
+            if(.not.l_godunov_upwind_wp3_ta)then
+
+              do k = 2, gr%nz-1
+
+                ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
+                lhs_ta_wp3(1,k) = + invrs_rho_ds_zt(k) * invrs_dzt(k) * rho_ds_zm(k) &
+                                  * a1(k) * wp3_on_wp2(k) * gr%weights_zt2zm(1,k)
 
                 ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
                 lhs_ta_wp3(3,k) = + invrs_rho_ds_zt(k) * invrs_dzt(k) * ( rho_ds_zm(k) &
@@ -4014,42 +4119,48 @@ module advance_wp2_wp3_module
                                       - rho_ds_zm(k-1) * a1(k-1) * wp3_on_wp2(k-1) &
                                       * gr%weights_zt2zm(1,k-1) )
 
-                ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-                lhs_ta_wp3(4,k) = - invrs_rho_ds_zt(k) * invrs_dzt(k) &
-                                  * rho_ds_zm(k-1) * a3(k-1) * wp2(k-1)
-
                 ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
                 lhs_ta_wp3(5,k) = - invrs_rho_ds_zt(k) * invrs_dzt(k) * rho_ds_zm(k-1) &
                                   * a1(k-1) * wp3_on_wp2(k-1) * gr%weights_zt2zm(2,k-1)
 
-            end do
+              end do
+
+            end if
 
         else
 
             do k = 2, gr%nz-1
 
-                ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
-                lhs_ta_wp3(1,k) = + invrs_rho_ds_zt(k) * a1_zt(k) * invrs_dzt(k) &
-                                  * rho_ds_zm(k) * wp3_on_wp2(k) * gr%weights_zt2zm(1,k)
-
                 ! Momentum superdiagonal: [ x wp2(k,<t+1>) ]
                 lhs_ta_wp3(2,k) = + invrs_rho_ds_zt(k) * a3_zt(k) * invrs_dzt(k) &
                                   * rho_ds_zm(k) * wp2(k)
+
+                ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
+                lhs_ta_wp3(4,k) = - invrs_rho_ds_zt(k) * a3_zt(k) * invrs_dzt(k) &
+                                  * rho_ds_zm(k-1) * wp2(k-1)
+
+            end do
+
+            if ( .not. l_godunov_upwind_wp3_ta ) then
+
+             do k = 2, gr%nz-1
+
+                ! Thermodynamic superdiagonal: [ x wp3(k+1,<t+1>) ]
+                lhs_ta_wp3(1,k) = + invrs_rho_ds_zt(k) * a1_zt(k) * invrs_dzt(k) &
+                                  * rho_ds_zm(k) * wp3_on_wp2(k) * gr%weights_zt2zm(1,k)
 
                 ! Thermodynamic main diagonal: [ x wp3(k,<t+1>) ]
                 lhs_ta_wp3(3,k) = + invrs_rho_ds_zt(k) * a1_zt(k) * invrs_dzt(k) & 
                                   * ( rho_ds_zm(k) * wp3_on_wp2(k) * gr%weights_zt2zm(2,k) &
                                     - rho_ds_zm(k-1) * wp3_on_wp2(k-1) * gr%weights_zt2zm(1,k-1) )
 
-                ! Momentum subdiagonal: [ x wp2(k-1,<t+1>) ]
-                lhs_ta_wp3(4,k) = - invrs_rho_ds_zt(k) * a3_zt(k) * invrs_dzt(k) &
-                                  * rho_ds_zm(k-1) * wp2(k-1)
-
                 ! Thermodynamic subdiagonal: [ x wp3(k-1,<t+1>) ]
                 lhs_ta_wp3(5,k) = - invrs_rho_ds_zt(k) * a1_zt(k) * invrs_dzt(k) &
                                   * rho_ds_zm(k-1) * wp3_on_wp2(k-1) * gr%weights_zt2zm(2,k-1)
 
-            end do
+             end do
+
+            end if
 
 
         end if ! l_standard_term_ta

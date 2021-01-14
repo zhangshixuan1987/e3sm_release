@@ -753,7 +753,7 @@ module advance_clubb_core_module
        brunt_vaisala_freq_sqd,       & ! Buoyancy frequency squared, N^2              [s^-2]
        brunt_vaisala_freq_sqd_smth,  & ! smoothed Buoyancy frequency squared, N^2     [s^-2]
        brunt_freq_pos,               & ! 
-       brunt_freq_nosmooth,          & ! 
+       brunt_freq_pos_smth,          & ! 
        brunt_vaisala_freq_sqd_mixed, & ! A mixture of dry and moist N^2
        brunt_vaisala_freq_sqd_dry,   & ! dry N^2
        brunt_vaisala_freq_sqd_moist, & ! moist N^2
@@ -1204,34 +1204,27 @@ module advance_clubb_core_module
 !           and thereby allows tau to remain large in Sc layers in which thlm may
 !           be slightly stably stratified.
 
-       if (clubb_config_flags%l_smooth_brunt_vaisala_freq) then
+        brunt_vaisala_freq_sqd  = min( brunt_vaisala_freq_sqd, 1.e8_core_rknd * abs(brunt_vaisala_freq_sqd)**3 )
 
-          brunt_vaisala_freq_sqd_smth = &
-                min( brunt_vaisala_freq_sqd, 1.e8_core_rknd * abs(brunt_vaisala_freq_sqd)**3 )
+        if (clubb_config_flags%l_smooth_brunt_vaisala_freq) then
 
-          brunt_freq_nosmooth = sqrt( max(zero_threshold, brunt_vaisala_freq_sqd_smth) )
-          brunt_freq_pos      = zt2zm( zm2zt( brunt_freq_nosmooth ))
+          brunt_freq_pos                = sqrt( max( zero_threshold, brunt_vaisala_freq_sqd ) )
 
-          Ri_zm = sqrt(max(1e-7,brunt_freq_pos**2)/max((ddzt(um)**2+ddzt(vm)**2),1e-7))
+          brunt_freq_pos_smth           = zt2zm( zm2zt( brunt_freq_pos ) )
 
-          brunt_freq_out_cloud = brunt_freq_pos &
-                 * min(one, max(zero_threshold,&
-                 one - ( (zt2zm(ice_supersat_frac) / 0.007_core_rknd) )))
+          brunt_vaisala_freq_sqd_smth   = brunt_freq_pos_smth**2
 
-          where ( gr%zt < alt_thresh )
-             brunt_freq_out_cloud =0.0
-          end where
+        else 
 
-       else 
+          brunt_vaisala_freq_sqd_smth = zt2zm( zm2zt( brunt_vaisala_freq_sqd) )
 
-        brunt_vaisala_freq_sqd_smth = zt2zm( zm2zt( &
-              min( brunt_vaisala_freq_sqd, 1.e8_core_rknd * abs(brunt_vaisala_freq_sqd)**3 ) ) )
+          brunt_freq_pos_smth = sqrt( max( zero_threshold, brunt_vaisala_freq_sqd_smth ) )
+
+        end if 
 
         Ri_zm = sqrt(max(1e-7,brunt_vaisala_freq_sqd_smth)/max((ddzt(um)**2+ddzt(vm)**2),1e-7))
 
-        brunt_freq_pos = sqrt( max( zero_threshold, brunt_vaisala_freq_sqd_smth ) )
-
-        brunt_freq_out_cloud =  brunt_freq_pos &
+        brunt_freq_out_cloud =  brunt_freq_pos_smth &
               * min(one, max(zero_threshold,&
               one - ( (zt2zm(ice_supersat_frac) / 0.007_core_rknd) )))
 
@@ -1239,16 +1232,14 @@ module advance_clubb_core_module
            brunt_freq_out_cloud =0.0
         end where
 
-       end if
-
         invrs_tau_zm = invrs_tau_no_N2_zm & 
-              + C_invrs_tau_N2 * brunt_freq_pos !* (1.0-5.0* cloud_frac*(1.0-cloud_frac)**4 )
+              + C_invrs_tau_N2 * brunt_freq_pos_smth !* (1.0-5.0* cloud_frac*(1.0-cloud_frac)**4 )
 
         invrs_tau_wp2_zm = invrs_tau_no_N2_zm &
-              + C_invrs_tau_N2_wp2 * brunt_freq_pos  
+              + C_invrs_tau_N2_wp2 * brunt_freq_pos_smth  
 
         invrs_tau_xp2_zm =   invrs_tau_bkgnd  + invrs_tau_sfc + invrs_tau_shear & 
-              + C_invrs_tau_N2_xp2 * brunt_freq_pos & ! 0 
+              + C_invrs_tau_N2_xp2 * brunt_freq_pos_smth & ! 0 
               + C_invrs_tau_sfc *2 * sqrt(em)/(gr%zm - sfc_elevation + z_displace)  ! small
 
 !        where( gr%zt > alt_thresh) 
